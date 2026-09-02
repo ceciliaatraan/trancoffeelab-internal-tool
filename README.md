@@ -83,6 +83,42 @@ Endast adresser i `ALLOWED_ADMIN_EMAILS` (och ev. `ALLOWED_GOOGLE_HD`) får en
 session — spärren sitter server-side i `signIn`-callbacken i `src/auth.ts`,
 inte bara i UI:t. Nekade försök loggas i `audit_log`.
 
+## Testa mot Kustom playground
+
+Den här utvecklingsmiljön (sandboxen Claude byggde i) kan inte nå
+`api.kustom.co`/`docs.kustom.co` alls — nätverksåtkomst dit är blockerad av
+miljöns egress-policy. Inget i koden har därför kunnat köras mot en riktig
+Kustom-miljö, bara verifierats mot en riktig lokal Postgres och med mockade
+HTTP-svar i enhetstesterna. Kör det här steget själva, lokalt, där ni har
+vanlig internetåtkomst.
+
+1. Skaffa ett playground-konto/testnycklar hos Kustom om ni inte redan har
+   det (merchant-ID + en `kco_test_api_...`-nyckel).
+2. Kör det fristående testscriptet — det använder samma payload-byggare och
+   auth-header-logik som appen, men gör själva HTTP-anropet direkt (kräver
+   ingen databas, ingen `.env.local`, bara Node och de här två variablerna):
+
+   ```bash
+   KUSTOM_API_BASE_URL=https://api.playground.kustom.co \
+   KUSTOM_API_KEY=kco_test_api_... \
+   pnpm test:kustom
+   ```
+
+   Lägg till `KUSTOM_BASIC_AUTH_USERNAME=...` om er nyckel kräver det andra
+   Basic-auth-formatet (se `docs/kustom.md`).
+
+3. Scriptet skriver ut hela svaret från `POST /checkout/v3/orders` och
+   talar om ifall `order_id`/`id` och `html_snippet` hittades. Skicka
+   gärna hela utskriften hit — den löser flera av de öppna punkterna i
+   `docs/kustom.md` (exakt fältnamn för order-id, om `html_snippet` finns
+   kvar efter att en order lästs igen, m.m.).
+4. För att testa hela flödet (kundvagn → checkout-iframe → betalning med
+   Kustoms testkort → push → order i databasen) behöver appen köras någonstans
+   Kustom kan nå — antingen en Vercel-preview av den här branchen, eller
+   dev-servern lokalt bakom en tunnel (t.ex. ngrok). Då kan `/api/kustom/push`
+   och `/api/kustom/validate` faktiskt anropas av Kustom på riktigt. Säg till
+   om ni vill ha hjälp att sätta upp det.
+
 ## Byta från playground till live (Kustom)
 
 Sätt i Vercels miljövariabler (produktionsmiljön):
