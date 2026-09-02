@@ -105,10 +105,14 @@ Projektet byggs i faser, med avstämning efter varje fas:
 
 1. **Repo, Next.js, Tailwind, Supabase-schema, Google-inloggning** — klar.
 2. **Produkter, lager, bilder, publika produkt-endpoints** — klar.
-3. Kustom-klient, checkout-session, push/validate-endpoints, ordermodell.
+3. **Kustom-klient (create/read/update order), checkout-session,
+   cart/validate, /api/kustom/validate** — klar. **/api/kustom/push och
+   Order Management (capture/refund/cancel) väntar** på Kustoms
+   Order Management API-referens — se docs/kustom.md.
 4. Orderhantering: capture, refund, cancel, frakt, e-post.
 5. Rabattkoder, dashboard-statistik, loggvyer, GDPR-export.
 
 Se `docs/branding.md` för öppna punkter kring varumärkesprofilen (bl.a.
 spacing/typsteg/brytpunkter som inte kunnat läsas av trancoffeelab.com än,
-och den riktiga logotyp-SVG:n som saknas).
+och den riktiga logotyp-SVG:n som saknas) och `docs/kustom.md` för exakt
+vilka Kustom-fält/statusvärden som är bekräftade kontra overifierade.
