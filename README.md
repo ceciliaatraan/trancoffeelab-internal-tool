@@ -45,6 +45,10 @@ pnpm db:generate   # generera SQL från src/db/schema (bara vid schemaändring)
 pnpm db:migrate    # applicera migrationer i drizzle/ mot DATABASE_URL
 ```
 
+Skapa en Storage-bucket i Supabase Dashboard (Storage → New bucket) som
+heter **`product-images`** med publik läsbehörighet — produktbilder laddas
+upp dit av `src/lib/supabase.ts`.
+
 Starta dev-servern:
 
 ```bash
@@ -100,7 +104,7 @@ playground med Kustoms testkort (fas 3).
 Projektet byggs i faser, med avstämning efter varje fas:
 
 1. **Repo, Next.js, Tailwind, Supabase-schema, Google-inloggning** — klar.
-2. Produkter, lager, bilder, publika produkt-endpoints.
+2. **Produkter, lager, bilder, publika produkt-endpoints** — klar.
 3. Kustom-klient, checkout-session, push/validate-endpoints, ordermodell.
 4. Orderhantering: capture, refund, cancel, frakt, e-post.
 5. Rabattkoder, dashboard-statistik, loggvyer, GDPR-export.
