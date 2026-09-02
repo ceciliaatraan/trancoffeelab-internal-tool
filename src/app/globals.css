@@ -1,0 +1,97 @@
+@import "tailwindcss";
+
+/*
+ * TRAN Coffee Lab — brand tokens.
+ * Källa: grafisk profil (facit för färg/typsnitt/logotyp) + docs/branding.md.
+ * Spacing- och typsteg nedan är ANTAGNA i väntan på avläsning av
+ * trancoffeelab.com — se docs/branding.md "Avvikelser att bekräfta".
+ */
+
+@font-face {
+  font-family: "Bulky";
+  src: url("/fonts/Bulky.ttf") format("truetype");
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* Varumärkesfärger — de enda som finns. */
+  --tran-white: #ffffff;
+  --tran-black: #000000;
+  --tran-red: #eb1c24;
+  --tran-blue: #205fac;
+
+  /* Neutraler härledda som opacitet på svart, inte egna gråtoner. */
+  --tran-hairline: rgba(0, 0, 0, 0.12);
+  --tran-hairline-strong: rgba(0, 0, 0, 0.24);
+  --tran-muted: rgba(0, 0, 0, 0.55);
+  --tran-faint: rgba(0, 0, 0, 0.35);
+
+  /* Kaffesorternas färgkodning. */
+  --tran-horse: #eb1c24;
+  --tran-dragon: #000000;
+  --tran-tiger: #205fac;
+
+  /* Typografi. */
+  --font-display: "Bulky", ui-sans-serif, system-ui, sans-serif;
+  --font-body: var(--font-space-grotesk), "Space Grotesk", ui-sans-serif,
+    system-ui, sans-serif;
+
+  --background: var(--tran-white);
+  --foreground: var(--tran-black);
+}
+
+@theme inline {
+  --color-tran-white: var(--tran-white);
+  --color-tran-black: var(--tran-black);
+  --color-tran-red: var(--tran-red);
+  --color-tran-blue: var(--tran-blue);
+
+  --color-tran-hairline: var(--tran-hairline);
+  --color-tran-hairline-strong: var(--tran-hairline-strong);
+  --color-tran-muted: var(--tran-muted);
+  --color-tran-faint: var(--tran-faint);
+
+  --color-tran-horse: var(--tran-horse);
+  --color-tran-dragon: var(--tran-dragon);
+  --color-tran-tiger: var(--tran-tiger);
+
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --font-display: var(--font-display);
+  --font-body: var(--font-body);
+
+  /* Border-radius 0 rakt igenom — hairline-rutnätet har inga rundade hörn. */
+  --radius-none: 0px;
+  --radius-sm: 0px;
+  --radius-md: 0px;
+  --radius-lg: 0px;
+  --radius-xl: 0px;
+  --radius-2xl: 0px;
+  --radius-full: 0px;
+}
+
+/*
+ * TRAN är ett fast varumärke, inte en systemtema-anpassad UI — vi följer
+ * INTE prefers-color-scheme. Vitt/svart/rött/blått gäller oavsett
+ * besökarens systeminställning.
+ */
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: var(--font-body);
+}
+
+/* Versala etiketter: nav, kolumnrubriker, metadata. */
+.tran-label {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-weight: 500;
+}
+
+/* Siffror i tabeller ska aldrig hoppa i bredd. */
+.tran-tabular {
+  font-variant-numeric: tabular-nums;
+}
