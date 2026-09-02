@@ -1,10 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   KustomApiError,
+  acknowledgeOrder,
+  cancelOrder,
+  captureOrder,
   createOrder,
   extractHtmlSnippet,
   extractOrderId,
+  getOrderManagementOrder,
   readOrder,
+  refundOrder,
   updateOrder,
 } from "./client";
 
@@ -130,6 +135,71 @@ describe("readOrder / updateOrder", () => {
     await readOrder("has space/slash");
     const [url] = fetchMock.mock.calls[0];
     expect(url).toContain(encodeURIComponent("has space/slash"));
+  });
+});
+
+describe("Order Management", () => {
+  it("GET:ar /ordermanagement/v1/orders/{order_id}", async () => {
+    const fetchMock = mockFetchOnce(200, { order_id: "abc123", status: "AUTHORIZED" });
+    await getOrderManagementOrder("abc123");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe("https://api.playground.kustom.co/ordermanagement/v1/orders/abc123");
+    expect(init.method).toBeUndefined();
+  });
+
+  it("acknowledgeOrder POSTar till /acknowledge och skickar idempotency-header", async () => {
+    const fetchMock = mockFetchOnce(204, null);
+    await acknowledgeOrder("abc123", "my-idempotency-key");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(
+      "https://api.playground.kustom.co/ordermanagement/v1/orders/abc123/acknowledge",
+    );
+    expect(init.method).toBe("POST");
+    expect(init.headers["Klarna-Idempotency-Key"]).toBe("my-idempotency-key");
+  });
+
+  it("acknowledgeOrder fungerar utan idempotency-key", async () => {
+    const fetchMock = mockFetchOnce(204, null);
+    await acknowledgeOrder("abc123");
+    const [, init] = fetchMock.mock.calls[0];
+    expect(init.headers["Klarna-Idempotency-Key"]).toBeUndefined();
+  });
+
+  it("captureOrder POSTar captured_amount till /captures", async () => {
+    const fetchMock = mockFetchOnce(201, {});
+    await captureOrder("abc123", { captured_amount: 14900 });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(
+      "https://api.playground.kustom.co/ordermanagement/v1/orders/abc123/captures",
+    );
+    expect(JSON.parse(init.body)).toEqual({ captured_amount: 14900 });
+  });
+
+  it("refundOrder POSTar refunded_amount till /refunds", async () => {
+    const fetchMock = mockFetchOnce(201, {});
+    await refundOrder("abc123", { refunded_amount: 5000 });
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(
+      "https://api.playground.kustom.co/ordermanagement/v1/orders/abc123/refunds",
+    );
+    expect(JSON.parse(init.body)).toEqual({ refunded_amount: 5000 });
+  });
+
+  it("cancelOrder POSTar till /cancel", async () => {
+    const fetchMock = mockFetchOnce(204, null);
+    await cancelOrder("abc123");
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe(
+      "https://api.playground.kustom.co/ordermanagement/v1/orders/abc123/cancel",
+    );
+    expect(init.method).toBe("POST");
+  });
+
+  it("kastar KustomApiError när Order Management svarar 403 CAPTURE_NOT_ALLOWED", async () => {
+    mockFetchOnce(403, { error_code: "CAPTURE_NOT_ALLOWED" });
+    await expect(captureOrder("abc123", { captured_amount: 100 })).rejects.toBeInstanceOf(
+      KustomApiError,
+    );
   });
 });
 
