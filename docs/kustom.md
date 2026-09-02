@@ -1,31 +1,54 @@
 # Kustom Checkout-integration
 
 Det här dokumentet listar exakt vilka fältnamn och statusvärden som är
-**bekräftade** (antingen ur AGENTS.md-specen, som räknas som facit här,
-eller ur dokumentation/OpenAPI-spec ni klistrat in från docs.kustom.co)
-kontra **overifierade**. Nätverksåtkomst till docs.kustom.co/
+**bekräftade** (ur AGENTS.md-specen, ur dokumentation/OpenAPI-spec ni
+klistrat in från docs.kustom.co, eller ur ett riktigt liveanrop mot
+playground) kontra **overifierade**. Nätverksåtkomst till docs.kustom.co/
 api.playground.kustom.co är blockerad av sandboxens egress-policy under
 utveckling (samma begränsning som för trancoffeelab.com i fas 1, se
-docs/branding.md) — därför är vissa delar fortfarande inte kunnat läsas
-av direkt, och inget i produktionskoden har kunnat testas mot en riktig
-Kustom-miljö (bara mot mockat/simulerat svar och verifierat att koden
-själv fungerar korrekt när anropet misslyckas).
+docs/branding.md) — koden har därför testats mot en riktig Kustom-miljö
+genom att NI kört `pnpm test:kustom` lokalt och skickat hit resultatet,
+inte av Claude direkt.
 
 Skriv INTE av ett antagande här som om det vore bekräftat. Allt i
 "Overifierat"-sektionen måste stämmas av innan produktion.
 
 ## Bekräftat
 
+### Live mot playground (kört av er, 2026-09-02, `pnpm test:kustom`)
+
+`POST /checkout/v3/orders` med vår riktiga payload-byggare gav ett lyckat
+svar (order skapad). Det här bekräftar:
+
+- **Auth-formatet ni har fungerar UTAN `KUSTOM_BASIC_AUTH_USERNAME`** —
+  standardformatet `base64(<nyckel>:)` (nyckeln som eget användarnamn,
+  inget lösenord) är korrekt för er nyckel. Den tidigare öppna frågan
+  om vilket av de två Basic-auth-formaten som krävs är alltså löst.
+- **Order-id-fältet i svaret heter `order_id`**, inte `id` — t.ex.
+  `"f949a813-c5b3-2b3b-ad40-04d2584eb641"`. `extractOrderId`
+  (`src/lib/kustom/client.ts`) provar `order_id` först så den fungerar
+  redan korrekt, men vi vet nu att fallbacken till `id` aldrig kommer
+  att behövas i praktiken.
+- **`html_snippet` finns i svaret** från `createOrder` (bekräftat
+  4624 tecken lång HTML/JS för Kustoms checkout-iframe).
+- **`status: "checkout_incomplete"`** (gemener) bekräftat som det
+  faktiska värdet direkt efter att en order skapats — matchar
+  AGENTS.md, inte valideringsdokumentationens versala exempel
+  (`"CHECKOUT_INCOMPLETE"`), som alltså bara var ett dokumentations-
+  exempel och inte det riktiga värdet.
+
 ### Checkout v3 API (från AGENTS.md)
 
 - Auth: HTTP Basic. Två format stöds via `buildKustomAuthHeader`
   (`src/lib/kustom/auth.ts`): `base64(<nyckel>:)` (nyckeln som eget
-  användarnamn, standard) eller `base64(<username>:<nyckel>)` när
-  `KUSTOM_BASIC_AUTH_USERNAME` är satt.
+  användarnamn, standard — **bekräftat korrekt för er nyckel, se ovan**)
+  eller `base64(<username>:<nyckel>)` när `KUSTOM_BASIC_AUTH_USERNAME`
+  är satt.
 - Base URL playground: `https://api.playground.kustom.co`. Produktion:
   `https://api.kustom.co` (bekräftat även i Order Management-specens
   `servers`-fält).
-- `createOrder`: `POST /checkout/v3/orders`
+- `createOrder`: `POST /checkout/v3/orders` — **bekräftat fungerande
+  live, se ovan.**
 - `readOrder`: `GET /checkout/v3/orders/{order_id}`
 - `updateOrder`: `POST /checkout/v3/orders/{order_id}` — går bara medan
   `status` är `checkout_incomplete`.
@@ -86,22 +109,21 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
 ## Overifierat — måste stämmas av innan produktion
 
 1. **Push-endpointens exakta HTTP-metod (GET/POST) och ev. förväntat
-   svar.** Vi antar POST (i linje med validation-callbacken).
-2. **Exakt fältnamn för order-id i checkout v3:s svar** (`createOrder`/
-   `readOrder`, INTE Order Management, som bekräftat använder
-   `order_id`). `extractOrderId` provar `order_id` sedan `id`.
-3. **Om checkout v3:s `readOrder` fortfarande returnerar `html_snippet`
-   efter att ordern slutförts.** Antas (samma resurs, samma API-yta som
-   `createOrder`) i `GET /api/public/checkout/[orderId]/confirmation`,
-   men inte separat bekräftat.
-4. **Vilket Basic-auth-format er faktiska nyckel kräver.**
-5. **Live-test mot playground.** Inget i den här listan har kunnat
-   köras mot en riktig Kustom-miljö — nätverksåtkomst dit är blockerad
-   i den här sandboxen. All verifiering hittills är: enhetstester med
-   mockat `fetch`, och verifiering mot en riktig lokal Postgres av allt
-   som INTE kräver ett faktiskt Kustom-svar (kundvagn, lagerreservation,
-   idempotens, e-postinnehåll, felhantering när Kustom-anropet
-   misslyckas).
+   svar.** Vi antar POST (i linje med validation-callbacken). Kan bara
+   stämmas av genom att faktiskt slutföra ett testköp så Kustom anropar
+   push på riktigt (kräver att appen är nåbar från internet — Vercel-
+   preview eller en tunnel, se README "Testa mot Kustom playground"
+   punkt 4).
+2. **Om checkout v3:s `readOrder` fortfarande returnerar `html_snippet`
+   efter att ordern slutförts.** `pnpm test:kustom`-körningen testade
+   bara `createOrder` (en ny, ofullständig order), inte `readOrder` på
+   en KLAR order — så antagandet i
+   `GET /api/public/checkout/[orderId]/confirmation` är fortfarande
+   inte separat bekräftat.
+3. **Hela push/validate-flödet end-to-end** (kundvagn → checkout-iframe
+   → betalning med Kustoms testkort → Kustom anropar `/api/kustom/push`
+   och `/api/kustom/validate` → order sparad i databasen). Kräver att
+   appen är nåbar från internet, se README.
 
 ## Designbeslut som INTE kommer från Kustom-dokumentationen
 
@@ -125,13 +147,14 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
 | `lib/kustom/auth.ts` | Klar, testad |
 | `lib/kustom/tax.ts` | Klar, testad — formeln oberoende bekräftad |
 | `lib/kustom/order-payload.ts` | Klar, testad |
-| `lib/kustom/client.ts` — checkout v3 (create/read/update) | Klar, testad (mockat fetch) |
-| `lib/kustom/client.ts` — Order Management (get/acknowledge/capture/refund/cancel) | Klar, testad (mockat fetch) |
+| `lib/kustom/client.ts` — `createOrder` | **Klar, verifierad LIVE mot playground** (se ovan) — inte bara mockat fetch längre |
+| `lib/kustom/client.ts` — `readOrder`/`updateOrder` | Klar, testad (mockat fetch) — inte liveverifierade än |
+| `lib/kustom/client.ts` — Order Management (get/acknowledge/capture/refund/cancel) | Klar, testad (mockat fetch) — inte liveverifierade än (kräver en order som gått igenom hela checkout-flödet) |
 | `lib/orders/persist-order.ts` (idempotent orderpersistens + lagerreservation) | **Klar, verifierad mot riktig Postgres** — dubbelanrop med samma order-id testat: exakt en order, en lagerreservation |
 | `lib/email/order-confirmation.ts` | Klar, testad (sv/en) |
 | `POST /api/public/cart/validate` | Klar, verifierad mot riktig Postgres |
-| `POST /api/public/checkout/session` | Klar (utan frakt), verifierad mot riktig Postgres |
+| `POST /api/public/checkout/session` | Klar (utan frakt), verifierad mot riktig Postgres — och payloaden den bygger är nu samma som verifierats fungera live (se ovan) |
 | `POST /api/kustom/validate` | Klar, verifierad mot riktig Postgres |
-| `POST /api/kustom/push` | Klar — snabbt 200-svar + `next/server`s `after()` för tungt arbete, verifierat: webhook_events loggas rått, snabbt svar (< 300 ms), och fel vid onåbart Kustom-API fångas och sparas korrekt |
-| `GET /api/public/checkout/[orderId]/confirmation` | Klar (bygger på ej fullt verifierat antagande, se punkt 3 ovan) |
+| `POST /api/kustom/push` | Klar — snabbt 200-svar + `next/server`s `after()` för tungt arbete, verifierat: webhook_events loggas rått, snabbt svar (< 300 ms), och fel vid onåbart Kustom-API fångas och sparas korrekt. Inte testat med ett riktigt push-anrop från Kustom än (kräver internetnåbar app, se punkt 3 ovan) |
+| `GET /api/public/checkout/[orderId]/confirmation` | Klar (bygger på ej fullt verifierat antagande, se punkt 2 ovan) |
 | Order Management-flöden i backofficet (capture/refund/cancel-knappar i `/orders`) | **Inte påbörjat — fas 4** |
