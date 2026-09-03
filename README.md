@@ -143,12 +143,15 @@ Projektet byggs i faser, med avstämning efter varje fas:
 2. **Produkter, lager, bilder, publika produkt-endpoints** — klar.
 3. **Kustom-klient (checkout v3 + Order Management), checkout-session,
    cart/validate, /api/kustom/validate, /api/kustom/push, ordermodell,
-   orderbekräftelsemail** — klar. Inget har kunnat testas mot en riktig
-   Kustom-miljö (nätverksåtkomst dit är blockerad i utvecklingsmiljön)
-   — se docs/kustom.md för exakt vad som är verifierat.
-4. Orderhantering i backofficet: capture/refund/cancel-knappar i
-   `/orders`, frakt, `/settings`.
-5. Rabattkoder (admin-CRUD), dashboard-statistik, loggvyer, GDPR-export.
+   orderbekräftelsemail** — klar. `createOrder` verifierad live mot
+   playground (körd av er lokalt) — se docs/kustom.md för exakt vad
+   som är verifierat och vad som fortfarande kräver ett helt
+   testköp end-to-end.
+4. **Orderhantering i backofficet: capture/refund/cancel-knappar i
+   `/orders`, markera som skickad, plocklista, frakt/momsinställningar
+   i `/settings`** — klar.
+5. **Rabattkoder (admin-CRUD), dashboard-statistik, loggvyer
+   (`/logs`), kunder och GDPR-export** — klar.
 
 Se `docs/branding.md` för öppna punkter kring varumärkesprofilen (bl.a.
 spacing/typsteg/brytpunkter som inte kunnat läsas av trancoffeelab.com än,

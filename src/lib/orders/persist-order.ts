@@ -147,6 +147,13 @@ export async function persistOrderFromKustom(
           });
         }
       }
+
+      if (line.type === "discount" && line.reference) {
+        await tx
+          .update(schema.discountCodes)
+          .set({ usedCount: sql`${schema.discountCodes.usedCount} + 1`, updatedAt: new Date() })
+          .where(eq(schema.discountCodes.code, line.reference.toUpperCase()));
+      }
     }
 
     return { id: inserted.id, orderNumber: inserted.orderNumber, alreadyExisted: false };
