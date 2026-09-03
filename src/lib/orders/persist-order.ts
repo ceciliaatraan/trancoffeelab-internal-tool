@@ -2,12 +2,21 @@ import "server-only";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import type { KustomOrderManagementOrder } from "@/lib/kustom/client";
-import { resolveCartLine } from "@/lib/queries/cart";
+import { resolveCartLine, type ResolvedCartLine } from "@/lib/queries/cart";
 
 export type PersistedOrder = {
   id: string;
   orderNumber: number;
   alreadyExisted: boolean;
+  /** True om NÅGON fysisk orderrad pekade på en produkt med is_preorder=true vid ordertillfället. */
+  containsPreorder: boolean;
+  /** Fysiska rader, för orderbekräftelsemailet — annat innehåll för preorder- kontra lagerrader. */
+  physicalLines: {
+    name: string;
+    quantity: number;
+    isPreorder: boolean;
+    expectedShipDate: string | null;
+  }[];
 };
 
 function sumTaxAmount(order: KustomOrderManagementOrder): number {
@@ -63,6 +72,27 @@ export async function persistOrderFromKustom(
     const orderTaxAmountOre = sumTaxAmount(order);
     const isFinal = order.status !== "CANCELLED" && order.status !== "EXPIRED";
 
+    /**
+     * Slås upp INNAN orders-raden skapas så `containsPreorder` kan sättas
+     * redan vid insert (ingen extra UPDATE efteråt), och återanvänds i
+     * loopen nedan så varje orderrad bara slår upp sin produkt en gång.
+     */
+    const physicalLineResolutions: (ResolvedCartLine | null)[] = await Promise.all(
+      order.order_lines.map((line) =>
+        line.type === "physical" && line.reference ? resolveCartLine(line.reference) : Promise.resolve(null),
+      ),
+    );
+    const containsPreorder = physicalLineResolutions.some((resolved) => resolved?.isPreorder === true);
+    const physicalLines = order.order_lines
+      .map((line, index) => ({ line, resolved: physicalLineResolutions[index] }))
+      .filter(({ line }) => (line.type ?? "physical") === "physical")
+      .map(({ line, resolved }) => ({
+        name: line.name,
+        quantity: line.quantity,
+        isPreorder: resolved?.isPreorder ?? false,
+        expectedShipDate: resolved?.expectedShipDate ?? null,
+      }));
+
     const [inserted] = await tx
       .insert(schema.orders)
       .values({
@@ -76,6 +106,7 @@ export async function persistOrderFromKustom(
         locale: order.locale,
         orderAmountOre: order.order_amount,
         orderTaxAmountOre,
+        containsPreorder,
         shippingAddress: order.shipping_address ?? null,
         billingAddress: order.billing_address ?? null,
         rawKustomOrder: order,
@@ -86,17 +117,24 @@ export async function persistOrderFromKustom(
 
     if (!inserted) {
       const [existing] = await tx
-        .select({ id: schema.orders.id, orderNumber: schema.orders.orderNumber })
+        .select({
+          id: schema.orders.id,
+          orderNumber: schema.orders.orderNumber,
+          containsPreorder: schema.orders.containsPreorder,
+        })
         .from(schema.orders)
         .where(eq(schema.orders.kustomOrderId, order.order_id));
-      return { id: existing.id, orderNumber: existing.orderNumber, alreadyExisted: true };
+      return {
+        id: existing.id,
+        orderNumber: existing.orderNumber,
+        alreadyExisted: true,
+        containsPreorder: existing.containsPreorder,
+        physicalLines: [],
+      };
     }
 
-    for (const line of order.order_lines) {
-      const resolved =
-        line.type === "physical" && line.reference
-          ? await resolveCartLine(line.reference)
-          : null;
+    for (const [index, line] of order.order_lines.entries()) {
+      const resolved = physicalLineResolutions[index];
 
       await tx.insert(schema.orderLines).values({
         orderId: inserted.id,
@@ -156,6 +194,12 @@ export async function persistOrderFromKustom(
       }
     }
 
-    return { id: inserted.id, orderNumber: inserted.orderNumber, alreadyExisted: false };
+    return {
+      id: inserted.id,
+      orderNumber: inserted.orderNumber,
+      alreadyExisted: false,
+      containsPreorder,
+      physicalLines,
+    };
   });
 }

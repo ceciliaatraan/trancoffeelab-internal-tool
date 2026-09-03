@@ -37,4 +37,74 @@ describe("renderEmail", () => {
     expect(text).toContain("1 × No Regrets Horse 250g");
     expect(text).toContain("1 × Frakt");
   });
+
+  it("förklarar en ren förbeställningsorder tydligt (sv)", () => {
+    const { text } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      lines: [
+        {
+          name: "No Regrets Horse 250g",
+          quantity: 2,
+          isPreorder: true,
+          expectedShipDate: "2026-11-15",
+        },
+      ],
+    });
+    expect(text).toContain("Det här är en förbeställning");
+    expect(text).toContain("Du har betalat nu");
+    expect(text).toContain("förbeställning, beräknad leverans: november 2026");
+    expect(text).not.toContain("Tack för din beställning");
+  });
+
+  it("förklarar en ren förbeställningsorder tydligt (en)", () => {
+    const { text } = renderEmail({
+      ...baseInput,
+      locale: "en-US",
+      lines: [
+        {
+          name: "No Regrets Horse 250g",
+          quantity: 1,
+          isPreorder: true,
+          expectedShipDate: "2026-11-15",
+        },
+      ],
+    });
+    expect(text).toContain("This is a preorder");
+    expect(text).toContain("charged now");
+    expect(text).toContain("preorder, estimated ship: November 2026");
+  });
+
+  it("förklarar en blandad order rad för rad, inte som en klump (sv)", () => {
+    const { text } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      lines: [
+        { name: "Dancing Dragon 250g", quantity: 1 },
+        {
+          name: "No Regrets Horse 250g",
+          quantity: 1,
+          isPreorder: true,
+          expectedShipDate: "2026-12-01",
+        },
+      ],
+    });
+    expect(text).toContain("Din order innehåller både lagervaror och en förbeställning");
+    expect(text).toContain("1 × Dancing Dragon 250g");
+    expect(text).not.toContain("Dancing Dragon 250g —");
+    expect(text).toContain(
+      "1 × No Regrets Horse 250g — förbeställning, beräknad leverans: december 2026",
+    );
+  });
+
+  it("visar 'meddelas senare' när expectedShipDate saknas", () => {
+    const { text } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      lines: [
+        { name: "No Regrets Horse 250g", quantity: 1, isPreorder: true, expectedShipDate: null },
+      ],
+    });
+    expect(text).toContain("beräknad leverans: meddelas senare");
+  });
 });

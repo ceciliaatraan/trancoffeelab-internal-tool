@@ -10,6 +10,8 @@ type ProductFormValues = {
   weightGrams?: number;
   status?: string;
   sortOrder?: number;
+  isPreorder?: boolean;
+  expectedShipDate?: string | null;
 };
 
 const inputClass =
@@ -167,6 +169,30 @@ export function ProductForm({
             name="sortOrder"
             type="number"
             defaultValue={values?.sortOrder ?? 0}
+            className={inputClass}
+          />
+        </div>
+        <div className="flex items-end gap-2 pb-2.5">
+          <input
+            id="isPreorder"
+            name="isPreorder"
+            type="checkbox"
+            defaultChecked={values?.isPreorder ?? false}
+            className="h-4 w-4 border border-tran-hairline"
+          />
+          <label className="text-sm" htmlFor="isPreorder">
+            Förbeställning
+          </label>
+        </div>
+        <div>
+          <label className={labelClass} htmlFor="expectedShipDate">
+            Beräknad leverans (visas som månad/period för kund)
+          </label>
+          <input
+            id="expectedShipDate"
+            name="expectedShipDate"
+            type="date"
+            defaultValue={values?.expectedShipDate ?? ""}
             className={inputClass}
           />
         </div>

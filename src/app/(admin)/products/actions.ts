@@ -33,6 +33,8 @@ function parseProductForm(formData: FormData) {
     weightGrams: formData.get("weightGrams"),
     status: formData.get("status"),
     sortOrder: formData.get("sortOrder") || 0,
+    isPreorder: formData.get("isPreorder"),
+    expectedShipDate: formData.get("expectedShipDate") || undefined,
   });
 }
 

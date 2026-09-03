@@ -14,6 +14,9 @@ export type ValidatedCartItem = {
   maxAvailable: number;
   productId: string | null;
   variantId: string | null;
+  /** Visas i checkout-sammanfattningen: "Beräknad leverans: ‹expectedShipDate›". */
+  isPreorder: boolean;
+  expectedShipDate: string | null;
 };
 
 export type ValidatedCartDiscount =
@@ -51,6 +54,8 @@ export async function buildValidatedCart(request: CartRequest): Promise<Validate
         maxAvailable: 0,
         productId: null,
         variantId: null,
+        isPreorder: false,
+        expectedShipDate: null,
       });
       continue;
     }
@@ -66,6 +71,8 @@ export async function buildValidatedCart(request: CartRequest): Promise<Validate
       maxAvailable: resolved.available,
       productId: resolved.productId,
       variantId: resolved.variantId,
+      isPreorder: resolved.isPreorder,
+      expectedShipDate: resolved.expectedShipDate,
     });
   }
 

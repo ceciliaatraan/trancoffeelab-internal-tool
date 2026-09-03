@@ -7,6 +7,7 @@ import {
   jsonb,
   pgEnum,
   index,
+  boolean,
 } from "drizzle-orm/pg-core";
 import { customers } from "./customers";
 import { products } from "./catalog";
@@ -51,6 +52,15 @@ export const orders = pgTable("orders", {
   /** Cachat från Kustoms Order Management — källan till sanning är alltid Kustom, vi synkar efter varje capture/refund/cancel. */
   capturedAmountOre: integer("captured_amount_ore").notNull().default(0),
   refundedAmountOre: integer("refunded_amount_ore").notNull().default(0),
+
+  /**
+   * Sätts av push-hanteraren: true om NÅGON orderrad pekade på en produkt
+   * med `products.is_preorder = true` vid ordertillfället. Preorder-ordrar
+   * captureas alltid direkt (se persist-order.ts/push/route.ts) — det
+   * avviker medvetet från Klarnas normala "vänta med capture till fysisk
+   * leverans"-mönster, eftersom varan inte finns i lager än.
+   */
+  containsPreorder: boolean("contains_preorder").notNull().default(false),
 
   shippingAddress: jsonb("shipping_address"),
   billingAddress: jsonb("billing_address"),

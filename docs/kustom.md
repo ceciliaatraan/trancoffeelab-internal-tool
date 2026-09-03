@@ -142,6 +142,15 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
   vår egen tabell, inget Kustom-fält.
 - **`RESEND_FROM_EMAIL`** måste sättas till en avsändaradress på en
   domän verifierad i ert Resend-konto — ingen adress är förvald/gissad.
+- **Preorder-ordrar (`orders.contains_preorder`) captureas alltid direkt
+  vid order, oavsett betalmetod** (`src/lib/orders/capture-preorder.ts`,
+  anropas från push-hanteraren). Ett medvetet undantag från Klarnas
+  normala mönster där fakturaköp/delbetalning väntar med capture till
+  fysisk leverans — den senareläggningen skyddar kunden vid KORT tid
+  till leverans, vilket inte gäller en förbeställning där varan inte
+  ens finns i lager än. Icke-preorder-ordrar är helt orörda av detta:
+  de captureas fortsatt manuellt via "Debitera"-knappen i
+  `/orders/[id]` (`captureOrderAction`), precis som innan.
 
 ## Status i koden
 

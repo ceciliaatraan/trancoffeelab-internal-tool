@@ -12,6 +12,9 @@ export type ResolvedCartLine = {
   available: number;
   productId: string;
   variantId: string | null;
+  /** Alltid från produkten, aldrig från varianten — se src/db/schema/catalog.ts. */
+  isPreorder: boolean;
+  expectedShipDate: string | null;
 };
 
 async function resolveBaseProduct(sku: string): Promise<ResolvedCartLine | null> {
@@ -24,6 +27,8 @@ async function resolveBaseProduct(sku: string): Promise<ResolvedCartLine | null>
       taxRate: schema.products.taxRate,
       weightGrams: schema.products.weightGrams,
       status: schema.products.status,
+      isPreorder: schema.products.isPreorder,
+      expectedShipDate: schema.products.expectedShipDate,
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
     })
@@ -49,6 +54,8 @@ async function resolveBaseProduct(sku: string): Promise<ResolvedCartLine | null>
     available: Math.max(0, (row.quantity ?? 0) - (row.reservedQuantity ?? 0)),
     productId: row.productId,
     variantId: null,
+    isPreorder: row.isPreorder,
+    expectedShipDate: row.expectedShipDate,
   };
 }
 
@@ -63,6 +70,8 @@ async function resolveVariant(sku: string): Promise<ResolvedCartLine | null> {
       weightGrams: schema.productVariants.weightGrams,
       taxRate: schema.products.taxRate,
       status: schema.products.status,
+      isPreorder: schema.products.isPreorder,
+      expectedShipDate: schema.products.expectedShipDate,
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
     })
@@ -83,6 +92,8 @@ async function resolveVariant(sku: string): Promise<ResolvedCartLine | null> {
     available: Math.max(0, (row.quantity ?? 0) - (row.reservedQuantity ?? 0)),
     productId: row.productId,
     variantId: row.variantId,
+    isPreorder: row.isPreorder,
+    expectedShipDate: row.expectedShipDate,
   };
 }
 

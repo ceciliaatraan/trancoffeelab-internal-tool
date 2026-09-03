@@ -3,6 +3,7 @@ import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatOre, formatDateTime } from "@/lib/format";
 import { OrderStatusChip } from "@/components/order-status-chip";
+import { PreorderChip } from "@/components/preorder-chip";
 
 const FULFILLMENT_LABELS: Record<string, string> = {
   unfulfilled: "Ej skickad",
@@ -103,7 +104,10 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
                 <td className="py-4 pr-4 text-tran-muted">{order.customerEmail}</td>
                 <td className="tran-tabular py-4 pr-4">{formatOre(order.orderAmountOre)}</td>
                 <td className="py-4 pr-4">
-                  <OrderStatusChip status={order.status} />
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <OrderStatusChip status={order.status} />
+                    {order.containsPreorder && <PreorderChip />}
+                  </div>
                 </td>
                 <td className="py-4 pr-4 text-tran-muted">
                   {FULFILLMENT_LABELS[order.fulfillmentStatus] ?? order.fulfillmentStatus}

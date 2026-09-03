@@ -7,6 +7,8 @@ import {
   integer,
   jsonb,
   index,
+  boolean,
+  date,
 } from "drizzle-orm/pg-core";
 import { adminUsers } from "./admin";
 
@@ -37,6 +39,14 @@ export const products = pgTable("products", {
   status: productStatusEnum("status").notNull().default("draft"),
   images: jsonb("images").notNull().default([]).$type<string[]>(),
   sortOrder: integer("sort_order").notNull().default(0),
+  /**
+   * Förbeställning: en egenskap på produkten, inte på varianten
+   * (`product_variants` ska INTE ha motsvarande fält). `expectedShipDate`
+   * är ett ungefärligt datum — visas för kund som "Beräknad leverans:
+   * ‹månad/period›", aldrig ett exakt löfte.
+   */
+  isPreorder: boolean("is_preorder").notNull().default(false),
+  expectedShipDate: date("expected_ship_date"),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),
