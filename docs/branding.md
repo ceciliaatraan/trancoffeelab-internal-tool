@@ -101,7 +101,7 @@ en approximation.
 | 5 | Master-SVG av wordmarken "TRAN®" | SVG, aldrig text med fallback-font | Okänt | Platshållar-SVG med `<text>` i Bulky-fonten (inte en riktig vektoriserad logotyp) i `tran-wordmark.tsx` | **Öppet — behöver riktig fil från er** |
 | 6 | Bulky-fontfil | Självhostas i `/public/fonts` | — | Mottagen direkt från er (`Bulky__Final_Edit.ttf`, familj "bulky", vikt Medium), sparad som `/public/fonts/Bulky.ttf` | **Löst** |
 | 7 | `ALLOWED_ADMIN_EMAILS` startvärde | `systrarna@trancoffeelab.com,‹winnies-adress›` | — | Ni bekräftade att Winnie loggar in med samma adress, `systrarna@trancoffeelab.com` — startvärdet är alltså en enda adress. Fler adresser läggs till i Vercel vid behov, inte i kod. | **Löst** |
-| 8 | Kustom-dokumentation (docs.kustom.co, api.playground.kustom.co) | Ska verifieras innan klienten byggs (fas 3) | — | Samma nätverksblockering som punkt 2 i avsnitt 2 gäller här. Fältnamn/statusvärden i `orders`/`order_lines` är därför fritext (`text`), inte enum, tills verifierat — se kommentarer i `src/db/schema/orders.ts` och kommande `docs/kustom.md`. | **Öppet, hanteras i fas 3** |
+| 8 | Kustom-dokumentation (docs.kustom.co, api.playground.kustom.co) | Skulle verifieras innan klienten byggdes | — | Ni klistrade in relevanta delar av dokumentationen och körde ett riktigt playground-test (`pnpm test:kustom`) — se `docs/kustom.md` för exakt vad som är bekräftat kontra fortfarande öppet. | **Till stor del löst, detaljer i docs/kustom.md** |
 
 Inget i den här listan är tyst gissat — allt som inte kunnat avläsas eller
 verifieras är explicit markerat som öppet ovan, och byggkoden är skriven så
