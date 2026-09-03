@@ -10,6 +10,13 @@ export class UnauthorizedError extends Error {
   }
 }
 
+export class ForbiddenError extends Error {
+  constructor() {
+    super("Kräver ägarbehörighet.");
+    this.name = "ForbiddenError";
+  }
+}
+
 /** Kastar om ingen session finns — alla anrop hit sker bakom proxy.ts skydd ändå. */
 export async function requireCurrentAdmin() {
   const session = await auth();
@@ -26,5 +33,18 @@ export async function requireCurrentAdmin() {
     throw new UnauthorizedError();
   }
 
+  return adminUser;
+}
+
+/**
+ * Rabattkoder och inställningar är ägar-only (spec: "staff får inte
+ * ändra rabattkoder eller inställningar") — kontrollen sitter här,
+ * server-side, inte bara genom att dölja knappar i UI:t.
+ */
+export async function requireOwner() {
+  const adminUser = await requireCurrentAdmin();
+  if (adminUser.role !== "owner") {
+    throw new ForbiddenError();
+  }
   return adminUser;
 }

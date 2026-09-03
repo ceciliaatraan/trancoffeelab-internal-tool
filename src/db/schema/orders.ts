@@ -10,6 +10,7 @@ import {
 } from "drizzle-orm/pg-core";
 import { customers } from "./customers";
 import { products } from "./catalog";
+import { adminUsers } from "./admin";
 
 /**
  * `status` och `paymentStatus` är fritext, inte enum, tills vidare: Kustoms
@@ -47,6 +48,9 @@ export const orders = pgTable("orders", {
 
   orderAmountOre: integer("order_amount_ore").notNull(),
   orderTaxAmountOre: integer("order_tax_amount_ore").notNull(),
+  /** Cachat från Kustoms Order Management — källan till sanning är alltid Kustom, vi synkar efter varje capture/refund/cancel. */
+  capturedAmountOre: integer("captured_amount_ore").notNull().default(0),
+  refundedAmountOre: integer("refunded_amount_ore").notNull().default(0),
 
   shippingAddress: jsonb("shipping_address"),
   billingAddress: jsonb("billing_address"),
@@ -106,3 +110,28 @@ export const shipments = pgTable("shipments", {
     .defaultNow(),
 });
 shipments.enableRLS();
+
+export const orderEventTypeEnum = pgEnum("order_event_type", [
+  "capture",
+  "refund",
+  "cancel",
+]);
+
+/** Betalningshändelser (capture/refund/cancel) — visas i orderdetaljen. */
+export const orderEvents = pgTable("order_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orderId: uuid("order_id")
+    .notNull()
+    .references(() => orders.id, { onDelete: "cascade" }),
+  type: orderEventTypeEnum("type").notNull(),
+  /** Null för cancel. */
+  amountOre: integer("amount_ore"),
+  note: text("note"),
+  causedByAdminId: uuid("caused_by_admin_id").references(() => adminUsers.id, {
+    onDelete: "set null",
+  }),
+  createdAt: timestamp("created_at", { withTimezone: true })
+    .notNull()
+    .defaultNow(),
+});
+orderEvents.enableRLS();

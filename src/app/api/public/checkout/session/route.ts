@@ -2,9 +2,10 @@ import { NextResponse } from "next/server";
 import { checkRateLimit, corsHeaders, getClientIp, resolveAllowedOrigin } from "@/lib/public-api";
 import { cartRequestSchema } from "@/lib/validation/cart";
 import { buildValidatedCart } from "@/lib/queries/cart-summary";
-import { buildCreateOrderPayload, type CartItemInput } from "@/lib/kustom/order-payload";
+import { buildCreateOrderPayload, type CartItemInput, type ShippingInput } from "@/lib/kustom/order-payload";
 import { getMerchantUrls } from "@/lib/kustom/merchant-urls";
 import { createOrder, extractHtmlSnippet, extractOrderId, KustomApiError } from "@/lib/kustom/client";
+import { getShopSettings } from "@/lib/settings";
 
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
@@ -61,11 +62,23 @@ export async function POST(request: Request) {
     taxRateHundredthsPercent: item.taxRate,
   }));
 
+  const shopSettings = await getShopSettings();
+  const freeShipping =
+    shopSettings.freeShippingThresholdOre !== null &&
+    cart.subtotalOre >= shopSettings.freeShippingThresholdOre;
+
+  const shipping: ShippingInput | undefined = freeShipping
+    ? undefined
+    : {
+        nameSv: "Frakt",
+        nameEn: "Shipping",
+        amountOre: shopSettings.shippingFlatRateOre,
+        taxRateHundredthsPercent: shopSettings.shippingTaxRate,
+      };
+
   const payload = buildCreateOrderPayload({
     items,
-    // Frakt är inte kopplad in än — det finns ingen fraktinställning i
-    // datamodellen ännu (se docs/kustom.md). Ordern skapas utan
-    // shipping_fee-rad tills vidare.
+    shipping,
     discount:
       cart.discount?.valid && cart.discount.amountOre > 0
         ? {

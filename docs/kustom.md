@@ -131,8 +131,11 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
   (mest generella av de tre tillåtna värdena).
 - **Rabattradens momssats i checkout-session:** kvantitetsviktat snitt
   av kundvagnens rader (`weightedAverageTaxRate`).
-- **Frakt saknas i checkout-session helt** — ingen fraktinställning
-  finns i datamodellen än.
+- **Fraktkostnad och momssats för frakten** (`shop_settings`-tabellen,
+  redigerbar i `/settings` av ägare) — standardvärden 49,00 kr / 25%
+  moms är rimliga gissningar, INTE bekräftade priser. Bekräfta/ändra i
+  `/settings` innan skarp drift. Fri frakt-gräns är valfri (null =
+  ingen fri frakt).
 - **`inventory_movements.change_amount`-tolkning:** för
   `order_reserved`/`order_released` avser den `reservedQuantity`, för
   `manual_adjustment`/`return`/`order_shipped` avser den `quantity` —
