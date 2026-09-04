@@ -39,7 +39,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
 
   return (
     <div className="flex flex-col gap-8">
-      <h1 className="font-display text-4xl">Ordrar</h1>
+      <h1 className="text-4xl font-bold uppercase tracking-tight">Ordrar</h1>
 
       <form className="flex flex-wrap items-end gap-4">
         <div>

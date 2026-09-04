@@ -32,7 +32,7 @@ export default async function InventoryPage({
 
   return (
     <div className="flex flex-col gap-8">
-      <h1 className="font-display text-4xl">Lager</h1>
+      <h1 className="text-4xl font-bold uppercase tracking-tight">Lager</h1>
 
       {error ? (
         <p className="border border-tran-red px-4 py-3 text-sm text-tran-red">{error}</p>

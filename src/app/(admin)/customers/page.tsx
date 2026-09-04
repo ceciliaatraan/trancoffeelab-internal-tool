@@ -25,7 +25,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/custom
 
   return (
     <div className="flex flex-col gap-8">
-      <h1 className="font-display text-4xl">Kunder</h1>
+      <h1 className="text-4xl font-bold uppercase tracking-tight">Kunder</h1>
 
       <form className="flex items-end gap-4">
         <div>

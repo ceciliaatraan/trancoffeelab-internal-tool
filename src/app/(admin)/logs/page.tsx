@@ -10,7 +10,7 @@ export default async function LogsPage() {
 
   return (
     <div className="flex flex-col gap-10">
-      <h1 className="font-display text-4xl">Loggar</h1>
+      <h1 className="text-4xl font-bold uppercase tracking-tight">Loggar</h1>
 
       <section className="flex flex-col gap-4">
         <h2 className="tran-label text-xs text-tran-muted">Webhook-anrop från Kustom</h2>

@@ -27,7 +27,7 @@ export default async function DiscountsPage({ searchParams }: PageProps<"/discou
 
   return (
     <div className="flex max-w-3xl flex-col gap-10">
-      <h1 className="font-display text-4xl">Rabattkoder</h1>
+      <h1 className="text-4xl font-bold uppercase tracking-tight">Rabattkoder</h1>
 
       {error ? (
         <p className="border border-tran-red px-4 py-3 text-sm text-tran-red">{error}</p>

@@ -64,7 +64,7 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex flex-col gap-10">
-      <h1 className="font-display text-4xl">Dashboard</h1>
+      <h1 className="text-4xl font-bold uppercase tracking-tight">Dashboard</h1>
 
       <section className="grid grid-cols-2 gap-6 sm:grid-cols-4">
         <div className="border border-tran-hairline p-6">

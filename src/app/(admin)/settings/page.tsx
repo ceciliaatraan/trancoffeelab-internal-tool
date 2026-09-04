@@ -23,7 +23,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
 
   return (
     <div className="flex max-w-2xl flex-col gap-10">
-      <h1 className="font-display text-4xl">Inställningar</h1>
+      <h1 className="text-4xl font-bold uppercase tracking-tight">Inställningar</h1>
 
       {error ? (
         <p className="border border-tran-red px-4 py-3 text-sm text-tran-red">{error}</p>

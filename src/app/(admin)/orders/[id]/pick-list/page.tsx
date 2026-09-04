@@ -24,7 +24,7 @@ export default async function PickListPage({ params }: PageProps<"/orders/[id]/p
 
   return (
     <div className="mx-auto max-w-xl p-8 font-body text-tran-black">
-      <h1 className="font-display text-3xl">Plocklista — order #{order.orderNumber}</h1>
+      <h1 className="text-3xl font-bold uppercase tracking-tight">Plocklista — order #{order.orderNumber}</h1>
       {address ? (
         <p className="mt-2 text-sm text-tran-muted">
           {address.given_name} {address.family_name} — {address.street_address}, {address.postal_code}{" "}

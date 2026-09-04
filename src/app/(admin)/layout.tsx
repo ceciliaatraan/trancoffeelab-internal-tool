@@ -1,17 +1,7 @@
 import Link from "next/link";
 import { auth, signOut } from "@/auth";
 import { TranWordmark } from "@/components/tran-wordmark";
-
-const NAV_ITEMS = [
-  { href: "/", label: "Dashboard" },
-  { href: "/orders", label: "Ordrar" },
-  { href: "/products", label: "Produkter" },
-  { href: "/inventory", label: "Lager" },
-  { href: "/discounts", label: "Rabatter" },
-  { href: "/customers", label: "Kunder" },
-  { href: "/settings", label: "Inställningar" },
-  { href: "/logs", label: "Loggar" },
-];
+import { AdminNav } from "@/components/admin-nav";
 
 export default async function AdminLayout({
   children,
@@ -21,25 +11,17 @@ export default async function AdminLayout({
   const session = await auth();
 
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex items-center gap-6 border-b border-tran-hairline px-6 py-4">
-        <Link href="/" className="shrink-0">
-          <TranWordmark className="h-8 w-auto" />
+    <div className="flex min-h-screen">
+      <aside className="flex w-56 shrink-0 flex-col border-r border-tran-black">
+        <Link
+          href="/"
+          className="flex items-center border-b border-tran-black px-6 py-6"
+        >
+          <TranWordmark className="h-7 w-auto" />
         </Link>
-        <div className="h-8 w-px bg-tran-hairline" aria-hidden />
-        <nav className="tran-label flex flex-1 flex-wrap gap-x-6 gap-y-2 text-xs">
-          {NAV_ITEMS.map((item) => (
-            <Link
-              key={item.href}
-              href={item.href}
-              className="text-tran-black transition-colors hover:text-tran-red"
-            >
-              {item.label}
-            </Link>
-          ))}
-        </nav>
-        <div className="flex items-center gap-4 text-xs text-tran-muted">
-          <span>{session?.user?.email}</span>
+        <AdminNav />
+        <div className="mt-auto flex flex-col gap-3 border-t border-tran-black px-6 py-5 text-xs text-tran-muted">
+          <span className="truncate">{session?.user?.email}</span>
           <form
             action={async () => {
               "use server";
@@ -48,14 +30,14 @@ export default async function AdminLayout({
           >
             <button
               type="submit"
-              className="tran-label border border-tran-black px-3 py-1.5 transition-colors hover:border-tran-red hover:text-tran-red"
+              className="tran-label w-full border border-tran-black px-3 py-1.5 text-left transition-colors hover:border-tran-red hover:text-tran-red"
             >
               Logga ut
             </button>
           </form>
         </div>
-      </header>
-      <main className="flex-1 px-6 py-8">{children}</main>
+      </aside>
+      <main className="flex-1 px-8 py-8">{children}</main>
     </div>
   );
 }

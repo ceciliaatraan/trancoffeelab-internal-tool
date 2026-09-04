@@ -51,7 +51,7 @@ export default async function EditProductPage({
 
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-4">
-          <h1 className="font-display text-4xl">{product.nameSv}</h1>
+          <h1 className="text-4xl font-bold uppercase tracking-tight">{product.nameSv}</h1>
           <StatusChip status={product.status} />
         </div>
         <div className="flex gap-2">

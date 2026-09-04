@@ -15,7 +15,7 @@ export default async function NewProductPage({
           ← Produkter
         </Link>
       </div>
-      <h1 className="font-display text-4xl">Ny produkt</h1>
+      <h1 className="text-4xl font-bold uppercase tracking-tight">Ny produkt</h1>
       {error ? (
         <p className="border border-tran-red px-4 py-3 text-sm text-tran-red">
           {error}
