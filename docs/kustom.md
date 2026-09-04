@@ -142,6 +142,15 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
   vår egen tabell, inget Kustom-fält.
 - **`RESEND_FROM_EMAIL`** måste sättas till en avsändaradress på en
   domän verifierad i ert Resend-konto — ingen adress är förvald/gissad.
+- **"The Full Kit"s blandade momssats (`taxRate: 1190`, se
+  `scripts/seed-products.ts`):** kaffe (179 kr) + kondenserad mjölk
+  (49 kr) = 228 kr till 6 % livsmedelsmoms, resterande 349−228 = 121 kr
+  till 25 %, omräknat till en enda blandad sats (≈11,90 %) eftersom
+  `products.taxRate` bara har ETT fält per produkt. Ni bekräftade själva
+  denna fördelningsmetod (hela kit-rabatten läggs på icke-matvaran,
+  inte proportionerligt fördelad) — värt att stämma av med revisor
+  innan skarp drift, det är en mer offensiv tolkning än Skatteverkets
+  vanliga proportionering efter marknadsvärde.
 - **Preorder-ordrar (`orders.contains_preorder`) captureas alltid direkt
   vid order, oavsett betalmetod** (`src/lib/orders/capture-preorder.ts`,
   anropas från push-hanteraren). Ett medvetet undantag från Klarnas

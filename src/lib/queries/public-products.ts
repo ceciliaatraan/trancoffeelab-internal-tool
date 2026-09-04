@@ -21,6 +21,9 @@ export type PublicProduct = {
   weightGrams: number;
   inStock: boolean;
   variants: PublicVariant[];
+  /** Alltid från produkten (aldrig varianten) — visas som "Beräknad leverans: ‹expectedShipDate›". */
+  isPreorder: boolean;
+  expectedShipDate: string | null;
 };
 
 function availableQuantity(quantity: number, reserved: number): number {
@@ -81,6 +84,8 @@ function baseProductQuery() {
       taxRate: schema.products.taxRate,
       images: schema.products.images,
       weightGrams: schema.products.weightGrams,
+      isPreorder: schema.products.isPreorder,
+      expectedShipDate: schema.products.expectedShipDate,
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
     })
@@ -112,6 +117,8 @@ function toPublicProduct(
         ? variants.some((variant) => variant.inStock)
         : availableQuantity(row.quantity ?? 0, row.reservedQuantity ?? 0) > 0,
     variants,
+    isPreorder: row.isPreorder,
+    expectedShipDate: row.expectedShipDate,
   };
 }
 
