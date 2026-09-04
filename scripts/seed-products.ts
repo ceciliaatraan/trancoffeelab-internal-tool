@@ -65,8 +65,12 @@ const PRODUCTS: SeedProduct[] = [
   {
     slug: "signature-coffee",
     sku: "COFFEE-SIG-250",
-    nameSv: "Signaturkaffe",
-    nameEn: "Signature Coffee",
+    // Namnet på själva bönpåsen (bekräftat av ägaren) — "No Regrets Horse"
+    // är TRANs första signaturkaffe, samma namn på svenska och engelska.
+    // Slug/SKU är oförändrade (signature-coffee/COFFEE-SIG-250) för att inte
+    // ändra produktens URL på sajten i onödan.
+    nameSv: "No Regrets Horse",
+    nameEn: "No Regrets Horse",
     descriptionSv:
       "Vår flaggskeppsblandning, noggrant utvald från högländerna i Buôn Ma Thuột. Dessa bönor är mörkrostade för att framhäva de djärva, chokladiga tonerna som vietnamesiskt kaffe är känt för.",
     descriptionEn:
