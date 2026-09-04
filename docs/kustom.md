@@ -15,15 +15,29 @@ Skriv INTE av ett antagande här som om det vore bekräftat. Allt i
 
 ## Bekräftat
 
-### Live mot playground (kört av er, 2026-09-02, `pnpm test:kustom`)
+### Auth-format — uppdaterat 2026-09-04 (ny nyckel)
+
+Den nyckel som testades 2026-09-02 (se nedan) slutade fungera (401 på
+alla anrop, både lokalt och i produktion) och ersattes 2026-09-04 med
+en ny nyckel från Kustom Playground. **Den nya nyckeln kräver DET ANDRA
+formatet**, till skillnad från den gamla:
+
+- **`base64(<username>:<nyckel>)`, med `KUSTOM_BASIC_AUTH_USERNAME`
+  satt till nyckelns "Key ID" från Kustom Playground-gränssnittet** —
+  bekräftat med ett lyckat `201`-svar (order skapad) 2026-09-04.
+- Slutsats: vilket av de två formaten som krävs verkar bero på den
+  specifika nyckeln/kontot, inte vara en global konstant för alla
+  Kustom-konton. Anta INTE att en ny nyckel automatiskt fungerar med
+  samma format som en tidigare — testa alltid båda vid en nyckelrotation
+  (se `scripts/test-kustom-playground.mjs`, kör en gång med
+  `KUSTOM_BASIC_AUTH_USERNAME` satt och en gång utan).
+
+### Live mot playground (kört av er, 2026-09-02, `pnpm test:kustom` — gammal nyckel, se ovan)
 
 `POST /checkout/v3/orders` med vår riktiga payload-byggare gav ett lyckat
-svar (order skapad). Det här bekräftar:
+svar (order skapad) med den nyckel som var aktiv då. Det här bekräftar
+fortfarande (oberoende av vilket auth-format som råkar krävas):
 
-- **Auth-formatet ni har fungerar UTAN `KUSTOM_BASIC_AUTH_USERNAME`** —
-  standardformatet `base64(<nyckel>:)` (nyckeln som eget användarnamn,
-  inget lösenord) är korrekt för er nyckel. Den tidigare öppna frågan
-  om vilket av de två Basic-auth-formaten som krävs är alltså löst.
 - **Order-id-fältet i svaret heter `order_id`**, inte `id` — t.ex.
   `"f949a813-c5b3-2b3b-ad40-04d2584eb641"`. `extractOrderId`
   (`src/lib/kustom/client.ts`) provar `order_id` först så den fungerar
@@ -41,9 +55,11 @@ svar (order skapad). Det här bekräftar:
 
 - Auth: HTTP Basic. Två format stöds via `buildKustomAuthHeader`
   (`src/lib/kustom/auth.ts`): `base64(<nyckel>:)` (nyckeln som eget
-  användarnamn, standard — **bekräftat korrekt för er nyckel, se ovan**)
-  eller `base64(<username>:<nyckel>)` när `KUSTOM_BASIC_AUTH_USERNAME`
-  är satt.
+  användarnamn, utan `KUSTOM_BASIC_AUTH_USERNAME`) eller
+  `base64(<username>:<nyckel>)` när `KUSTOM_BASIC_AUTH_USERNAME` är
+  satt — **vilket av de två som krävs beror på den specifika nyckeln,
+  se "Auth-format — uppdaterat 2026-09-04" ovan. Anta inte ett format,
+  testa.**
 - Base URL playground: `https://api.playground.kustom.co`. Produktion:
   `https://api.kustom.co` (bekräftat även i Order Management-specens
   `servers`-fält).
