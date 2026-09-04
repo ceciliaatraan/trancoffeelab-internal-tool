@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { productInputSchema } from "./product";
+import { inventoryAdjustSchema, productInputSchema } from "./product";
 
 const validInput = {
   slug: "no-regrets-horse",
@@ -44,5 +44,38 @@ describe("productInputSchema", () => {
     expect(
       productInputSchema.safeParse({ ...validInput, slug: "phin-filter-2-pack" }).success,
     ).toBe(true);
+  });
+});
+
+describe("inventoryAdjustSchema", () => {
+  const validInventoryInput = {
+    inventoryId: "123e4567-e89b-12d3-a456-426614174000",
+    newQuantity: 42,
+  };
+
+  it("accepterar ett nytt lagersaldo utan orsak/anteckning", () => {
+    expect(inventoryAdjustSchema.safeParse(validInventoryInput).success).toBe(true);
+  });
+
+  it("underkänner negativt lagersaldo", () => {
+    expect(
+      inventoryAdjustSchema.safeParse({ ...validInventoryInput, newQuantity: -1 }).success,
+    ).toBe(false);
+  });
+
+  it("tom anteckning blir null i stället för ett tvingande fält", () => {
+    const result = inventoryAdjustSchema.safeParse({ ...validInventoryInput, note: "" });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.note).toBeNull();
+    }
+  });
+
+  it("orsak används manual_adjustment som default när inget skickas", () => {
+    const result = inventoryAdjustSchema.safeParse(validInventoryInput);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.reason).toBe("manual_adjustment");
+    }
   });
 });

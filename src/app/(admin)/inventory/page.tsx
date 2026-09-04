@@ -82,21 +82,21 @@ export default async function InventoryPage({
                     <form action={adjustInventory} className="flex items-center gap-2">
                       <input type="hidden" name="inventoryId" value={row.inventoryId} />
                       <input
-                        name="delta"
+                        name="newQuantity"
                         type="number"
-                        placeholder="+/-"
+                        min={0}
                         required
+                        defaultValue={row.quantity}
                         className={inputClass}
                       />
-                      <select name="reason" required className={inputClass}>
+                      <select name="reason" defaultValue="manual_adjustment" className={inputClass}>
                         <option value="manual_adjustment">Justering</option>
                         <option value="return">Retur</option>
                       </select>
                       <input
                         name="note"
-                        placeholder="Orsak"
-                        required
-                        className="w-32 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
+                        placeholder="Anteckning (valfritt)"
+                        className="w-36 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
                       />
                       <button
                         type="submit"

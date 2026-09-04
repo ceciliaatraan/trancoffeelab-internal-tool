@@ -2,7 +2,7 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq, sql } from "drizzle-orm";
+import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCurrentAdmin } from "@/lib/current-admin";
 import { inventoryAdjustSchema } from "@/lib/validation/product";
@@ -12,7 +12,7 @@ export async function adjustInventory(formData: FormData) {
 
   const parsed = inventoryAdjustSchema.safeParse({
     inventoryId: formData.get("inventoryId"),
-    delta: formData.get("delta"),
+    newQuantity: formData.get("newQuantity"),
     reason: formData.get("reason"),
     note: formData.get("note"),
   });
@@ -23,7 +23,7 @@ export async function adjustInventory(formData: FormData) {
     );
   }
 
-  const { inventoryId, delta, reason, note } = parsed.data;
+  const { inventoryId, newQuantity, reason, note } = parsed.data;
 
   await db.transaction(async (tx) => {
     const [row] = await tx
@@ -35,13 +35,15 @@ export async function adjustInventory(formData: FormData) {
     if (!row) {
       throw new Error("Lagerraden finns inte.");
     }
-    if (row.quantity + delta < 0) {
-      throw new Error("Lagersaldot kan inte bli negativt.");
+
+    const delta = newQuantity - row.quantity;
+    if (delta === 0) {
+      return;
     }
 
     await tx
       .update(schema.inventory)
-      .set({ quantity: sql`${schema.inventory.quantity} + ${delta}`, updatedAt: new Date() })
+      .set({ quantity: newQuantity, updatedAt: new Date() })
       .where(eq(schema.inventory.id, inventoryId));
 
     await tx.insert(schema.inventoryMovements).values({

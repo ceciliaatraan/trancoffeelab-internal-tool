@@ -52,9 +52,13 @@ export type VariantInput = z.infer<typeof variantInputSchema>;
 
 export const inventoryAdjustSchema = z.object({
   inventoryId: z.uuid(),
-  delta: z.coerce.number().int().refine((v) => v !== 0, "Ange en ändring skild från noll"),
-  reason: z.enum(["manual_adjustment", "return"]),
-  note: z.string().trim().min(1, "Ange en orsak"),
+  newQuantity: z.coerce.number().int().min(0, "Lagersaldot kan inte bli negativt"),
+  reason: z.enum(["manual_adjustment", "return"]).default("manual_adjustment"),
+  note: z
+    .string()
+    .trim()
+    .optional()
+    .transform((v) => (v && v.length > 0 ? v : null)),
 });
 
 export type InventoryAdjustInput = z.infer<typeof inventoryAdjustSchema>;
