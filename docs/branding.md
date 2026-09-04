@@ -57,10 +57,17 @@ small/label) är INTE avlästa från sajten än — se avsnitt 3.
 
 ### Logotyp
 
-**Öppet — se avsnitt 3.** Ingen master-SVG av wordmarken "TRAN®" finns
-tillgänglig än. `src/components/tran-wordmark.tsx` renderar just nu en
-inline SVG med `<text>` i Bulky-fonten som platshållare, inte en riktig
-vektoriserad logotyp.
+**Löst, delvis — se avsnitt 3.** Riktig logotypfil mottagen från er
+(samma fil som redan används på trancoffeelab.com,
+`/public/logo/tran-wordmark.webp`, sparad från
+`trancoffeelab-website/src/assets/tran-logo.webp`). `tran-wordmark.tsx`
+renderar den nu som en vanlig `<img>` i stället för plats­hållar-SVG:n med
+Bulky-text. **Fortfarande öppet:** det är rastergrafik (webp), inte en
+vektor-SVG — den här sandboxen har inget bildspårningsverktyg
+(potrace/imagemagick m.fl. blockeras av nätverkspolicyn). Fungerar fint i
+nuvarande fasta-höjd-användningar (sidopanel, inloggningssida), men skalar
+inte lika skarpt som en riktig SVG vid stora storlekar. Om ni har
+originalfilen som vektor (AI/EPS/SVG) hör av er så byts den in direkt.
 
 ### Layoutspråk
 
@@ -98,7 +105,7 @@ en approximation.
 | 2 | Typsteg (px/rem, line-height, letter-spacing per nivå) | Ospecificerat utöver fontval | Okänt — sajten ej avläst | Ingen egen typskala definierad än utöver `.tran-label`/`.tran-tabular`-klasserna; sidrubriker använder `text-4xl` som platshållare | **Öppet** |
 | 3 | Brytpunkter | Ospecificerat | Okänt — sajten ej avläst | Tailwind v4:s standardbrytpunkter (`sm/md/lg/xl/2xl`) används tillfälligt | **Öppet** |
 | 4 | Komponentmönster (nav, språkväxlare, varukorgsikon, länkstilar, footer) | Ospecificerat | Okänt — sajten ej avläst | Adminets header byggd fritt utifrån "wordmark vänster, avdelare, navigation"-beskrivningen i profilen, inga sajtspecifika mönster kopierade | **Öppet** |
-| 5 | Master-SVG av wordmarken "TRAN®" | SVG, aldrig text med fallback-font | Okänt | Platshållar-SVG med `<text>` i Bulky-fonten (inte en riktig vektoriserad logotyp) i `tran-wordmark.tsx` | **Öppet — behöver riktig fil från er** |
+| 5 | Master-SVG av wordmarken "TRAN®" | SVG, aldrig text med fallback-font | Okänt | Riktig logotypfil mottagen (rastergrafik, `/public/logo/tran-wordmark.webp`) i `tran-wordmark.tsx` — inte längre text-med-fallback-font, men inte heller en vektor-SVG (inget bildspårningsverktyg tillgängligt i den här sandboxen) | **Delvis löst** — fungerar, riktig vektor-SVG om ni har originalfilen |
 | 6 | Bulky-fontfil | Självhostas i `/public/fonts` | — | Mottagen direkt från er (`Bulky__Final_Edit.ttf`, familj "bulky", vikt Medium), sparad som `/public/fonts/Bulky.ttf` | **Löst** |
 | 7 | `ALLOWED_ADMIN_EMAILS` startvärde | `systrarna@trancoffeelab.com,‹winnies-adress›` | — | Ni bekräftade att Winnie loggar in med samma adress, `systrarna@trancoffeelab.com` — startvärdet är alltså en enda adress. Fler adresser läggs till i Vercel vid behov, inte i kod. | **Löst** |
 | 8 | Kustom-dokumentation (docs.kustom.co, api.playground.kustom.co) | Skulle verifieras innan klienten byggdes | — | Ni klistrade in relevanta delar av dokumentationen och körde ett riktigt playground-test (`pnpm test:kustom`) — se `docs/kustom.md` för exakt vad som är bekräftat kontra fortfarande öppet. | **Till stor del löst, detaljer i docs/kustom.md** |

@@ -1,35 +1,22 @@
 /**
- * PLACEHOLDER tills sajtens riktiga logotyp-SVG finns tillgänglig — se
- * "Avvikelser att bekräfta" i docs/branding.md. Sätts inline (inte som
- * <img src>) så SVG:n kan använda den redan inlästa Bulky-fonten via
- * @font-face i stället för en fallback.
+ * Riktig logotypfil, mottagen från er (samma fil används redan på
+ * trancoffeelab.com — se trancoffeelab-website/src/assets/tran-logo.webp).
+ * Rastergrafik, inte vektor-SVG — den här sandboxen har ingen
+ * bildspårningsverktyg (potrace/imagemagick m.fl. är blockerade av
+ * nätverkspolicyn) för att göra en riktig SVG-spårning. Om ni har
+ * originalfilen som vektor (AI/EPS/SVG) hör av er, annars fungerar den
+ * här rasterversionen fint i alla nuvarande användningar (fast höjd,
+ * `w-auto`).
  */
-export function TranWordmark({
-  className,
-  color = "currentColor",
-}: {
-  className?: string;
-  color?: string;
-}) {
+export function TranWordmark({ className }: { className?: string }) {
   return (
-    <svg
-      viewBox="0 0 220 64"
-      role="img"
-      aria-label="TRAN"
+    // eslint-disable-next-line @next/next/no-img-element -- fast lokal /public-tillgång, inget behov av Next/Image här
+    <img
+      src="/logo/tran-wordmark.webp"
+      alt="TRAN"
+      width={1600}
+      height={645}
       className={className}
-    >
-      <text
-        x="0"
-        y="48"
-        fontFamily="Bulky, ui-sans-serif, system-ui, sans-serif"
-        fontSize="52"
-        fill={color}
-      >
-        TRAN
-        <tspan fontSize="20" dy="-28">
-          ®
-        </tspan>
-      </text>
-    </svg>
+    />
   );
 }
