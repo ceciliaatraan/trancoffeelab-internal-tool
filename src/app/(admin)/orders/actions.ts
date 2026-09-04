@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCurrentAdmin } from "@/lib/current-admin";
+import { expandLineToInventoryTargets } from "@/lib/inventory/bundles";
 import { resolveCartLine } from "@/lib/queries/cart";
 import {
   KustomApiError,
@@ -182,39 +183,51 @@ export async function markShippedAction(orderId: string, formData: FormData) {
       const resolved = await resolveCartLine(line.reference);
       if (!resolved) continue;
 
-      const condition = resolved.variantId
-        ? and(
-            eq(schema.inventory.productId, resolved.productId),
-            eq(schema.inventory.variantId, resolved.variantId),
-          )
-        : and(
-            eq(schema.inventory.productId, resolved.productId),
-            isNull(schema.inventory.variantId),
-          );
+      const targets = await expandLineToInventoryTargets(
+        tx,
+        resolved.productId,
+        resolved.variantId,
+        line.quantity,
+      );
 
-      const [inventoryRow] = await tx
-        .select({ id: schema.inventory.id })
-        .from(schema.inventory)
-        .where(condition);
+      for (const target of targets) {
+        const condition = target.variantId
+          ? and(
+              eq(schema.inventory.productId, target.productId),
+              eq(schema.inventory.variantId, target.variantId),
+            )
+          : and(
+              eq(schema.inventory.productId, target.productId),
+              isNull(schema.inventory.variantId),
+            );
 
-      if (!inventoryRow) continue;
+        const [inventoryRow] = await tx
+          .select({ id: schema.inventory.id })
+          .from(schema.inventory)
+          .where(condition);
 
-      await tx
-        .update(schema.inventory)
-        .set({
-          quantity: sql`${schema.inventory.quantity} - ${line.quantity}`,
-          reservedQuantity: sql`${schema.inventory.reservedQuantity} - ${line.quantity}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.inventory.id, inventoryRow.id));
+        if (!inventoryRow) continue;
 
-      await tx.insert(schema.inventoryMovements).values({
-        inventoryId: inventoryRow.id,
-        changeAmount: -line.quantity,
-        reason: "order_shipped",
-        orderId,
-        note: `Skickad: ${carrier} ${trackingNumber}`,
-      });
+        await tx
+          .update(schema.inventory)
+          .set({
+            quantity: sql`${schema.inventory.quantity} - ${target.quantity}`,
+            reservedQuantity: sql`${schema.inventory.reservedQuantity} - ${target.quantity}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.inventory.id, inventoryRow.id));
+
+        await tx.insert(schema.inventoryMovements).values({
+          inventoryId: inventoryRow.id,
+          changeAmount: -target.quantity,
+          reason: "order_shipped",
+          orderId,
+          note:
+            target.productId === resolved.productId
+              ? `Skickad: ${carrier} ${trackingNumber}`
+              : `Skickad: ${carrier} ${trackingNumber} (komponent i "${resolved.nameSv}")`,
+        });
+      }
     }
   });
 

@@ -9,6 +9,7 @@ import {
   index,
   boolean,
   date,
+  unique,
 } from "drizzle-orm/pg-core";
 import { adminUsers } from "./admin";
 
@@ -126,3 +127,41 @@ export const inventoryMovements = pgTable("inventory_movements", {
     .defaultNow(),
 });
 inventoryMovements.enableRLS();
+
+/**
+ * Kit-produkter (t.ex. Komplett Kit) har inget eget lagersaldo att fylla i
+ * manuellt — hur många som går att sätta ihop beräknas från
+ * komponenternas fria lager (kvantitet minus reserverat). Bara
+ * produktnivå stöds (ingen `componentVariantId` som pekar på en
+ * kit-variant), eftersom inga av dagens kit har varianter — enkelt att
+ * utöka om det behövs.
+ */
+export const productBundleItems = pgTable(
+  "product_bundle_items",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    bundleProductId: uuid("bundle_product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "cascade" }),
+    componentProductId: uuid("component_product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict" }),
+    componentVariantId: uuid("component_variant_id").references(
+      () => productVariants.id,
+      { onDelete: "restrict" },
+    ),
+    quantity: integer("quantity").notNull().default(1),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("product_bundle_items_bundle_idx").on(table.bundleProductId),
+    unique("product_bundle_items_component_unique").on(
+      table.bundleProductId,
+      table.componentProductId,
+      table.componentVariantId,
+    ),
+  ],
+);
+productBundleItems.enableRLS();

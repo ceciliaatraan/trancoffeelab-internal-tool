@@ -10,7 +10,7 @@
 //
 // Körs med: pnpm exec dotenv -e .env.local -- pnpm exec tsx scripts/seed-products.ts
 
-import { eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { db, schema } from "../src/db";
 
 const PLACEHOLDER_SLUGS = [
@@ -124,12 +124,27 @@ const PRODUCTS: SeedProduct[] = [
   },
 ];
 
+/**
+ * Komplett Kit har inget eget lagersaldo — hur många som går att sätta
+ * ihop beräknas från komponenternas fria lager (se
+ * src/lib/inventory/bundles.ts). Sammansättningen är hämtad direkt ur
+ * kitets egen beskrivning ovan: "vårt signaturmörka rostade kaffe,
+ * traditionell sötad kondenserad mjölk och ett litet phin-filter".
+ */
+const KIT_COMPONENTS: { bundleSlug: string; componentSlug: string; quantity: number }[] = [
+  { bundleSlug: "full-kit", componentSlug: "signature-coffee", quantity: 1 },
+  { bundleSlug: "full-kit", componentSlug: "condensed-milk", quantity: 1 },
+  { bundleSlug: "full-kit", componentSlug: "phin-filter-small", quantity: 1 },
+];
+
 async function main() {
   const removed = await db
     .delete(schema.products)
     .where(inArray(schema.products.slug, PLACEHOLDER_SLUGS))
     .returning({ slug: schema.products.slug });
   console.log(`Tog bort ${removed.length} platshållarprodukt(er):`, removed.map((r) => r.slug));
+
+  const productIdBySlug = new Map<string, string>();
 
   for (const product of PRODUCTS) {
     const [row] = await db
@@ -164,6 +179,8 @@ async function main() {
       })
       .returning({ id: schema.products.id, slug: schema.products.slug });
 
+    productIdBySlug.set(row.slug, row.id);
+
     const [existingInventory] = await db
       .select({ id: schema.inventory.id })
       .from(schema.inventory)
@@ -175,6 +192,45 @@ async function main() {
 
     console.log(`Upsertade ${row.slug} (${product.sku})`);
   }
+
+  for (const item of KIT_COMPONENTS) {
+    const bundleProductId = productIdBySlug.get(item.bundleSlug);
+    const componentProductId = productIdBySlug.get(item.componentSlug);
+    if (!bundleProductId || !componentProductId) {
+      throw new Error(
+        `Kunde inte hitta produkt-id för kit-komponent: ${item.bundleSlug} -> ${item.componentSlug}`,
+      );
+    }
+
+    // Postgres unique-index behandlar NULL som distinkt från NULL, så
+    // ON CONFLICT på (bundle, komponent, variant) skulle inte träffa här
+    // (component_variant_id är alltid null i dagens kit) — läs och
+    // uppdatera/infoga manuellt i stället för att lita på ON CONFLICT.
+    const [existing] = await db
+      .select({ id: schema.productBundleItems.id })
+      .from(schema.productBundleItems)
+      .where(
+        and(
+          eq(schema.productBundleItems.bundleProductId, bundleProductId),
+          eq(schema.productBundleItems.componentProductId, componentProductId),
+          isNull(schema.productBundleItems.componentVariantId),
+        ),
+      );
+
+    if (existing) {
+      await db
+        .update(schema.productBundleItems)
+        .set({ quantity: item.quantity })
+        .where(eq(schema.productBundleItems.id, existing.id));
+    } else {
+      await db.insert(schema.productBundleItems).values({
+        bundleProductId,
+        componentProductId,
+        quantity: item.quantity,
+      });
+    }
+  }
+  console.log(`Satte upp ${KIT_COMPONENTS.length} kit-komponent(er) för Komplett Kit.`);
 
   console.log(
     "\nKlart. Bilder saknas fortfarande (images: []) — ladda upp de riktiga produktfotona " +

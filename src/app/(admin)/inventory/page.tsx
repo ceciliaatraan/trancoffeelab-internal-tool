@@ -1,5 +1,4 @@
-import { asc, eq } from "drizzle-orm";
-import { db, schema } from "@/db";
+import { getInventoryOverview } from "@/lib/inventory/overview";
 import { adjustInventory } from "./actions";
 
 const inputClass =
@@ -11,24 +10,7 @@ export default async function InventoryPage({
   const search = await searchParams;
   const error = typeof search.error === "string" ? search.error : null;
 
-  const rows = await db
-    .select({
-      inventoryId: schema.inventory.id,
-      quantity: schema.inventory.quantity,
-      reservedQuantity: schema.inventory.reservedQuantity,
-      alarmLevel: schema.inventory.alarmLevel,
-      productName: schema.products.nameSv,
-      productSku: schema.products.sku,
-      variantName: schema.productVariants.nameSv,
-      variantSku: schema.productVariants.sku,
-    })
-    .from(schema.inventory)
-    .innerJoin(schema.products, eq(schema.inventory.productId, schema.products.id))
-    .leftJoin(
-      schema.productVariants,
-      eq(schema.inventory.variantId, schema.productVariants.id),
-    )
-    .orderBy(asc(schema.products.nameSv));
+  const rows = await getInventoryOverview();
 
   return (
     <div className="flex flex-col gap-8">
@@ -56,55 +38,77 @@ export default async function InventoryPage({
           </thead>
           <tbody>
             {rows.map((row) => {
-              const belowAlarm = row.quantity <= row.alarmLevel;
+              const belowAlarm = row.available <= row.alarmLevel;
               return (
                 <tr key={row.inventoryId} className="border-b border-tran-hairline">
-                  <td className="py-4 pr-4">
+                  <td className="py-4 pr-4 align-top">
                     {row.productName}
                     {row.variantName ? ` — ${row.variantName}` : ""}
+                    {row.isBundle && row.bundleBreakdown ? (
+                      <ul className="mt-1 text-xs text-tran-muted">
+                        {row.bundleBreakdown.map((component) => (
+                          <li key={component.name}>
+                            {component.name}: {component.available} i lager
+                            {component.quantityPerBundle > 1
+                              ? ` (${component.quantityPerBundle}/kit)`
+                              : ""}
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
                   </td>
-                  <td className="tran-tabular py-4 pr-4 text-tran-muted">
-                    {row.variantSku ?? row.productSku}
+                  <td className="tran-tabular py-4 pr-4 align-top text-tran-muted">
+                    {row.sku}
                   </td>
                   <td
-                    className={`tran-tabular py-4 pr-4 ${belowAlarm ? "text-tran-red" : ""}`}
+                    className={`tran-tabular py-4 pr-4 align-top ${belowAlarm ? "text-tran-red" : ""}`}
                   >
-                    {row.quantity}
+                    {row.available}
                     {belowAlarm ? " — Slut i lager" : ""}
                   </td>
-                  <td className="tran-tabular py-4 pr-4 text-tran-muted">
-                    {row.reservedQuantity}
+                  <td className="tran-tabular py-4 pr-4 align-top text-tran-muted">
+                    {row.isBundle ? "—" : row.reservedQuantity}
                   </td>
-                  <td className="tran-tabular py-4 pr-4 text-tran-muted">
+                  <td className="tran-tabular py-4 pr-4 align-top text-tran-muted">
                     {row.alarmLevel}
                   </td>
-                  <td className="py-4 pr-4">
-                    <form action={adjustInventory} className="flex items-center gap-2">
-                      <input type="hidden" name="inventoryId" value={row.inventoryId} />
-                      <input
-                        name="newQuantity"
-                        type="number"
-                        min={0}
-                        required
-                        defaultValue={row.quantity}
-                        className={inputClass}
-                      />
-                      <select name="reason" defaultValue="manual_adjustment" className={inputClass}>
-                        <option value="manual_adjustment">Justering</option>
-                        <option value="return">Retur</option>
-                      </select>
-                      <input
-                        name="note"
-                        placeholder="Anteckning (valfritt)"
-                        className="w-36 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
-                      />
-                      <button
-                        type="submit"
-                        className="tran-label border border-tran-black px-2 py-1.5 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red"
-                      >
-                        Spara
-                      </button>
-                    </form>
+                  <td className="py-4 pr-4 align-top">
+                    {row.isBundle ? (
+                      <p className="text-xs text-tran-muted">
+                        Beräknas automatiskt utifrån komponenterna till vänster.
+                      </p>
+                    ) : (
+                      <form action={adjustInventory} className="flex items-center gap-2">
+                        <input type="hidden" name="inventoryId" value={row.inventoryId} />
+                        <input
+                          name="newQuantity"
+                          type="number"
+                          min={0}
+                          required
+                          defaultValue={row.quantity}
+                          className={inputClass}
+                        />
+                        <select
+                          name="reason"
+                          defaultValue="manual_adjustment"
+                          className={inputClass}
+                        >
+                          <option value="manual_adjustment">Justering</option>
+                          <option value="return">Retur</option>
+                        </select>
+                        <input
+                          name="note"
+                          placeholder="Anteckning (valfritt)"
+                          className="w-36 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
+                        />
+                        <button
+                          type="submit"
+                          className="tran-label border border-tran-black px-2 py-1.5 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red"
+                        >
+                          Spara
+                        </button>
+                      </form>
+                    )}
                   </td>
                 </tr>
               );

@@ -1,6 +1,7 @@
 import "server-only";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { expandLineToInventoryTargets } from "@/lib/inventory/bundles";
 import type { KustomOrderManagementOrder } from "@/lib/kustom/client";
 import { resolveCartLine, type ResolvedCartLine } from "@/lib/queries/cart";
 
@@ -152,37 +153,49 @@ export async function persistOrderFromKustom(
       });
 
       if (resolved && isFinal) {
-        const condition = resolved.variantId
-          ? and(
-              eq(schema.inventory.productId, resolved.productId),
-              eq(schema.inventory.variantId, resolved.variantId),
-            )
-          : and(
-              eq(schema.inventory.productId, resolved.productId),
-              isNull(schema.inventory.variantId),
-            );
+        const targets = await expandLineToInventoryTargets(
+          tx,
+          resolved.productId,
+          resolved.variantId,
+          line.quantity,
+        );
 
-        const [inventoryRow] = await tx
-          .select({ id: schema.inventory.id })
-          .from(schema.inventory)
-          .where(condition);
+        for (const target of targets) {
+          const condition = target.variantId
+            ? and(
+                eq(schema.inventory.productId, target.productId),
+                eq(schema.inventory.variantId, target.variantId),
+              )
+            : and(
+                eq(schema.inventory.productId, target.productId),
+                isNull(schema.inventory.variantId),
+              );
 
-        if (inventoryRow) {
-          await tx
-            .update(schema.inventory)
-            .set({
-              reservedQuantity: sql`${schema.inventory.reservedQuantity} + ${line.quantity}`,
-              updatedAt: new Date(),
-            })
-            .where(eq(schema.inventory.id, inventoryRow.id));
+          const [inventoryRow] = await tx
+            .select({ id: schema.inventory.id })
+            .from(schema.inventory)
+            .where(condition);
 
-          await tx.insert(schema.inventoryMovements).values({
-            inventoryId: inventoryRow.id,
-            changeAmount: line.quantity,
-            reason: "order_reserved",
-            orderId: inserted.id,
-            note: "Reserverat vid orderbekräftelse från Kustom",
-          });
+          if (inventoryRow) {
+            await tx
+              .update(schema.inventory)
+              .set({
+                reservedQuantity: sql`${schema.inventory.reservedQuantity} + ${target.quantity}`,
+                updatedAt: new Date(),
+              })
+              .where(eq(schema.inventory.id, inventoryRow.id));
+
+            await tx.insert(schema.inventoryMovements).values({
+              inventoryId: inventoryRow.id,
+              changeAmount: target.quantity,
+              reason: "order_reserved",
+              orderId: inserted.id,
+              note:
+                target.productId === resolved.productId
+                  ? "Reserverat vid orderbekräftelse från Kustom"
+                  : `Reserverat vid orderbekräftelse från Kustom (komponent i "${resolved.nameSv}")`,
+            });
+          }
         }
       }
 

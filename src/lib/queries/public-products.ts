@@ -1,6 +1,7 @@
 import "server-only";
 import { and, asc, eq, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { computeBundleAvailability } from "@/lib/inventory/bundles";
 
 export type PublicVariant = {
   sku: string;
@@ -102,6 +103,7 @@ function baseProductQuery() {
 function toPublicProduct(
   row: Awaited<ReturnType<typeof baseProductQuery>>[number],
   variants: PublicVariant[],
+  bundleAvailable: number | null,
 ): PublicProduct {
   return {
     slug: row.slug,
@@ -113,9 +115,11 @@ function toPublicProduct(
     images: row.images,
     weightGrams: row.weightGrams,
     inStock:
-      variants.length > 0
-        ? variants.some((variant) => variant.inStock)
-        : availableQuantity(row.quantity ?? 0, row.reservedQuantity ?? 0) > 0,
+      bundleAvailable !== null
+        ? bundleAvailable > 0
+        : variants.length > 0
+          ? variants.some((variant) => variant.inStock)
+          : availableQuantity(row.quantity ?? 0, row.reservedQuantity ?? 0) > 0,
     variants,
     isPreorder: row.isPreorder,
     expectedShipDate: row.expectedShipDate,
@@ -128,8 +132,13 @@ export async function getPublishedProducts(): Promise<PublicProduct[]> {
     .orderBy(asc(schema.products.sortOrder));
 
   const variantsByProduct = await attachVariants(rows.map((row) => row.id));
+  const bundleAvailability = await Promise.all(
+    rows.map((row) => computeBundleAvailability(db, row.id)),
+  );
 
-  return rows.map((row) => toPublicProduct(row, variantsByProduct.get(row.id) ?? []));
+  return rows.map((row, index) =>
+    toPublicProduct(row, variantsByProduct.get(row.id) ?? [], bundleAvailability[index]),
+  );
 }
 
 export async function getPublishedProductBySlug(
@@ -142,5 +151,6 @@ export async function getPublishedProductBySlug(
   if (!row) return null;
 
   const variantsByProduct = await attachVariants([row.id]);
-  return toPublicProduct(row, variantsByProduct.get(row.id) ?? []);
+  const bundleAvailable = await computeBundleAvailability(db, row.id);
+  return toPublicProduct(row, variantsByProduct.get(row.id) ?? [], bundleAvailable);
 }

@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCurrentAdmin } from "@/lib/current-admin";
+import { getBundleItemsForProduct } from "@/lib/inventory/bundles";
 import { inventoryAdjustSchema } from "@/lib/validation/product";
 
 export async function adjustInventory(formData: FormData) {
@@ -27,13 +28,20 @@ export async function adjustInventory(formData: FormData) {
 
   await db.transaction(async (tx) => {
     const [row] = await tx
-      .select({ quantity: schema.inventory.quantity })
+      .select({ productId: schema.inventory.productId, quantity: schema.inventory.quantity })
       .from(schema.inventory)
       .where(eq(schema.inventory.id, inventoryId))
       .for("update");
 
     if (!row) {
       throw new Error("Lagerraden finns inte.");
+    }
+
+    const bundleItems = await getBundleItemsForProduct(tx, row.productId);
+    if (bundleItems.length > 0) {
+      throw new Error(
+        "Det här är ett kit — lagersaldot beräknas automatiskt utifrån komponenterna och kan inte ändras manuellt.",
+      );
     }
 
     const delta = newQuantity - row.quantity;

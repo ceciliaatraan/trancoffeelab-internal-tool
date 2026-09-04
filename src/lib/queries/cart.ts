@@ -1,6 +1,7 @@
 import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { computeBundleAvailability } from "@/lib/inventory/bundles";
 
 export type ResolvedCartLine = {
   sku: string;
@@ -44,6 +45,13 @@ async function resolveBaseProduct(sku: string): Promise<ResolvedCartLine | null>
 
   if (!row) return null;
 
+  /**
+   * Kit (t.ex. Komplett Kit) har inget eget lagersaldo — hur många som
+   * går att sätta ihop beräknas från komponenternas fria lager. Returnerar
+   * null för vanliga produkter, så de faller tillbaka på sin egen rad.
+   */
+  const bundleAvailable = await computeBundleAvailability(db, row.productId);
+
   return {
     sku,
     nameSv: row.nameSv,
@@ -51,7 +59,8 @@ async function resolveBaseProduct(sku: string): Promise<ResolvedCartLine | null>
     priceOre: row.priceOre,
     taxRate: row.taxRate,
     weightGrams: row.weightGrams,
-    available: Math.max(0, (row.quantity ?? 0) - (row.reservedQuantity ?? 0)),
+    available:
+      bundleAvailable ?? Math.max(0, (row.quantity ?? 0) - (row.reservedQuantity ?? 0)),
     productId: row.productId,
     variantId: null,
     isPreorder: row.isPreorder,

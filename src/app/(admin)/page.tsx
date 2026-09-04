@@ -1,7 +1,8 @@
 import Link from "next/link";
-import { and, asc, desc, eq, gte, isNotNull, lte, ne, sql } from "drizzle-orm";
+import { and, desc, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatDateTime, formatOre } from "@/lib/format";
+import { getInventoryOverview } from "@/lib/inventory/overview";
 
 function startOfToday(): Date {
   const now = new Date();
@@ -32,35 +33,27 @@ async function sumOrderAmount(since: Date): Promise<number> {
 }
 
 export default async function DashboardPage() {
-  const [todaySales, weekSales, unprocessedOrders, lowStock, webhookErrors] = await Promise.all([
-    sumOrderAmount(startOfToday()),
-    sumOrderAmount(startOfWeek()),
-    db
-      .select({ count: sql<number>`count(*)` })
-      .from(schema.orders)
-      .where(eq(schema.orders.fulfillmentStatus, "unfulfilled")),
-    db
-      .select({
-        productName: schema.products.nameSv,
-        variantName: schema.productVariants.nameSv,
-        quantity: schema.inventory.quantity,
-        reservedQuantity: schema.inventory.reservedQuantity,
-        alarmLevel: schema.inventory.alarmLevel,
-      })
-      .from(schema.inventory)
-      .innerJoin(schema.products, eq(schema.inventory.productId, schema.products.id))
-      .leftJoin(schema.productVariants, eq(schema.inventory.variantId, schema.productVariants.id))
-      .where(lte(schema.inventory.quantity, schema.inventory.alarmLevel))
-      .orderBy(asc(schema.inventory.quantity)),
-    db
-      .select()
-      .from(schema.webhookEvents)
-      .where(and(eq(schema.webhookEvents.processed, false), isNotNull(schema.webhookEvents.errorMessage)))
-      .orderBy(desc(schema.webhookEvents.receivedAt))
-      .limit(5),
-  ]);
+  const [todaySales, weekSales, unprocessedOrders, inventoryOverview, webhookErrors] =
+    await Promise.all([
+      sumOrderAmount(startOfToday()),
+      sumOrderAmount(startOfWeek()),
+      db
+        .select({ count: sql<number>`count(*)` })
+        .from(schema.orders)
+        .where(eq(schema.orders.fulfillmentStatus, "unfulfilled")),
+      getInventoryOverview(),
+      db
+        .select()
+        .from(schema.webhookEvents)
+        .where(and(eq(schema.webhookEvents.processed, false), isNotNull(schema.webhookEvents.errorMessage)))
+        .orderBy(desc(schema.webhookEvents.receivedAt))
+        .limit(5),
+    ]);
 
   const unprocessedCount = Number(unprocessedOrders[0]?.count ?? 0);
+  const lowStock = inventoryOverview
+    .filter((row) => row.available <= row.alarmLevel)
+    .sort((a, b) => a.available - b.available);
 
   return (
     <div className="flex flex-col gap-10">
@@ -91,10 +84,10 @@ export default async function DashboardPage() {
           <p className="text-sm text-tran-muted">Inga produkter under larmnivå.</p>
         ) : (
           <ul className="text-sm">
-            {lowStock.map((row, index) => (
-              <li key={index} className="border-b border-tran-hairline py-2">
+            {lowStock.map((row) => (
+              <li key={row.inventoryId} className="border-b border-tran-hairline py-2">
                 {row.productName}
-                {row.variantName ? ` — ${row.variantName}` : ""}: {row.quantity} i lager
+                {row.variantName ? ` — ${row.variantName}` : ""}: {row.available} i lager
                 (larmnivå {row.alarmLevel})
               </li>
             ))}
