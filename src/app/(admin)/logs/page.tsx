@@ -25,28 +25,45 @@ export default async function LogsPage() {
                 <th className="py-2 pr-4 font-medium">Bearbetad</th>
                 <th className="py-2 pr-4 font-medium">Fel</th>
                 <th className="py-2 pr-4 font-medium">Mottaget</th>
+                <th className="py-2 pr-4 font-medium">Klar</th>
+                <th className="py-2 pr-4 font-medium">Tid</th>
               </tr>
             </thead>
             <tbody>
-              {webhookEvents.map((event) => (
-                <tr key={event.id} className="border-b border-tran-hairline">
-                  <td className="py-2 pr-4">{event.source}</td>
-                  <td className="tran-tabular py-2 pr-4 text-tran-muted">
-                    {event.kustomOrderId ?? "—"}
-                  </td>
-                  <td className="py-2 pr-4">
-                    {event.processed ? (
-                      "Ja"
-                    ) : (
-                      <span className="text-tran-red">Nej</span>
-                    )}
-                  </td>
-                  <td className="py-2 pr-4 text-tran-red">{event.errorMessage ?? ""}</td>
-                  <td className="tran-tabular py-2 pr-4 text-tran-muted">
-                    {formatDateTime(event.receivedAt)}
-                  </td>
-                </tr>
-              ))}
+              {webhookEvents.map((event) => {
+                const processingMs = event.processedAt
+                  ? event.processedAt.getTime() - event.receivedAt.getTime()
+                  : null;
+                return (
+                  <tr key={event.id} className="border-b border-tran-hairline">
+                    <td className="py-2 pr-4">{event.source}</td>
+                    <td className="tran-tabular py-2 pr-4 text-tran-muted">
+                      {event.kustomOrderId ?? "—"}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {event.processed ? (
+                        "Ja"
+                      ) : (
+                        <span className="text-tran-red">Nej</span>
+                      )}
+                    </td>
+                    <td className="py-2 pr-4 text-tran-red">{event.errorMessage ?? ""}</td>
+                    <td className="tran-tabular py-2 pr-4 text-tran-muted">
+                      {formatDateTime(event.receivedAt)}
+                    </td>
+                    <td className="tran-tabular py-2 pr-4 text-tran-muted">
+                      {event.processedAt ? formatDateTime(event.processedAt) : "—"}
+                    </td>
+                    <td className="tran-tabular py-2 pr-4 text-tran-muted">
+                      {processingMs === null
+                        ? "—"
+                        : processingMs < 1000
+                          ? `${processingMs} ms`
+                          : `${(processingMs / 1000).toFixed(1)} s`}
+                    </td>
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         )}
