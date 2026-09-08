@@ -110,6 +110,19 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
   const preorderLabel = isEnglish ? "Preorder" : "Förbeställning";
   const shipLabel = isEnglish ? "Estimated ship" : "Beräknad leverans";
   const shippingLabel = isEnglish ? "Shipping" : "Frakt";
+  const freeShippingLabel = isEnglish ? "Free shipping" : "Fri frakt";
+  /**
+   * `shipping` är null (inte undefined) för en riktig order utan
+   * fraktkostnad — Kustom fick då ingen shipping_fee-rad alls (t.ex.
+   * gränsen för fri frakt uppnådd, se checkout/session/route.ts). En
+   * rad på exakt 0 kr räknas likadant. undefined betyder att anroparen
+   * inte skickat med fraktinfo alls (äldre anrop/tester) — då visas
+   * ingen rad, för att inte ljuga om en order vi inte vet något om.
+   */
+  function shippingValueText(shipping: { amountOre: number } | null): string {
+    if (!shipping || shipping.amountOre === 0) return freeShippingLabel;
+    return `${formatPrice(shipping.amountOre, isEnglish)} kr`;
+  }
   const closingLine = isEnglish
     ? "Thank you for helping us spread Vietnamese coffee across Sweden."
     : "Tack för att ni är med och sprider vietnamesiskt kaffe i Sverige.";
@@ -145,12 +158,13 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
     })
     .join("");
 
-  const shippingRow = input.shipping
-    ? `<tr>
+  const shippingRow =
+    input.shipping === undefined
+      ? ""
+      : `<tr>
         <td style="font-size:13px;color:rgba(0,0,0,0.55);padding-bottom:6px;">${escapeHtml(shippingLabel)}</td>
-        <td style="font-size:13px;color:rgba(0,0,0,0.55);text-align:right;padding-bottom:6px;">${formatPrice(input.shipping.amountOre, isEnglish)} kr</td>
-      </tr>`
-    : "";
+        <td style="font-size:13px;color:rgba(0,0,0,0.55);text-align:right;padding-bottom:6px;">${escapeHtml(shippingValueText(input.shipping))}</td>
+      </tr>`;
 
   const html = `<!doctype html>
 <html lang="${isEnglish ? "en" : "sv"}">
@@ -211,9 +225,8 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
 </html>`;
 
   const footer = `${closingLine}\n\n${signature}\nTRAN Coffee Lab`;
-  const shippingText = input.shipping
-    ? `${shippingLabel}: ${formatPrice(input.shipping.amountOre, isEnglish)} kr\n`
-    : "";
+  const shippingText =
+    input.shipping === undefined ? "" : `${shippingLabel}: ${shippingValueText(input.shipping)}\n`;
 
   if (isEnglish) {
     return {

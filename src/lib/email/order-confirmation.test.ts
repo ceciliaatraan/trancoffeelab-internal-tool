@@ -221,9 +221,30 @@ describe("renderEmail", () => {
     expect(text).toContain("Shipping: 49.00 kr");
   });
 
-  it("visar ingen fraktrad om ordern saknar frakt (t.ex. redan inkluderad eller fri frakt utan egen rad)", () => {
+  it("visar ingen fraktrad om anroparen inte skickat med fraktinfo alls (shipping: undefined)", () => {
     const { text } = renderEmail({ ...baseInput, locale: "sv-SE" });
     expect(text).not.toContain("Frakt:");
+  });
+
+  it("visar 'Fri frakt' istället för 0,00 kr när Kustom inte skapade någon fraktrad (shipping: null — gränsen för fri frakt uppnådd)", () => {
+    const { html, text } = renderEmail({ ...baseInput, locale: "sv-SE", shipping: null });
+    expect(text).toContain("Frakt: Fri frakt");
+    expect(text).not.toContain("0,00 kr");
+    expect(html).toContain("Fri frakt");
+  });
+
+  it("visar 'Fri frakt' även när en riktig fraktrad finns men landar på exakt 0 kr", () => {
+    const { text } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      shipping: { name: "Frakt", amountOre: 0 },
+    });
+    expect(text).toContain("Frakt: Fri frakt");
+  });
+
+  it("visar 'Free shipping' på engelska när frakten är gratis", () => {
+    const { text } = renderEmail({ ...baseInput, locale: "en-US", shipping: null });
+    expect(text).toContain("Shipping: Free shipping");
   });
 
   it("länkar produktbild och namn till produktsidan när raden har en slug", () => {
