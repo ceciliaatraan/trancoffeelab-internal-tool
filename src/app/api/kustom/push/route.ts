@@ -1,10 +1,7 @@
 import { NextResponse, after } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { acknowledgeOrder, getOrderManagementOrder } from "@/lib/kustom/client";
-import { persistOrderFromKustom } from "@/lib/orders/persist-order";
-import { capturePreorderOrder } from "@/lib/orders/capture-preorder";
-import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
+import { processKustomOrder } from "@/lib/orders/process-kustom-order";
 
 /**
  * order_id kommer som query-parameter (bekräftat i AGENTS.md:s
@@ -44,30 +41,7 @@ export async function POST(request: Request) {
 
   after(async () => {
     try {
-      const order = await getOrderManagementOrder(orderId);
-      const persisted = await persistOrderFromKustom(order);
-
-      if (!persisted.alreadyExisted) {
-        await acknowledgeOrder(orderId, orderId);
-
-        // Preorder-ordrar captureas direkt, oavsett betalmetod — se den
-        // förklarande kommentaren i capture-preorder.ts. Icke-preorder-
-        // ordrar rörs INTE här; de captureas fortsatt manuellt via
-        // "Debitera"-knappen i /orders/[id] (captureOrderAction).
-        if (persisted.containsPreorder) {
-          await capturePreorderOrder(persisted.id, orderId, order.order_amount);
-        }
-
-        if (order.billing_address?.email) {
-          await sendOrderConfirmationEmail({
-            to: order.billing_address.email,
-            locale: order.locale,
-            orderNumber: persisted.orderNumber,
-            totalOre: order.order_amount,
-            lines: persisted.physicalLines,
-          });
-        }
-      }
+      await processKustomOrder(orderId);
 
       await db
         .update(schema.webhookEvents)
