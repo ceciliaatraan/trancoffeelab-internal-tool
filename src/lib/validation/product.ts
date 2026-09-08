@@ -25,7 +25,7 @@ export const productInputSchema = z.object({
     .min(0, "Moms kan inte vara negativ")
     .max(10000, "Moms kan inte överstiga 100%"),
   weightGrams: z.coerce.number().int().min(1, "Vikt krävs"),
-  status: z.enum(["draft", "published", "archived"]),
+  status: z.enum(["draft", "published", "archived", "coming_soon"]),
   sortOrder: z.coerce.number().int().default(0),
   /** Förbeställning: egenskap på PRODUKTEN, inte på varianten. */
   isPreorder: z.coerce.boolean().default(false),

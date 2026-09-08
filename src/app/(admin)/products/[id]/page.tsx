@@ -55,7 +55,7 @@ export default async function EditProductPage({
           <StatusChip status={product.status} />
         </div>
         <div className="flex gap-2">
-          {(["draft", "published", "archived"] as const)
+          {(["draft", "published", "coming_soon", "archived"] as const)
             .filter((status) => status !== product.status)
             .map((status) => (
               <form key={status} action={setProductStatus.bind(null, id, status)}>
@@ -67,7 +67,9 @@ export default async function EditProductPage({
                     ? "Sätt som utkast"
                     : status === "published"
                       ? "Publicera"
-                      : "Arkivera"}
+                      : status === "coming_soon"
+                        ? "Sätt som 'Kommer snart'"
+                        : "Arkivera"}
                 </button>
               </form>
             ))}

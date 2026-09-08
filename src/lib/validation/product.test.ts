@@ -45,6 +45,18 @@ describe("productInputSchema", () => {
       productInputSchema.safeParse({ ...validInput, slug: "phin-filter-2-pack" }).success,
     ).toBe(true);
   });
+
+  it("accepterar status coming_soon (synlig sneak peek, inte köpbar)", () => {
+    expect(
+      productInputSchema.safeParse({ ...validInput, status: "coming_soon" }).success,
+    ).toBe(true);
+  });
+
+  it("underkänner ogiltig status", () => {
+    expect(
+      productInputSchema.safeParse({ ...validInput, status: "hidden" }).success,
+    ).toBe(false);
+  });
 });
 
 describe("inventoryAdjustSchema", () => {

@@ -36,6 +36,13 @@
       "when": 1788855051548,
       "tag": "0004_common_starbolt",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1788875923915,
+      "tag": "0005_even_the_hunter",
+      "breakpoints": true
     }
   ]
 }

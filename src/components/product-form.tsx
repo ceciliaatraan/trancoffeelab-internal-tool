@@ -157,6 +157,7 @@ export function ProductForm({
           >
             <option value="draft">Utkast</option>
             <option value="published">Publicerad</option>
+            <option value="coming_soon">Kommer snart (synlig, ej köpbar)</option>
             <option value="archived">Arkiverad</option>
           </select>
         </div>

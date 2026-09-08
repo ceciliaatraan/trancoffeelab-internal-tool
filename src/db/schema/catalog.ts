@@ -13,10 +13,19 @@ import {
 } from "drizzle-orm/pg-core";
 import { adminUsers } from "./admin";
 
+/**
+ * coming_soon: synlig publikt (produktsida + lista, för "sneak peek")
+ * men INTE köpbar — samma spärr som draft/archived i resolveCartLine
+ * (lib/queries/cart.ts), som bara accepterar status="published". Bara
+ * getPublishedProducts/getPublishedProductBySlug (lib/queries/public-
+ * products.ts) gör undantag och visar den ändå, flaggad som
+ * PublicProduct.comingSoon.
+ */
 export const productStatusEnum = pgEnum("product_status", [
   "draft",
   "published",
   "archived",
+  "coming_soon",
 ]);
 
 /**

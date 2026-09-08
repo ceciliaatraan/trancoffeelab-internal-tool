@@ -88,7 +88,7 @@ export async function updateProduct(productId: string, formData: FormData) {
 
 export async function setProductStatus(
   productId: string,
-  status: "draft" | "published" | "archived",
+  status: "draft" | "published" | "archived" | "coming_soon",
 ) {
   await requireCurrentAdmin();
   await db

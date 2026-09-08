@@ -1,7 +1,16 @@
 import "server-only";
-import { and, asc, eq, isNull } from "drizzle-orm";
+import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { computeBundleAvailability } from "@/lib/inventory/bundles";
+
+/**
+ * Publikt synliga statusar — inte bara "published". "coming_soon" visas
+ * också (sneak peek), men är ALDRIG köpbar: resolveCartLine
+ * (lib/queries/cart.ts) accepterar bara status="published", så en
+ * coming_soon-produkt kan aldrig läggas i varukorgen eller checkoutas,
+ * oavsett vad klienten skickar in.
+ */
+const PUBLICLY_VISIBLE_STATUSES = ["published", "coming_soon"] as const;
 
 export type PublicVariant = {
   sku: string;
@@ -25,6 +34,8 @@ export type PublicProduct = {
   /** Alltid från produkten (aldrig varianten) — visas som "Beräknad leverans: ‹expectedShipDate›". */
   isPreorder: boolean;
   expectedShipDate: string | null;
+  /** status="coming_soon" — synlig för sneak peek, men aldrig köpbar (se resolveCartLine). */
+  comingSoon: boolean;
 };
 
 function availableQuantity(quantity: number, reserved: number): number {
@@ -87,6 +98,7 @@ function baseProductQuery() {
       weightGrams: schema.products.weightGrams,
       isPreorder: schema.products.isPreorder,
       expectedShipDate: schema.products.expectedShipDate,
+      status: schema.products.status,
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
     })
@@ -123,12 +135,13 @@ function toPublicProduct(
     variants,
     isPreorder: row.isPreorder,
     expectedShipDate: row.expectedShipDate,
+    comingSoon: row.status === "coming_soon",
   };
 }
 
 export async function getPublishedProducts(): Promise<PublicProduct[]> {
   const rows = await baseProductQuery()
-    .where(eq(schema.products.status, "published"))
+    .where(inArray(schema.products.status, PUBLICLY_VISIBLE_STATUSES))
     .orderBy(asc(schema.products.sortOrder));
 
   const variantsByProduct = await attachVariants(rows.map((row) => row.id));
@@ -145,7 +158,7 @@ export async function getPublishedProductBySlug(
   slug: string,
 ): Promise<PublicProduct | null> {
   const [row] = await baseProductQuery().where(
-    and(eq(schema.products.slug, slug), eq(schema.products.status, "published")),
+    and(eq(schema.products.slug, slug), inArray(schema.products.status, PUBLICLY_VISIBLE_STATUSES)),
   );
 
   if (!row) return null;

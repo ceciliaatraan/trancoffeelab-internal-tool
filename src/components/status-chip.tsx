@@ -2,12 +2,14 @@ const STYLES: Record<string, string> = {
   draft: "border border-tran-hairline-strong text-tran-muted",
   published: "bg-tran-black text-tran-white",
   archived: "border border-tran-red text-tran-red",
+  coming_soon: "border border-tran-blue text-tran-blue",
 };
 
 const LABELS: Record<string, string> = {
   draft: "Utkast",
   published: "Publicerad",
   archived: "Arkiverad",
+  coming_soon: "Kommer snart",
 };
 
 export function StatusChip({ status }: { status: string }) {
