@@ -1,46 +1,30 @@
 import Link from "next/link";
-import { and, desc, eq, gte, isNotNull, ne, sql } from "drizzle-orm";
+import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatDateTime, formatOre } from "@/lib/format";
 import { getInventoryOverview } from "@/lib/inventory/overview";
+import { getDailySales, getRecentOrders, getTopProducts, summarizeDailySales } from "@/lib/dashboard/stats";
+import { SalesBarChart } from "@/components/sales-bar-chart";
+import { TopProductsList } from "@/components/top-products-list";
+import { OrderStatusChip } from "@/components/order-status-chip";
+import { PreorderChip } from "@/components/preorder-chip";
 
-function startOfToday(): Date {
-  const now = new Date();
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate());
-}
-
-/** Måndag som veckostart, svensk konvention. */
-function startOfWeek(): Date {
-  const today = startOfToday();
-  const day = today.getDay();
-  const diffToMonday = day === 0 ? 6 : day - 1;
-  today.setDate(today.getDate() - diffToMonday);
-  return today;
-}
-
-async function sumOrderAmount(since: Date): Promise<number> {
-  const [row] = await db
-    .select({ total: sql<number>`coalesce(sum(${schema.orders.orderAmountOre}), 0)` })
-    .from(schema.orders)
-    .where(
-      and(
-        gte(schema.orders.createdAt, since),
-        ne(schema.orders.status, "CANCELLED"),
-        ne(schema.orders.status, "EXPIRED"),
-      ),
-    );
-  return Number(row?.total ?? 0);
-}
+const FULFILLMENT_LABELS: Record<string, string> = {
+  unfulfilled: "Ej skickad",
+  shipped: "Skickad",
+  cancelled: "Avbruten",
+};
 
 export default async function DashboardPage() {
-  const [todaySales, weekSales, unprocessedOrders, inventoryOverview, webhookErrors] =
+  const [daily, recentOrders, topProducts, unprocessedOrders, inventoryOverview, webhookErrors] =
     await Promise.all([
-      sumOrderAmount(startOfToday()),
-      sumOrderAmount(startOfWeek()),
+      getDailySales(30),
+      getRecentOrders(8),
+      getTopProducts(30, 5),
       db
         .select({ count: sql<number>`count(*)` })
         .from(schema.orders)
-        .where(eq(schema.orders.fulfillmentStatus, "unfulfilled")),
+        .where(and(eq(schema.orders.fulfillmentStatus, "unfulfilled"), eq(schema.orders.isTest, false))),
       getInventoryOverview(),
       db
         .select()
@@ -50,6 +34,7 @@ export default async function DashboardPage() {
         .limit(5),
     ]);
 
+  const summary = summarizeDailySales(daily);
   const unprocessedCount = Number(unprocessedOrders[0]?.count ?? 0);
   const lowStock = inventoryOverview
     .filter((row) => row.available <= row.alarmLevel)
@@ -59,14 +44,22 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-10">
       <h1 className="text-4xl font-bold uppercase tracking-tight">Dashboard</h1>
 
-      <section className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+      <section className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
         <div className="border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Försäljning idag</p>
-          <p className="tran-tabular text-2xl">{formatOre(todaySales)}</p>
+          <p className="tran-tabular text-2xl">{formatOre(summary.todayOre)}</p>
         </div>
         <div className="border border-tran-hairline p-6">
-          <p className="tran-label text-xs text-tran-muted">Försäljning denna vecka</p>
-          <p className="tran-tabular text-2xl">{formatOre(weekSales)}</p>
+          <p className="tran-label text-xs text-tran-muted">Denna vecka</p>
+          <p className="tran-tabular text-2xl">{formatOre(summary.weekOre)}</p>
+        </div>
+        <div className="border border-tran-hairline p-6">
+          <p className="tran-label text-xs text-tran-muted">Denna månad</p>
+          <p className="tran-tabular text-2xl">{formatOre(summary.monthOre)}</p>
+        </div>
+        <div className="border border-tran-hairline p-6">
+          <p className="tran-label text-xs text-tran-muted">Snittorder (månad)</p>
+          <p className="tran-tabular text-2xl">{formatOre(summary.monthAvgOrderOre)}</p>
         </div>
         <div className="border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Obehandlade ordrar</p>
@@ -77,6 +70,70 @@ export default async function DashboardPage() {
           <p className="tran-tabular text-2xl">{lowStock.length}</p>
         </div>
       </section>
+
+      <section className="flex flex-col gap-4 border border-tran-hairline p-6">
+        <h2 className="tran-label text-xs text-tran-muted">Försäljning, senaste 30 dagarna</h2>
+        <SalesBarChart data={daily} />
+      </section>
+
+      <div className="grid grid-cols-1 gap-10 lg:grid-cols-3">
+        <section className="flex flex-col gap-4 lg:col-span-2">
+          <div className="flex items-baseline justify-between">
+            <h2 className="tran-label text-xs text-tran-muted">Senaste ordrar</h2>
+            <Link href="/orders" className="text-sm text-tran-muted hover:text-tran-red">
+              Alla ordrar →
+            </Link>
+          </div>
+          {recentOrders.length === 0 ? (
+            <p className="text-sm text-tran-muted">Inga ordrar än.</p>
+          ) : (
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
+                  <th className="py-2 pr-4 font-medium">Order</th>
+                  <th className="py-2 pr-4 font-medium">Kund</th>
+                  <th className="py-2 pr-4 font-medium">Belopp</th>
+                  <th className="py-2 pr-4 font-medium">Status</th>
+                  <th className="py-2 pr-4 font-medium">Frakt</th>
+                  <th className="py-2 pr-4 font-medium">Datum</th>
+                </tr>
+              </thead>
+              <tbody>
+                {recentOrders.map((order) => (
+                  <tr key={order.id} className="border-b border-tran-hairline">
+                    <td className="py-3 pr-4">
+                      <Link href={`/orders/${order.id}`} className="tran-tabular hover:text-tran-red">
+                        #{order.orderNumber}
+                      </Link>
+                    </td>
+                    <td className="max-w-[160px] truncate py-3 pr-4 text-tran-muted">
+                      {order.customerEmail}
+                    </td>
+                    <td className="tran-tabular py-3 pr-4">{formatOre(order.orderAmountOre)}</td>
+                    <td className="py-3 pr-4">
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <OrderStatusChip status={order.status} />
+                        {order.containsPreorder && <PreorderChip />}
+                      </div>
+                    </td>
+                    <td className="py-3 pr-4 text-tran-muted">
+                      {FULFILLMENT_LABELS[order.fulfillmentStatus] ?? order.fulfillmentStatus}
+                    </td>
+                    <td className="tran-tabular py-3 pr-4 text-tran-muted">
+                      {formatDateTime(order.createdAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </section>
+
+        <section className="flex flex-col gap-4">
+          <h2 className="tran-label text-xs text-tran-muted">Mest sålda, senaste 30 dagarna</h2>
+          <TopProductsList products={topProducts} />
+        </section>
+      </div>
 
       <section className="flex flex-col gap-4">
         <h2 className="tran-label text-xs text-tran-muted">Produkter under larmnivå</h2>
