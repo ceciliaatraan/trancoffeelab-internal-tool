@@ -78,6 +78,8 @@ export const productVariants = pgTable("product_variants", {
   priceOre: integer("price_ore").notNull(),
   weightGrams: integer("weight_grams").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
+  /** Egna bilder, t.ex. hela bönor kontra malet — tom lista = ingen egen bild, visar produktens bild istället (se lib/queries/cart.ts och public-products.ts). */
+  images: jsonb("images").notNull().default([]).$type<string[]>(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
     .defaultNow(),

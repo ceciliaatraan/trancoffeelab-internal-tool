@@ -209,3 +209,60 @@ export async function deleteVariant(productId: string, variantId: string) {
   await db.delete(schema.productVariants).where(eq(schema.productVariants.id, variantId));
   revalidatePath(`/products/${productId}`);
 }
+
+/**
+ * Samma uppladdningsfunktion som produktbilder (uploadProductImage tar
+ * bara ett id att namnge lagringssökvägen efter — inte kopplad till
+ * products-tabellen), men sparas på varianten. Tom bildlista på
+ * varianten faller tillbaka på produktens egna bilder, se
+ * lib/queries/cart.ts och public-products.ts.
+ */
+export async function addVariantImage(
+  productId: string,
+  variantId: string,
+  formData: FormData,
+) {
+  await requireCurrentAdmin();
+  const file = formData.get("image");
+
+  if (!(file instanceof File) || file.size === 0) {
+    redirect(`/products/${productId}?error=${encodeURIComponent("Välj en bildfil")}`);
+  }
+
+  try {
+    const url = await uploadProductImage(variantId, file);
+    const [variant] = await db
+      .select({ images: schema.productVariants.images })
+      .from(schema.productVariants)
+      .where(eq(schema.productVariants.id, variantId));
+
+    await db
+      .update(schema.productVariants)
+      .set({ images: [...(variant?.images ?? []), url], updatedAt: new Date() })
+      .where(eq(schema.productVariants.id, variantId));
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Kunde inte ladda upp bild.";
+    redirect(`/products/${productId}?error=${encodeURIComponent(message)}`);
+  }
+
+  revalidatePath(`/products/${productId}`);
+}
+
+export async function removeVariantImage(productId: string, variantId: string, url: string) {
+  await requireCurrentAdmin();
+  const [variant] = await db
+    .select({ images: schema.productVariants.images })
+    .from(schema.productVariants)
+    .where(eq(schema.productVariants.id, variantId));
+
+  await db
+    .update(schema.productVariants)
+    .set({
+      images: (variant?.images ?? []).filter((image) => image !== url),
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.productVariants.id, variantId));
+
+  await deleteProductImage(url);
+  revalidatePath(`/products/${productId}`);
+}

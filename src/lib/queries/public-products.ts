@@ -18,6 +18,8 @@ export type PublicVariant = {
   price: { amountOre: number; currency: "SEK" };
   weightGrams: number;
   inStock: boolean;
+  /** Alltid minst produktens egna bilder om varianten saknar egna — aldrig tom om produkten har någon bild. */
+  images: string[];
 };
 
 export type PublicProduct = {
@@ -56,6 +58,7 @@ async function attachVariants(
       priceOre: schema.productVariants.priceOre,
       weightGrams: schema.productVariants.weightGrams,
       sortOrder: schema.productVariants.sortOrder,
+      images: schema.productVariants.images,
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
     })
@@ -76,6 +79,7 @@ async function attachVariants(
       price: { amountOre: row.priceOre, currency: "SEK" },
       weightGrams: row.weightGrams,
       inStock: availableQuantity(row.quantity ?? 0, row.reservedQuantity ?? 0) > 0,
+      images: row.images,
     });
     byProduct.set(row.productId, list);
   }
@@ -117,6 +121,13 @@ function toPublicProduct(
   variants: PublicVariant[],
   bundleAvailable: number | null,
 ): PublicProduct {
+  // Variant utan egna bilder (t.ex. innan någon hunnit ladda upp ett
+  // eget foto) visar produktens bilder istället för att stå helt tom.
+  const variantsWithImages = variants.map((variant) => ({
+    ...variant,
+    images: variant.images.length > 0 ? variant.images : row.images,
+  }));
+
   return {
     slug: row.slug,
     sku: row.sku,
@@ -132,7 +143,7 @@ function toPublicProduct(
         : variants.length > 0
           ? variants.some((variant) => variant.inStock)
           : availableQuantity(row.quantity ?? 0, row.reservedQuantity ?? 0) > 0,
-    variants,
+    variants: variantsWithImages,
     isPreorder: row.isPreorder,
     expectedShipDate: row.expectedShipDate,
     comingSoon: row.status === "coming_soon",

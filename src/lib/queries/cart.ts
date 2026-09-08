@@ -16,7 +16,7 @@ export type ResolvedCartLine = {
   /** Alltid från produkten, aldrig från varianten — se src/db/schema/catalog.ts. */
   isPreorder: boolean;
   expectedShipDate: string | null;
-  /** Produktens första bild, om någon — varianter har ingen egen bildlista, delar produktens. */
+  /** Variantens egen första bild om den har någon, annars produktens första bild. */
   imageUrl: string | null;
   /** Produktens slug på trancoffeelab.com — för länkar till produktsidan, t.ex. i orderbekräftelsemailet. */
   slug: string;
@@ -90,7 +90,8 @@ async function resolveVariant(sku: string): Promise<ResolvedCartLine | null> {
       status: schema.products.status,
       isPreorder: schema.products.isPreorder,
       expectedShipDate: schema.products.expectedShipDate,
-      images: schema.products.images,
+      variantImages: schema.productVariants.images,
+      productImages: schema.products.images,
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
     })
@@ -113,7 +114,7 @@ async function resolveVariant(sku: string): Promise<ResolvedCartLine | null> {
     variantId: row.variantId,
     isPreorder: row.isPreorder,
     expectedShipDate: row.expectedShipDate,
-    imageUrl: row.images[0] ?? null,
+    imageUrl: row.variantImages[0] ?? row.productImages[0] ?? null,
     slug: row.slug,
   };
 }

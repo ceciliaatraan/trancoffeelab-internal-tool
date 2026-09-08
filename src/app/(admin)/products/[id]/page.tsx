@@ -9,8 +9,10 @@ import { formatOre } from "@/lib/format";
 import {
   addProductImage,
   addVariant,
+  addVariantImage,
   deleteVariant,
   removeProductImage,
+  removeVariantImage,
   setProductStatus,
   updateProduct,
   updateVariant,
@@ -201,7 +203,50 @@ export default async function EditProductPage({
                     </button>
                   </div>
                 </form>
-                <form action={deleteVariant.bind(null, id, variant.id)} className="mt-2">
+
+                <div className="mt-4 flex flex-col gap-3">
+                  <h3 className="tran-label text-[11px] text-tran-muted">
+                    Bild för denna variant
+                  </h3>
+                  <p className="text-xs text-tran-muted">
+                    Visas när kunden väljer just den här varianten (t.ex. hela
+                    bönor kontra malet). Ingen egen bild = produktens bild
+                    visas istället.
+                  </p>
+                  {variant.images.length > 0 ? (
+                    <div className="grid grid-cols-3 gap-3 sm:grid-cols-4">
+                      {variant.images.map((url) => (
+                        <div key={url} className="flex flex-col gap-2">
+                          <div className="relative aspect-square border border-tran-hairline">
+                            <Image src={url} alt="" fill className="object-cover" unoptimized />
+                          </div>
+                          <form action={removeVariantImage.bind(null, id, variant.id, url)}>
+                            <button
+                              type="submit"
+                              className="tran-label text-[11px] text-tran-muted hover:text-tran-red"
+                            >
+                              Ta bort
+                            </button>
+                          </form>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+                  <form
+                    action={addVariantImage.bind(null, id, variant.id)}
+                    className="flex items-center gap-3"
+                  >
+                    <input type="file" name="image" accept="image/*" required className="text-sm" />
+                    <button
+                      type="submit"
+                      className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
+                    >
+                      Ladda upp
+                    </button>
+                  </form>
+                </div>
+
+                <form action={deleteVariant.bind(null, id, variant.id)} className="mt-4">
                   <button
                     type="submit"
                     className="tran-label text-[11px] text-tran-muted hover:text-tran-red"
