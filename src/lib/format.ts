@@ -3,9 +3,16 @@ const currencyFormatter = new Intl.NumberFormat("sv-SE", {
   currency: "SEK",
 });
 
+/**
+ * Utan explicit timeZone används körtidens egen (UTC på Vercels
+ * serverless-funktioner) — inte besökarens, eftersom det här renderas
+ * server-side. Låst till svensk tid så klockslag i adminet stämmer med
+ * väggklockan, oavsett var koden faktiskt körs.
+ */
 const dateFormatter = new Intl.DateTimeFormat("sv-SE", {
   dateStyle: "short",
   timeStyle: "short",
+  timeZone: "Europe/Stockholm",
 });
 
 export function formatOre(ore: number): string {
