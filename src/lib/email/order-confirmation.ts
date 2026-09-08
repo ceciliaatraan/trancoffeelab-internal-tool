@@ -11,6 +11,10 @@ export type OrderConfirmationEmailInput = {
     quantity: number;
     isPreorder?: boolean;
     expectedShipDate?: string | null;
+    /** Produktbild — visas bara om satt, se docstringen på renderEmail. */
+    imageUrl?: string | null;
+    /** Radens totalpris (kvantitet × pris), inte à-pris. Visas bara om satt. */
+    lineTotalOre?: number;
   }[];
 };
 
@@ -25,6 +29,13 @@ function formatShipPeriod(expectedShipDate: string | null | undefined, isEnglish
     year: "numeric",
     timeZone: "UTC",
   }).format(date);
+}
+
+function formatPrice(ore: number, isEnglish: boolean): string {
+  return (ore / 100).toLocaleString(isEnglish ? "en-US" : "sv-SE", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
 }
 
 function escapeHtml(value: string): string {
@@ -48,10 +59,7 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
   html: string;
 } {
   const isEnglish = input.locale.toLowerCase().startsWith("en");
-  const total = (input.totalOre / 100).toLocaleString(isEnglish ? "en-US" : "sv-SE", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  });
+  const total = formatPrice(input.totalOre, isEnglish);
 
   const hasPreorder = input.lines.some((line) => line.isPreorder);
   const hasInStock = input.lines.some((line) => !line.isPreorder);
@@ -61,12 +69,15 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
   // nedan — klumpas ALDRIG ihop som ett generellt "skickas senare".
   const lines = input.lines
     .map((line) => {
-      const base = `${line.quantity} × ${line.name}`;
-      if (!line.isPreorder) return base;
+      const withPrice =
+        line.lineTotalOre === undefined
+          ? `${line.quantity} × ${line.name}`
+          : `${line.quantity} × ${line.name} — ${formatPrice(line.lineTotalOre, isEnglish)} kr`;
+      if (!line.isPreorder) return withPrice;
       const period = formatShipPeriod(line.expectedShipDate, isEnglish);
       return isEnglish
-        ? `${base} — preorder, estimated ship: ${period}`
-        : `${base} — förbeställning, beräknad leverans: ${period}`;
+        ? `${withPrice} — preorder, estimated ship: ${period}`
+        : `${withPrice} — förbeställning, beräknad leverans: ${period}`;
     })
     .join("\n");
 
@@ -87,12 +98,27 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
   const totalLabel = isEnglish ? "Total" : "Totalt";
   const preorderLabel = isEnglish ? "Preorder" : "Förbeställning";
   const shipLabel = isEnglish ? "Estimated ship" : "Beräknad leverans";
+  const closingLine = isEnglish
+    ? "Thank you for helping us spread Vietnamese coffee across Sweden."
+    : "Tack för att ni är med och sprider vietnamesiskt kaffe i Sverige.";
+  const signature = "Cecilia Tran & Winnie Tran";
 
   const lineRows = input.lines
     .map((line) => {
       const period = line.isPreorder ? formatShipPeriod(line.expectedShipDate, isEnglish) : null;
+      const priceCell =
+        line.lineTotalOre === undefined
+          ? ""
+          : `<td style="padding:12px 0;border-bottom:1px solid rgba(0,0,0,0.12);font-size:14px;line-height:1.4;text-align:right;white-space:nowrap;">${formatPrice(line.lineTotalOre, isEnglish)} kr</td>`;
       return `
         <tr>
+          <td width="56" style="padding:12px 12px 12px 0;border-bottom:1px solid rgba(0,0,0,0.12);">
+            ${
+              line.imageUrl
+                ? `<img src="${escapeHtml(line.imageUrl)}" width="56" height="56" alt="" style="display:block;width:56px;height:56px;border:1px solid rgba(0,0,0,0.12);object-fit:cover;" />`
+                : `<div style="width:56px;height:56px;"></div>`
+            }
+          </td>
           <td style="padding:12px 0;border-bottom:1px solid rgba(0,0,0,0.12);font-size:14px;line-height:1.4;">
             ${line.quantity} × ${escapeHtml(line.name)}
             ${
@@ -101,6 +127,7 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
                 : ""
             }
           </td>
+          ${priceCell}
         </tr>`;
     })
     .join("");
@@ -112,7 +139,7 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;border-collapse:collapse;">
         <tr>
           <td style="padding-bottom:24px;border-bottom:1px solid #000000;">
-            <img src="https://admin.trancoffeelab.com/logo/tran-wordmark.webp" alt="TRAN" width="96" style="display:block;height:auto;border:0;" />
+            <img src="https://admin.trancoffeelab.com/logo/tran-wordmark-email.png" alt="TRAN" width="96" style="display:block;height:auto;border:0;" />
           </td>
         </tr>
         <tr>
@@ -148,8 +175,11 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
           </td>
         </tr>
         <tr>
-          <td style="padding-top:32px;font-size:11px;letter-spacing:0.04em;color:rgba(0,0,0,0.55);">
-            — TRAN Coffee Lab
+          <td style="padding-top:32px;font-size:13px;line-height:1.6;color:#000000;">
+            ${escapeHtml(closingLine)}
+            <br/><br/>
+            ${escapeHtml(signature)}<br/>
+            <span style="color:rgba(0,0,0,0.55);">TRAN Coffee Lab</span>
           </td>
         </tr>
       </table>
@@ -157,17 +187,19 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
   </body>
 </html>`;
 
+  const footer = `${closingLine}\n\n${signature}\nTRAN Coffee Lab`;
+
   if (isEnglish) {
     return {
       subject: `Order confirmation #${input.orderNumber} — TRAN Coffee Lab`,
-      text: `${intro}\n\nOrder #${input.orderNumber}\n\n${lines}\n\nTotal: ${total} kr\n\n— TRAN Coffee Lab`,
+      text: `${intro}\n\nOrder #${input.orderNumber}\n\n${lines}\n\nTotal: ${total} kr\n\n${footer}`,
       html,
     };
   }
 
   return {
     subject: `Orderbekräftelse #${input.orderNumber} — TRAN Coffee Lab`,
-    text: `${intro}\n\nOrder #${input.orderNumber}\n\n${lines}\n\nTotalt: ${total} kr\n\n— TRAN Coffee Lab`,
+    text: `${intro}\n\nOrder #${input.orderNumber}\n\n${lines}\n\nTotalt: ${total} kr\n\n${footer}`,
     html,
   };
 }

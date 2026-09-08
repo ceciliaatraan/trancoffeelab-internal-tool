@@ -145,4 +145,59 @@ describe("renderEmail", () => {
     expect(preorderBadgeCount).toBe(1);
     expect(html).toContain("december 2026");
   });
+
+  it("visar produktbild och radpris när de finns, både i html och text", () => {
+    const { html, text } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      lines: [
+        {
+          name: "No Regrets Horse 250g",
+          quantity: 2,
+          imageUrl: "https://admin.trancoffeelab.com/uploads/no-regrets-horse.jpg",
+          lineTotalOre: 29800,
+        },
+      ],
+    });
+    expect(html).toContain('src="https://admin.trancoffeelab.com/uploads/no-regrets-horse.jpg"');
+    expect(html).toContain("298,00 kr");
+    expect(text).toContain("2 × No Regrets Horse 250g — 298,00 kr");
+  });
+
+  it("visar ingen produktbild om raden saknar imageUrl — bara TRAN-loggan finns kvar", () => {
+    const { html } = renderEmail({ ...baseInput, locale: "sv-SE" });
+    const imgCount = (html.match(/<img/g) ?? []).length;
+    expect(imgCount).toBe(1);
+  });
+
+  it("escapar bild-url:en precis som produktnamnet", () => {
+    const { html } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      lines: [
+        {
+          name: "No Regrets Horse 250g",
+          quantity: 1,
+          imageUrl: 'https://example.com/x.jpg?a="b"',
+          lineTotalOre: 100,
+        },
+      ],
+    });
+    expect(html).toContain("&quot;b&quot;");
+  });
+
+  it("avslutar med hälsning från Cecilia och Winnie, inte den gamla signaturen", () => {
+    const { html, text } = renderEmail({ ...baseInput, locale: "sv-SE" });
+    expect(text).toContain("Tack för att ni är med och sprider vietnamesiskt kaffe i Sverige");
+    expect(text).toContain("Cecilia Tran & Winnie Tran");
+    expect(html).toContain("Tack för att ni är med och sprider vietnamesiskt kaffe i Sverige");
+    expect(html).toContain("Cecilia Tran &amp; Winnie Tran");
+    expect(text).not.toContain("— TRAN Coffee Lab");
+  });
+
+  it("avslutar på engelska med översatt hälsning", () => {
+    const { text } = renderEmail({ ...baseInput, locale: "en-US" });
+    expect(text).toContain("Thank you for helping us spread Vietnamese coffee across Sweden");
+    expect(text).toContain("Cecilia Tran & Winnie Tran");
+  });
 });

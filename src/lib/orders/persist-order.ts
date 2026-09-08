@@ -17,6 +17,8 @@ export type PersistedOrder = {
     quantity: number;
     isPreorder: boolean;
     expectedShipDate: string | null;
+    imageUrl: string | null;
+    lineTotalOre: number;
   }[];
 };
 
@@ -92,6 +94,8 @@ export async function persistOrderFromKustom(
         quantity: line.quantity,
         isPreorder: resolved?.isPreorder ?? false,
         expectedShipDate: resolved?.expectedShipDate ?? null,
+        imageUrl: resolved?.imageUrl ?? null,
+        lineTotalOre: line.total_amount,
       }));
 
     const [inserted] = await tx
