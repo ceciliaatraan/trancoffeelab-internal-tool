@@ -6,6 +6,9 @@ export type OrderConfirmationEmailInput = {
   locale: string;
   orderNumber: number;
   totalOre: number;
+  /** Bas-URL till kundsajten, för att länka produktbild/namn till produktsidan och loggan till startsidan. Default https://trancoffeelab.com om inte satt (se sendOrderConfirmationEmail). */
+  storefrontUrl?: string;
+  shipping?: { name: string; amountOre: number } | null;
   lines: {
     name: string;
     quantity: number;
@@ -15,6 +18,8 @@ export type OrderConfirmationEmailInput = {
     imageUrl?: string | null;
     /** Radens totalpris (kvantitet × pris), inte à-pris. Visas bara om satt. */
     lineTotalOre?: number;
+    /** Produktens slug på trancoffeelab.com — bild/namn länkas dit om satt. */
+    slug?: string | null;
   }[];
 };
 
@@ -60,6 +65,12 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
 } {
   const isEnglish = input.locale.toLowerCase().startsWith("en");
   const total = formatPrice(input.totalOre, isEnglish);
+  const storefrontUrl = (input.storefrontUrl ?? "https://trancoffeelab.com").replace(/\/$/, "");
+  const productPathSegment = isEnglish ? "product" : "produkt";
+
+  function productUrl(slug: string | null | undefined): string | null {
+    return slug ? `${storefrontUrl}/${productPathSegment}/${encodeURIComponent(slug)}` : null;
+  }
 
   const hasPreorder = input.lines.some((line) => line.isPreorder);
   const hasInStock = input.lines.some((line) => !line.isPreorder);
@@ -98,6 +109,7 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
   const totalLabel = isEnglish ? "Total" : "Totalt";
   const preorderLabel = isEnglish ? "Preorder" : "Förbeställning";
   const shipLabel = isEnglish ? "Estimated ship" : "Beräknad leverans";
+  const shippingLabel = isEnglish ? "Shipping" : "Frakt";
   const closingLine = isEnglish
     ? "Thank you for helping us spread Vietnamese coffee across Sweden."
     : "Tack för att ni är med och sprider vietnamesiskt kaffe i Sverige.";
@@ -110,17 +122,18 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
         line.lineTotalOre === undefined
           ? ""
           : `<td style="padding:12px 0;border-bottom:1px solid rgba(0,0,0,0.12);font-size:14px;line-height:1.4;text-align:right;white-space:nowrap;">${formatPrice(line.lineTotalOre, isEnglish)} kr</td>`;
+      const url = productUrl(line.slug);
+      const image = line.imageUrl
+        ? `<img src="${escapeHtml(line.imageUrl)}" width="56" height="56" alt="" style="display:block;width:56px;height:56px;border:1px solid rgba(0,0,0,0.12);object-fit:cover;" />`
+        : `<div style="width:56px;height:56px;"></div>`;
+      const nameText = `${line.quantity} × ${escapeHtml(line.name)}`;
       return `
         <tr>
           <td width="56" style="padding:12px 12px 12px 0;border-bottom:1px solid rgba(0,0,0,0.12);">
-            ${
-              line.imageUrl
-                ? `<img src="${escapeHtml(line.imageUrl)}" width="56" height="56" alt="" style="display:block;width:56px;height:56px;border:1px solid rgba(0,0,0,0.12);object-fit:cover;" />`
-                : `<div style="width:56px;height:56px;"></div>`
-            }
+            ${url ? `<a href="${escapeHtml(url)}">${image}</a>` : image}
           </td>
           <td style="padding:12px 0;border-bottom:1px solid rgba(0,0,0,0.12);font-size:14px;line-height:1.4;">
-            ${line.quantity} × ${escapeHtml(line.name)}
+            ${url ? `<a href="${escapeHtml(url)}" style="color:#000000;text-decoration:none;">${nameText}</a>` : nameText}
             ${
               period
                 ? `<br/><span style="display:inline-block;margin-top:4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#EB1C24;">${escapeHtml(preorderLabel)} — ${escapeHtml(shipLabel)}: ${escapeHtml(period)}</span>`
@@ -132,6 +145,13 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
     })
     .join("");
 
+  const shippingRow = input.shipping
+    ? `<tr>
+        <td style="font-size:13px;color:rgba(0,0,0,0.55);padding-bottom:6px;">${escapeHtml(shippingLabel)}</td>
+        <td style="font-size:13px;color:rgba(0,0,0,0.55);text-align:right;padding-bottom:6px;">${formatPrice(input.shipping.amountOre, isEnglish)} kr</td>
+      </tr>`
+    : "";
+
   const html = `<!doctype html>
 <html lang="${isEnglish ? "en" : "sv"}">
   <body style="margin:0;padding:0;background:#ffffff;">
@@ -139,7 +159,9 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;border-collapse:collapse;">
         <tr>
           <td style="padding-bottom:24px;border-bottom:1px solid #000000;">
-            <img src="https://admin.trancoffeelab.com/logo/tran-wordmark-email.png" alt="TRAN" width="96" style="display:block;height:auto;border:0;" />
+            <a href="${storefrontUrl}">
+              <img src="https://admin.trancoffeelab.com/logo/tran-wordmark-email.png" alt="TRAN" width="96" style="display:block;height:auto;border:0;" />
+            </a>
           </td>
         </tr>
         <tr>
@@ -167,6 +189,7 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
         <tr>
           <td style="padding-top:16px;border-top:1px solid #000000;">
             <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              ${shippingRow}
               <tr>
                 <td style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">${escapeHtml(totalLabel)}</td>
                 <td style="font-size:14px;font-weight:700;text-align:right;">${total} kr</td>
@@ -188,18 +211,21 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
 </html>`;
 
   const footer = `${closingLine}\n\n${signature}\nTRAN Coffee Lab`;
+  const shippingText = input.shipping
+    ? `${shippingLabel}: ${formatPrice(input.shipping.amountOre, isEnglish)} kr\n`
+    : "";
 
   if (isEnglish) {
     return {
       subject: `Order confirmation #${input.orderNumber} — TRAN Coffee Lab`,
-      text: `${intro}\n\nOrder #${input.orderNumber}\n\n${lines}\n\nTotal: ${total} kr\n\n${footer}`,
+      text: `${intro}\n\nOrder #${input.orderNumber}\n\n${lines}\n\n${shippingText}Total: ${total} kr\n\n${footer}`,
       html,
     };
   }
 
   return {
     subject: `Orderbekräftelse #${input.orderNumber} — TRAN Coffee Lab`,
-    text: `${intro}\n\nOrder #${input.orderNumber}\n\n${lines}\n\nTotalt: ${total} kr\n\n${footer}`,
+    text: `${intro}\n\nOrder #${input.orderNumber}\n\n${lines}\n\n${shippingText}Totalt: ${total} kr\n\n${footer}`,
     html,
   };
 }
@@ -222,7 +248,8 @@ export async function sendOrderConfirmationEmail(
   }
 
   const resend = new Resend(apiKey);
-  const { subject, text, html } = renderEmail(input);
+  const storefrontUrl = input.storefrontUrl ?? process.env.NEXT_PUBLIC_STOREFRONT_URL;
+  const { subject, text, html } = renderEmail({ ...input, storefrontUrl });
 
   const { error } = await resend.emails.send({
     from,

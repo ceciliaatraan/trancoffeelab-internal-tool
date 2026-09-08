@@ -18,12 +18,15 @@ export type ResolvedCartLine = {
   expectedShipDate: string | null;
   /** Produktens första bild, om någon — varianter har ingen egen bildlista, delar produktens. */
   imageUrl: string | null;
+  /** Produktens slug på trancoffeelab.com — för länkar till produktsidan, t.ex. i orderbekräftelsemailet. */
+  slug: string;
 };
 
 async function resolveBaseProduct(sku: string): Promise<ResolvedCartLine | null> {
   const [row] = await db
     .select({
       productId: schema.products.id,
+      slug: schema.products.slug,
       nameSv: schema.products.nameSv,
       nameEn: schema.products.nameEn,
       priceOre: schema.products.priceOre,
@@ -69,6 +72,7 @@ async function resolveBaseProduct(sku: string): Promise<ResolvedCartLine | null>
     isPreorder: row.isPreorder,
     expectedShipDate: row.expectedShipDate,
     imageUrl: row.images[0] ?? null,
+    slug: row.slug,
   };
 }
 
@@ -77,6 +81,7 @@ async function resolveVariant(sku: string): Promise<ResolvedCartLine | null> {
     .select({
       productId: schema.productVariants.productId,
       variantId: schema.productVariants.id,
+      slug: schema.products.slug,
       nameSv: schema.productVariants.nameSv,
       nameEn: schema.productVariants.nameEn,
       priceOre: schema.productVariants.priceOre,
@@ -109,6 +114,7 @@ async function resolveVariant(sku: string): Promise<ResolvedCartLine | null> {
     isPreorder: row.isPreorder,
     expectedShipDate: row.expectedShipDate,
     imageUrl: row.images[0] ?? null,
+    slug: row.slug,
   };
 }
 

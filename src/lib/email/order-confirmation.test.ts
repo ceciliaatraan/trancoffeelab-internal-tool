@@ -200,4 +200,80 @@ describe("renderEmail", () => {
     expect(text).toContain("Thank you for helping us spread Vietnamese coffee across Sweden");
     expect(text).toContain("Cecilia Tran & Winnie Tran");
   });
+
+  it("visar fraktkostnaden som en egen rad, både i html och text (sv)", () => {
+    const { html, text } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      shipping: { name: "Standardfrakt", amountOre: 4900 },
+    });
+    expect(text).toContain("Frakt: 49,00 kr");
+    expect(html).toContain("Frakt");
+    expect(html).toContain("49,00 kr");
+  });
+
+  it("visar fraktkostnaden på engelska", () => {
+    const { text } = renderEmail({
+      ...baseInput,
+      locale: "en-US",
+      shipping: { name: "Standard shipping", amountOre: 4900 },
+    });
+    expect(text).toContain("Shipping: 49.00 kr");
+  });
+
+  it("visar ingen fraktrad om ordern saknar frakt (t.ex. redan inkluderad eller fri frakt utan egen rad)", () => {
+    const { text } = renderEmail({ ...baseInput, locale: "sv-SE" });
+    expect(text).not.toContain("Frakt:");
+  });
+
+  it("länkar produktbild och namn till produktsidan när raden har en slug", () => {
+    const { html } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      lines: [
+        {
+          name: "No Regrets Horse 250g",
+          quantity: 1,
+          imageUrl: "https://admin.trancoffeelab.com/uploads/horse.jpg",
+          slug: "signature-coffee",
+        },
+      ],
+    });
+    expect(html).toContain('<a href="https://trancoffeelab.com/produkt/signature-coffee">');
+  });
+
+  it("länkar till den engelska produktsökvägen för engelska mejl", () => {
+    const { html } = renderEmail({
+      ...baseInput,
+      locale: "en-US",
+      lines: [{ name: "No Regrets Horse 250g", quantity: 1, slug: "signature-coffee" }],
+    });
+    expect(html).toContain('href="https://trancoffeelab.com/product/signature-coffee"');
+  });
+
+  it("länkar inte produktnamnet om raden saknar slug — bara loggan länkas", () => {
+    const { html } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      lines: [{ name: "No Regrets Horse 250g", quantity: 1 }],
+    });
+    expect(html).not.toContain("/produkt/");
+    expect((html.match(/<a href/g) ?? []).length).toBe(1); // bara loggan
+  });
+
+  it("loggan länkar till kundsajtens startsida", () => {
+    const { html } = renderEmail({ ...baseInput, locale: "sv-SE" });
+    expect(html).toContain('<a href="https://trancoffeelab.com">');
+  });
+
+  it("respekterar en egen storefrontUrl istället för default-domänen", () => {
+    const { html } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      storefrontUrl: "https://staging.trancoffeelab.com/",
+      lines: [{ name: "No Regrets Horse 250g", quantity: 1, slug: "signature-coffee" }],
+    });
+    expect(html).toContain('<a href="https://staging.trancoffeelab.com">');
+    expect(html).toContain('href="https://staging.trancoffeelab.com/produkt/signature-coffee"');
+  });
 });

@@ -34,6 +34,7 @@ export async function processKustomOrder(orderId: string): Promise<PersistedOrde
         orderNumber: persisted.orderNumber,
         totalOre: order.order_amount,
         lines: persisted.physicalLines,
+        shipping: persisted.shippingLine,
       });
     }
   }

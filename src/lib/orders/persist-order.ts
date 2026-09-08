@@ -19,7 +19,10 @@ export type PersistedOrder = {
     expectedShipDate: string | null;
     imageUrl: string | null;
     lineTotalOre: number;
+    slug: string | null;
   }[];
+  /** Fraktraden (type=shipping_fee) om Kustom-ordern hade en — för orderbekräftelsemailets radbrytning. */
+  shippingLine: { name: string; amountOre: number } | null;
 };
 
 function sumTaxAmount(order: KustomOrderManagementOrder): number {
@@ -96,7 +99,12 @@ export async function persistOrderFromKustom(
         expectedShipDate: resolved?.expectedShipDate ?? null,
         imageUrl: resolved?.imageUrl ?? null,
         lineTotalOre: line.total_amount,
+        slug: resolved?.slug ?? null,
       }));
+    const shippingKustomLine = order.order_lines.find((line) => line.type === "shipping_fee");
+    const shippingLine = shippingKustomLine
+      ? { name: shippingKustomLine.name, amountOre: shippingKustomLine.total_amount }
+      : null;
 
     const [inserted] = await tx
       .insert(schema.orders)
@@ -136,6 +144,7 @@ export async function persistOrderFromKustom(
         alreadyExisted: true,
         containsPreorder: existing.containsPreorder,
         physicalLines: [],
+        shippingLine: null,
       };
     }
 
@@ -218,6 +227,7 @@ export async function persistOrderFromKustom(
       alreadyExisted: false,
       containsPreorder,
       physicalLines,
+      shippingLine,
     };
   });
 }
