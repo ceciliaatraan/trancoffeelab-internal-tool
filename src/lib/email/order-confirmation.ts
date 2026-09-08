@@ -27,9 +27,25 @@ function formatShipPeriod(expectedShipDate: string | null | undefined, isEnglish
   }).format(date);
 }
 
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * Skrivet som handskriven, inline-stylad HTML (inte JSX/Tailwind) — det
+ * enda som fungerar tillförlitligt över e-postklienter, som inte kör
+ * någon byggprocess och ofta saknar stöd för <style>/flexbox/grid
+ * (särskilt Outlook). Speglar adminets hairline/versal-formspråk
+ * (docs/branding.md) så långt e-postklienter tillåter.
+ */
 export function renderEmail(input: OrderConfirmationEmailInput): {
   subject: string;
   text: string;
+  html: string;
 } {
   const isEnglish = input.locale.toLowerCase().startsWith("en");
   const total = (input.totalOre / 100).toLocaleString(isEnglish ? "en-US" : "sv-SE", {
@@ -66,16 +82,93 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
         ? "Det här är en förbeställning. Du har betalat nu — varan skickas när den finns i lager, se beräknad leverans nedan."
         : "Tack för din beställning.";
 
+  const heading = isEnglish ? "Thank you for your order" : "Tack för din beställning";
+  const orderLabel = isEnglish ? "Order confirmation" : "Orderbekräftelse";
+  const totalLabel = isEnglish ? "Total" : "Totalt";
+  const preorderLabel = isEnglish ? "Preorder" : "Förbeställning";
+  const shipLabel = isEnglish ? "Estimated ship" : "Beräknad leverans";
+
+  const lineRows = input.lines
+    .map((line) => {
+      const period = line.isPreorder ? formatShipPeriod(line.expectedShipDate, isEnglish) : null;
+      return `
+        <tr>
+          <td style="padding:12px 0;border-bottom:1px solid rgba(0,0,0,0.12);font-size:14px;line-height:1.4;">
+            ${line.quantity} × ${escapeHtml(line.name)}
+            ${
+              period
+                ? `<br/><span style="display:inline-block;margin-top:4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#EB1C24;">${escapeHtml(preorderLabel)} — ${escapeHtml(shipLabel)}: ${escapeHtml(period)}</span>`
+                : ""
+            }
+          </td>
+        </tr>`;
+    })
+    .join("");
+
+  const html = `<!doctype html>
+<html lang="${isEnglish ? "en" : "sv"}">
+  <body style="margin:0;padding:0;background:#ffffff;">
+    <div style="background:#ffffff;padding:32px 16px;font-family:'Space Grotesk',Helvetica,Arial,sans-serif;color:#000000;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:560px;margin:0 auto;border-collapse:collapse;">
+        <tr>
+          <td style="padding-bottom:24px;border-bottom:1px solid #000000;">
+            <img src="https://admin.trancoffeelab.com/logo/tran-wordmark.webp" alt="TRAN" width="96" style="display:block;height:auto;border:0;" />
+          </td>
+        </tr>
+        <tr>
+          <td style="padding-top:24px;padding-bottom:4px;">
+            <p style="margin:0;font-size:11px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:rgba(0,0,0,0.55);">
+              ${escapeHtml(orderLabel)} #${input.orderNumber}
+            </p>
+            <h1 style="margin:6px 0 0;font-size:22px;font-weight:700;text-transform:uppercase;letter-spacing:-0.01em;line-height:1.2;">
+              ${escapeHtml(heading)}
+            </h1>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:16px 0;font-size:14px;line-height:1.5;color:#000000;">
+            ${escapeHtml(intro)}
+          </td>
+        </tr>
+        <tr>
+          <td>
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border-collapse:collapse;border-top:1px solid rgba(0,0,0,0.12);">
+              ${lineRows}
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding-top:16px;border-top:1px solid #000000;">
+            <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">${escapeHtml(totalLabel)}</td>
+                <td style="font-size:14px;font-weight:700;text-align:right;">${total} kr</td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding-top:32px;font-size:11px;letter-spacing:0.04em;color:rgba(0,0,0,0.55);">
+            — TRAN Coffee Lab
+          </td>
+        </tr>
+      </table>
+    </div>
+  </body>
+</html>`;
+
   if (isEnglish) {
     return {
       subject: `Order confirmation #${input.orderNumber} — TRAN Coffee Lab`,
       text: `${intro}\n\nOrder #${input.orderNumber}\n\n${lines}\n\nTotal: ${total} kr\n\n— TRAN Coffee Lab`,
+      html,
     };
   }
 
   return {
     subject: `Orderbekräftelse #${input.orderNumber} — TRAN Coffee Lab`,
     text: `${intro}\n\nOrder #${input.orderNumber}\n\n${lines}\n\nTotalt: ${total} kr\n\n— TRAN Coffee Lab`,
+    html,
   };
 }
 
@@ -97,13 +190,14 @@ export async function sendOrderConfirmationEmail(
   }
 
   const resend = new Resend(apiKey);
-  const { subject, text } = renderEmail(input);
+  const { subject, text, html } = renderEmail(input);
 
   const { error } = await resend.emails.send({
     from,
     to: input.to,
     subject,
     text,
+    html,
   });
 
   if (error) {

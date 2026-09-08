@@ -107,4 +107,42 @@ describe("renderEmail", () => {
     });
     expect(text).toContain("beräknad leverans: meddelas senare");
   });
+
+  it("html-versionen innehåller ordernummer, radvara och totalsumma", () => {
+    const { html } = renderEmail({ ...baseInput, locale: "sv-SE" });
+    expect(html).toContain("#1042");
+    expect(html).toContain("No Regrets Horse 250g");
+    expect(html).toContain("298,00");
+  });
+
+  it("html-versionen escapar produktnamn — ingen rå HTML/skript slinker igenom", () => {
+    const { html } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      lines: [{ name: '<script>alert("x")</script>', quantity: 1 }],
+    });
+    expect(html).not.toContain("<script>alert");
+    expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("html-versionen visar förbeställningsmärkning bara på rader som faktiskt är förbeställningar", () => {
+    const { html } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      lines: [
+        { name: "Dancing Dragon 250g", quantity: 1 },
+        {
+          name: "No Regrets Horse 250g",
+          quantity: 1,
+          isPreorder: true,
+          expectedShipDate: "2026-12-01",
+        },
+      ],
+    });
+    // Räknar bara den röda per-rad-märkningen, inte inledningstexten (som
+    // själv legitimt nämner "förbeställning" i en blandad order).
+    const preorderBadgeCount = (html.match(/color:#EB1C24/g) ?? []).length;
+    expect(preorderBadgeCount).toBe(1);
+    expect(html).toContain("december 2026");
+  });
 });
