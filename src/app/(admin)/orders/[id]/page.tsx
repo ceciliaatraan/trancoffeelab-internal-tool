@@ -4,9 +4,11 @@ import { asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatDateTime, formatOre } from "@/lib/format";
 import { OrderStatusChip } from "@/components/order-status-chip";
+import { TestOrderChip } from "@/components/test-order-chip";
 import {
   cancelOrderAction,
   captureOrderAction,
+  deleteTestOrderAction,
   markShippedAction,
   refundFullAction,
   refundPartialAction,
@@ -100,6 +102,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         <div className="flex items-center gap-4">
           <h1 className="text-4xl font-bold uppercase tracking-tight">Order #{order.orderNumber}</h1>
           <OrderStatusChip status={order.status} />
+          {order.isTest && <TestOrderChip />}
         </div>
         <Link
           href={`/orders/${order.id}/pick-list`}
@@ -316,6 +319,25 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           </form>
         ) : null}
       </section>
+
+      {order.isTest ? (
+        <section className="flex flex-col gap-3 border border-tran-red p-6">
+          <h2 className="tran-label text-xs text-tran-red">Testorder</h2>
+          <p className="text-sm text-tran-muted">
+            Den här ordern skapades medan Kustom stod på testmiljö och räknas
+            inte som en riktig beställning. Tar bort ordern permanent och
+            återställer det lagersaldo den påverkade.
+          </p>
+          <form action={deleteTestOrderAction.bind(null, order.id)}>
+            <button
+              type="submit"
+              className="tran-label border border-tran-red px-3 py-1.5 text-xs text-tran-red transition-colors hover:bg-tran-red hover:text-tran-white"
+            >
+              Ta bort testorder (permanent)
+            </button>
+          </form>
+        </section>
+      ) : null}
     </div>
   );
 }

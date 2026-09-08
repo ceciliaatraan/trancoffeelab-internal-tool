@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import { formatOre, formatDateTime } from "@/lib/format";
 import { OrderStatusChip } from "@/components/order-status-chip";
 import { PreorderChip } from "@/components/preorder-chip";
+import { TestOrderChip } from "@/components/test-order-chip";
 
 const FULFILLMENT_LABELS: Record<string, string> = {
   unfulfilled: "Ej skickad",
@@ -15,6 +16,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
   const params = await searchParams;
   const statusFilter = typeof params.status === "string" ? params.status : "";
   const query = typeof params.q === "string" ? params.q.trim() : "";
+  const error = typeof params.error === "string" ? params.error : null;
+  const deleted = "deleted" in params;
 
   const conditions = [];
   if (statusFilter) {
@@ -40,6 +43,15 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
   return (
     <div className="flex flex-col gap-8">
       <h1 className="text-4xl font-bold uppercase tracking-tight">Ordrar</h1>
+
+      {error ? (
+        <p className="border border-tran-red px-4 py-3 text-sm text-tran-red">{error}</p>
+      ) : null}
+      {deleted ? (
+        <p className="border border-tran-hairline px-4 py-3 text-sm text-tran-muted">
+          Testordern togs bort.
+        </p>
+      ) : null}
 
       <form className="flex flex-wrap items-end gap-4">
         <div>
@@ -107,6 +119,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
                   <div className="flex flex-wrap items-center gap-1.5">
                     <OrderStatusChip status={order.status} />
                     {order.containsPreorder && <PreorderChip />}
+                    {order.isTest && <TestOrderChip />}
                   </div>
                 </td>
                 <td className="py-4 pr-4 text-tran-muted">

@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { requireCurrentAdmin } from "@/lib/current-admin";
+import { requireCurrentAdmin, requireOwner } from "@/lib/current-admin";
 import { expandLineToInventoryTargets } from "@/lib/inventory/bundles";
 import { resolveCartLine } from "@/lib/queries/cart";
 import {
@@ -235,4 +235,71 @@ export async function markShippedAction(orderId: string, formData: FormData) {
   revalidatePath("/orders");
   revalidatePath("/inventory");
   redirect(`/orders/${orderId}?saved=1`);
+}
+
+/**
+ * Tar bort en testorder (order.is_test = true) permanent — enda sättet
+ * att bli av med testordrar från Kustom Playground. Blockerad för
+ * riktiga ordrar oavsett vem som anropar, som ett extra skydd utöver
+ * ägarkravet. Reverserar de lagerförändringar ordern orsakat (reservation
+ * och/eller avdrag vid "Markera skickad") innan raden tas bort, så
+ * lagersaldot blir precis som om testordern aldrig lagts — annars hade
+ * borttagning bara städat bort ordern och lämnat kvar en felaktig
+ * reservation/minskning i lagret.
+ */
+export async function deleteTestOrderAction(orderId: string) {
+  await requireOwner();
+
+  const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
+  if (!order) {
+    redirect("/orders?error=" + encodeURIComponent("Ordern hittades inte."));
+  }
+  if (!order.isTest) {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent("Endast testordrar kan tas bort — den här är inte markerad som test.")}`,
+    );
+  }
+
+  await db.transaction(async (tx) => {
+    const movements = await tx
+      .select()
+      .from(schema.inventoryMovements)
+      .where(eq(schema.inventoryMovements.orderId, orderId));
+
+    for (const movement of movements) {
+      if (movement.reason === "order_reserved") {
+        await tx
+          .update(schema.inventory)
+          .set({
+            reservedQuantity: sql`${schema.inventory.reservedQuantity} - ${movement.changeAmount}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.inventory.id, movement.inventoryId));
+      } else if (movement.reason === "order_shipped") {
+        await tx
+          .update(schema.inventory)
+          .set({
+            quantity: sql`${schema.inventory.quantity} - ${movement.changeAmount}`,
+            reservedQuantity: sql`${schema.inventory.reservedQuantity} - ${movement.changeAmount}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.inventory.id, movement.inventoryId));
+      } else {
+        throw new Error(
+          `Okänd lagerorsak "${movement.reason}" på testordern — avbryter borttagningen för säkerhets skull.`,
+        );
+      }
+    }
+
+    await tx.delete(schema.inventoryMovements).where(eq(schema.inventoryMovements.orderId, orderId));
+    await tx.delete(schema.orders).where(eq(schema.orders.id, orderId));
+  }).catch((err) => {
+    const message = err instanceof Error ? err.message : "Något gick fel.";
+    redirect(`/orders/${orderId}?error=${encodeURIComponent(message)}`);
+  });
+
+  revalidatePath("/orders");
+  revalidatePath("/inventory");
+  revalidatePath("/");
+  redirect("/orders?deleted=1");
 }

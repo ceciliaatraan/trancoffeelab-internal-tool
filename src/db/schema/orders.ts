@@ -62,6 +62,15 @@ export const orders = pgTable("orders", {
    */
   containsPreorder: boolean("contains_preorder").notNull().default(false),
 
+  /**
+   * Sätts av push-hanteraren utifrån KUSTOM_ENV vid ordertillfället
+   * (allt utom exakt "live" räknas som test) — låter testordrar från
+   * Kustom Playground märkas ut i gränssnittet och tas bort separat,
+   * utan att kunna blandas ihop med eller av misstag radera riktiga
+   * ordrar. Se deleteTestOrderAction i orders/actions.ts.
+   */
+  isTest: boolean("is_test").notNull().default(false),
+
   shippingAddress: jsonb("shipping_address"),
   billingAddress: jsonb("billing_address"),
 

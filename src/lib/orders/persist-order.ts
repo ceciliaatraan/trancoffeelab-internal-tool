@@ -108,6 +108,7 @@ export async function persistOrderFromKustom(
         orderAmountOre: order.order_amount,
         orderTaxAmountOre,
         containsPreorder,
+        isTest: process.env.KUSTOM_ENV !== "live",
         shippingAddress: order.shipping_address ?? null,
         billingAddress: order.billing_address ?? null,
         rawKustomOrder: order,
