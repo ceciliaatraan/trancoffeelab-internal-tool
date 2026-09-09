@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireOwner } from "@/lib/current-admin";
 import { getShopSettings } from "@/lib/settings";
-import { kronorToOre, percentToHundredths } from "@/lib/money-input";
+import { kronorToOre } from "@/lib/money-input";
 
 export async function updateShippingSettingsAction(formData: FormData) {
   try {
@@ -16,15 +16,11 @@ export async function updateShippingSettingsAction(formData: FormData) {
   }
 
   const flatRate = kronorToOre(formData.get("shippingFlatRate")?.toString());
-  const taxRate = percentToHundredths(formData.get("shippingTaxRatePercent")?.toString());
   const thresholdRaw = formData.get("freeShippingThreshold")?.toString().trim();
   const threshold = thresholdRaw ? kronorToOre(thresholdRaw) : null;
 
   if (!Number.isInteger(flatRate) || flatRate < 0) {
     redirect(`/settings?error=${encodeURIComponent("Ogiltig fraktkostnad.")}`);
-  }
-  if (!Number.isInteger(taxRate) || taxRate < 0 || taxRate > 10000) {
-    redirect(`/settings?error=${encodeURIComponent("Ogiltig momssats för frakt.")}`);
   }
   if (threshold !== null && (!Number.isInteger(threshold) || threshold < 0)) {
     redirect(`/settings?error=${encodeURIComponent("Ogiltig gräns för fri frakt.")}`);
@@ -35,7 +31,6 @@ export async function updateShippingSettingsAction(formData: FormData) {
     .update(schema.shopSettings)
     .set({
       shippingFlatRateOre: flatRate,
-      shippingTaxRate: taxRate,
       freeShippingThresholdOre: threshold,
       updatedAt: new Date(),
     })

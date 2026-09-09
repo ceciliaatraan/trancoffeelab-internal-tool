@@ -1,7 +1,7 @@
 import { requireCurrentAdmin } from "@/lib/current-admin";
 import { getShopSettings } from "@/lib/settings";
 import { formatOre } from "@/lib/format";
-import { oreToKronorInput, hundredthsToPercentInput } from "@/lib/money-input";
+import { oreToKronorInput } from "@/lib/money-input";
 import { updateShippingSettingsAction } from "./actions";
 
 const inputClass =
@@ -35,6 +35,12 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
 
       <section className="flex flex-col gap-4">
         <h2 className="tran-label text-xs text-tran-muted">Frakt och moms</h2>
+        <p className="text-sm text-tran-muted">
+          Frakten har ingen egen momssats att ställa in — den räknas
+          automatiskt utifrån vad som faktiskt ligger i varukorgen (t.ex.
+          rent kaffe blir 6 %, ett phin-filter för sig 25 %, Komplett Kit
+          en blandning av båda).
+        </p>
         {admin.role === "owner" ? (
           <form action={updateShippingSettingsAction} className="flex flex-wrap gap-6">
             <div>
@@ -48,22 +54,6 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
                 min={0}
                 step="0.01"
                 defaultValue={oreToKronorInput(settings.shippingFlatRateOre)}
-                required
-                className={inputClass}
-              />
-            </div>
-            <div>
-              <label className={labelClass} htmlFor="shippingTaxRatePercent">
-                Moms på frakt (%)
-              </label>
-              <input
-                id="shippingTaxRatePercent"
-                name="shippingTaxRatePercent"
-                type="number"
-                min={0}
-                max={100}
-                step="0.01"
-                defaultValue={hundredthsToPercentInput(settings.shippingTaxRate)}
                 required
                 className={inputClass}
               />
@@ -100,12 +90,6 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
             <div>
               <dt className="tran-label text-xs text-tran-muted">Fraktkostnad</dt>
               <dd className="tran-tabular">{formatOre(settings.shippingFlatRateOre)}</dd>
-            </div>
-            <div>
-              <dt className="tran-label text-xs text-tran-muted">Moms på frakt</dt>
-              <dd className="tran-tabular">
-                {(settings.shippingTaxRate / 100).toLocaleString("sv-SE")}%
-              </dd>
             </div>
             <div>
               <dt className="tran-label text-xs text-tran-muted">Fri frakt från</dt>

@@ -73,7 +73,9 @@ export async function POST(request: Request) {
         nameSv: "Frakt",
         nameEn: "Shipping",
         amountOre: shopSettings.shippingFlatRateOre,
-        taxRateHundredthsPercent: shopSettings.shippingTaxRate,
+        // Frakten har ingen egen momssats — den ärver kundvagnens
+        // kvantitetsviktade snitt, precis som rabattraden nedan.
+        taxRateHundredthsPercent: weightedAverageTaxRate(cart.items),
       };
 
   const payload = buildCreateOrderPayload({
@@ -111,7 +113,8 @@ export async function POST(request: Request) {
 }
 
 /**
- * Rabattraden behöver en representativ momssats. Vi använder ett
+ * Rabatt- och fraktraden behöver en representativ momssats var och en
+ * (ingen av dem tillhör ett enskilt varuslag). Vi använder ett
  * kvantitetsviktat snitt av kundvagnens rader — en egen designbeslut
  * (inte hämtat från Kustom-dokumentationen), dokumenterat i docs/kustom.md.
  */

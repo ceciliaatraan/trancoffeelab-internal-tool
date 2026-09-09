@@ -145,13 +145,16 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
 
 - **`error_type` vid slut-i-lager-avslag i validate:** `approval_failed`
   (mest generella av de tre tillåtna värdena).
-- **Rabattradens momssats i checkout-session:** kvantitetsviktat snitt
-  av kundvagnens rader (`weightedAverageTaxRate`).
-- **Fraktkostnad och momssats för frakten** (`shop_settings`-tabellen,
-  redigerbar i `/settings` av ägare) — standardvärden 49,00 kr / 25%
-  moms är rimliga gissningar, INTE bekräftade priser. Bekräfta/ändra i
-  `/settings` innan skarp drift. Fri frakt-gräns är valfri (null =
-  ingen fri frakt).
+- **Rabatt- och fraktradens momssats i checkout-session:**
+  kvantitetsviktat snitt av kundvagnens rader (`weightedAverageTaxRate`)
+  — frakten har ingen egen fast momssats, den ärver samma blandade sats
+  som resten av ordern (ett rent kaffeköp blir 6 %, ett phin-filter för
+  sig 25 %, Komplett Kit sin blandade ~11,9 %).
+- **Fraktkostnad** (`shop_settings.shippingFlatRateOre`, redigerbar i
+  `/settings` av ägare) — standardvärdet 49,00 kr är en rimlig
+  gissning, INTE ett bekräftat pris. Bekräfta/ändra i `/settings`
+  innan skarp drift. Fri frakt-gräns är valfri (null = ingen fri
+  frakt).
 - **`inventory_movements.change_amount`-tolkning:** för
   `order_reserved`/`order_released` avser den `reservedQuantity`, för
   `manual_adjustment`/`return`/`order_shipped` avser den `quantity` —

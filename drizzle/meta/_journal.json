@@ -50,6 +50,13 @@
       "when": 1788876353882,
       "tag": "0006_pale_tinkerer",
       "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1788956850290,
+      "tag": "0007_illegal_celestials",
+      "breakpoints": true
     }
   ]
 }

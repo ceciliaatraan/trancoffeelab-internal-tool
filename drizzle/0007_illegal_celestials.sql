@@ -1,0 +1,1 @@
+ALTER TABLE "shop_settings" DROP COLUMN "shipping_tax_rate";
