@@ -1,0 +1,2 @@
+CREATE TYPE "public"."discount_applies_to" AS ENUM('products', 'shipping', 'both');--> statement-breakpoint
+ALTER TABLE "discount_codes" ADD COLUMN "applies_to" "discount_applies_to" DEFAULT 'products' NOT NULL;

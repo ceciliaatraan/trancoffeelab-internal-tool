@@ -14,6 +14,12 @@ function toDateInputValue(date: Date | null): string {
   return date ? date.toISOString().slice(0, 10) : "";
 }
 
+const appliesToLabels: Record<"products" | "shipping" | "both", string> = {
+  products: "Produkter",
+  shipping: "Frakt",
+  both: "Produkter + frakt",
+};
+
 export default async function DiscountsPage({ searchParams }: PageProps<"/discounts">) {
   const admin = await requireCurrentAdmin();
   const search = await searchParams;
@@ -68,6 +74,14 @@ export default async function DiscountsPage({ searchParams }: PageProps<"/discou
                       : oreToKronorInput(discount.value)
                   }
                 />
+                <div>
+                  <label className={labelClass}>Gäller för</label>
+                  <select name="appliesTo" defaultValue={discount.appliesTo} className={inputClass}>
+                    <option value="products">Produkter</option>
+                    <option value="shipping">Frakt</option>
+                    <option value="both">Produkter + frakt</option>
+                  </select>
+                </div>
                 <div>
                   <label className={labelClass}>Använd</label>
                   <p className="tran-tabular py-1.5 text-sm">
@@ -143,6 +157,8 @@ export default async function DiscountsPage({ searchParams }: PageProps<"/discou
                   {discount.type === "percentage"
                     ? `${(discount.value / 100).toLocaleString("sv-SE")}%`
                     : formatOre(discount.value)}
+                  {" på "}
+                  {appliesToLabels[discount.appliesTo]}
                   {" — "}
                   {discount.active ? "Aktiv" : "Inaktiv"} — använd {discount.usedCount}
                   {discount.maxUses ? ` / ${discount.maxUses}` : ""} gånger
@@ -165,6 +181,14 @@ export default async function DiscountsPage({ searchParams }: PageProps<"/discou
               <input name="code" required className={inputClass} />
             </div>
             <DiscountValueField />
+            <div>
+              <label className={labelClass}>Gäller för</label>
+              <select name="appliesTo" defaultValue="products" className={inputClass}>
+                <option value="products">Produkter</option>
+                <option value="shipping">Frakt</option>
+                <option value="both">Produkter + frakt</option>
+              </select>
+            </div>
             <div>
               <label className={labelClass}>Giltig från</label>
               <input name="validFrom" type="date" className={inputClass} />

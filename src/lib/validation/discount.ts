@@ -9,6 +9,7 @@ export const discountInputSchema = z
       .transform((value) => value.toUpperCase()),
     type: z.enum(["percentage", "fixed"]),
     value: z.coerce.number().int().min(1, "Värdet måste vara större än 0"),
+    appliesTo: z.enum(["products", "shipping", "both"]).default("products"),
     validFrom: z
       .string()
       .trim()

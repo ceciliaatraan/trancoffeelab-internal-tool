@@ -27,6 +27,7 @@ function parseForm(formData: FormData) {
     code: formData.get("code"),
     type,
     value,
+    appliesTo: formData.get("appliesTo") || undefined,
     validFrom: formData.get("validFrom") || undefined,
     validUntil: formData.get("validUntil") || undefined,
     maxUses: formData.get("maxUses") || undefined,

@@ -1,6 +1,7 @@
 import "server-only";
 import type { CartRequest } from "@/lib/validation/cart";
-import { evaluateDiscountCode } from "@/lib/discounts";
+import { evaluateDiscountCode, type DiscountAppliesTo } from "@/lib/discounts";
+import { getShopSettings } from "@/lib/settings";
 import { resolveCartLine } from "./cart";
 
 export type ValidatedCartItem = {
@@ -20,7 +21,15 @@ export type ValidatedCartItem = {
 };
 
 export type ValidatedCartDiscount =
-  | { code: string; valid: true; type: "percentage" | "fixed"; amountOre: number }
+  | {
+      code: string;
+      valid: true;
+      type: "percentage" | "fixed";
+      appliesTo: DiscountAppliesTo;
+      amountOre: number;
+      productsDiscountOre: number;
+      shippingDiscountOre: number;
+    }
   | { code: string; valid: false; reason: string };
 
 export type ValidatedCart = {
@@ -28,6 +37,9 @@ export type ValidatedCart = {
   /** Alla rader hittades och finns i tillräcklig mängd. */
   valid: boolean;
   subtotalOre: number;
+  /** 0 om fri frakt gäller (se freeShipping) — annars shop_settings flatrate. */
+  shippingOre: number;
+  freeShipping: boolean;
   discount: ValidatedCartDiscount | null;
 };
 
@@ -79,13 +91,27 @@ export async function buildValidatedCart(request: CartRequest): Promise<Validate
   const valid = items.length > 0 && items.every((item) => item.available);
   const subtotalOre = items.reduce((sum, item) => sum + item.unitPriceOre * item.quantity, 0);
 
+  const shopSettings = await getShopSettings();
+  const freeShipping =
+    shopSettings.freeShippingThresholdOre !== null &&
+    subtotalOre >= shopSettings.freeShippingThresholdOre;
+  const shippingOre = freeShipping ? 0 : shopSettings.shippingFlatRateOre;
+
   let discount: ValidatedCart["discount"] = null;
   if (request.discountCode) {
-    const evaluation = await evaluateDiscountCode(request.discountCode, subtotalOre);
+    const evaluation = await evaluateDiscountCode(request.discountCode, subtotalOre, shippingOre);
     discount = evaluation.valid
-      ? { code: evaluation.code, valid: true, type: evaluation.type, amountOre: evaluation.amountOre }
+      ? {
+          code: evaluation.code,
+          valid: true,
+          type: evaluation.type,
+          appliesTo: evaluation.appliesTo,
+          amountOre: evaluation.amountOre,
+          productsDiscountOre: evaluation.productsDiscountOre,
+          shippingDiscountOre: evaluation.shippingDiscountOre,
+        }
       : { code: request.discountCode, valid: false, reason: evaluation.reason };
   }
 
-  return { items, valid, subtotalOre, discount };
+  return { items, valid, subtotalOre, shippingOre, freeShipping, discount };
 }

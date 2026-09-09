@@ -57,6 +57,13 @@
       "when": 1788956850290,
       "tag": "0007_illegal_celestials",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1788958064368,
+      "tag": "0008_brave_rocket_raccoon",
+      "breakpoints": true
     }
   ]
 }

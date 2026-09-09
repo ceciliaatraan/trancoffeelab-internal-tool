@@ -5,7 +5,6 @@ import { buildValidatedCart } from "@/lib/queries/cart-summary";
 import { buildCreateOrderPayload, type CartItemInput, type ShippingInput } from "@/lib/kustom/order-payload";
 import { getMerchantUrls } from "@/lib/kustom/merchant-urls";
 import { createOrder, extractHtmlSnippet, extractOrderId, KustomApiError } from "@/lib/kustom/client";
-import { getShopSettings } from "@/lib/settings";
 
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
@@ -62,17 +61,19 @@ export async function POST(request: Request) {
     taxRateHundredthsPercent: item.taxRate,
   }));
 
-  const shopSettings = await getShopSettings();
-  const freeShipping =
-    shopSettings.freeShippingThresholdOre !== null &&
-    cart.subtotalOre >= shopSettings.freeShippingThresholdOre;
-
-  const shipping: ShippingInput | undefined = freeShipping
+  // A "shipping"/"both"-scoped discount reduces the shipping line's own
+  // amount directly rather than needing a second Kustom discount line —
+  // see computeDiscountSplit in lib/discount-split.ts.
+  const shippingDiscountOre =
+    cart.discount?.valid && cart.discount.shippingDiscountOre > 0
+      ? cart.discount.shippingDiscountOre
+      : 0;
+  const shipping: ShippingInput | undefined = cart.freeShipping
     ? undefined
     : {
         nameSv: "Frakt",
         nameEn: "Shipping",
-        amountOre: shopSettings.shippingFlatRateOre,
+        amountOre: cart.shippingOre - shippingDiscountOre,
         // Frakten har ingen egen momssats — den ärver kundvagnens
         // kvantitetsviktade snitt, precis som rabattraden nedan.
         taxRateHundredthsPercent: weightedAverageTaxRate(cart.items),
@@ -82,10 +83,10 @@ export async function POST(request: Request) {
     items,
     shipping,
     discount:
-      cart.discount?.valid && cart.discount.amountOre > 0
+      cart.discount?.valid && cart.discount.productsDiscountOre > 0
         ? {
             code: cart.discount.code,
-            amountOre: cart.discount.amountOre,
+            amountOre: cart.discount.productsDiscountOre,
             taxRateHundredthsPercent: weightedAverageTaxRate(cart.items),
           }
         : undefined,
@@ -96,7 +97,17 @@ export async function POST(request: Request) {
   try {
     const order = await createOrder(payload);
     return NextResponse.json(
-      { html_snippet: extractHtmlSnippet(order), order_id: extractOrderId(order) },
+      {
+        html_snippet: extractHtmlSnippet(order),
+        order_id: extractOrderId(order),
+        // The discount was already resolved into the Kustom payload above —
+        // echoed back here so the storefront's own order summary (which has
+        // no other way to know the amount) can actually show it.
+        discount:
+          cart.discount?.valid && cart.discount.amountOre > 0
+            ? { code: cart.discount.code, amountOre: cart.discount.amountOre }
+            : null,
+      },
       { headers: corsHeaders(origin) },
     );
   } catch (err) {
