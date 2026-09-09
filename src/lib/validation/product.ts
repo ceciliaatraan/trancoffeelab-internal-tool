@@ -50,6 +50,18 @@ export const variantInputSchema = z.object({
 
 export type VariantInput = z.infer<typeof variantInputSchema>;
 
+export const bundleItemInputSchema = z.object({
+  componentProductId: z.uuid("Välj en komponent"),
+  componentVariantId: z.uuid().nullable(),
+  quantity: z.coerce.number().int().min(1, "Antal måste vara minst 1"),
+});
+
+export type BundleItemInput = z.infer<typeof bundleItemInputSchema>;
+
+export const bundleItemQuantitySchema = z.object({
+  quantity: z.coerce.number().int().min(1, "Antal måste vara minst 1"),
+});
+
 export const inventoryAdjustSchema = z.object({
   inventoryId: z.uuid(),
   newQuantity: z.coerce.number().int().min(0, "Lagersaldot kan inte bli negativt"),

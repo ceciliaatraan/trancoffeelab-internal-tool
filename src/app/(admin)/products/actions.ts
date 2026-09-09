@@ -2,19 +2,29 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCurrentAdmin } from "@/lib/current-admin";
 import { uploadProductImage, deleteProductImage } from "@/lib/supabase";
-import { productInputSchema, variantInputSchema } from "@/lib/validation/product";
+import {
+  bundleItemInputSchema,
+  bundleItemQuantitySchema,
+  productInputSchema,
+  variantInputSchema,
+} from "@/lib/validation/product";
+
+/**
+ * Drizzle wraps the driver's postgres error in a DrizzleQueryError, so the
+ * Postgres error code isn't on `err.code` — it's on `err.cause.code`.
+ */
+function isUniqueViolation(err: unknown): boolean {
+  const code = (err as { code?: string } | undefined)?.code;
+  const causeCode = (err as { cause?: { code?: string } } | undefined)?.cause?.code;
+  return code === "23505" || causeCode === "23505";
+}
 
 function friendlyDbError(err: unknown): string {
-  if (
-    err &&
-    typeof err === "object" &&
-    "code" in err &&
-    (err as { code?: string }).code === "23505"
-  ) {
+  if (isUniqueViolation(err)) {
     return "Slug eller SKU används redan av en annan produkt.";
   }
   return "Något gick fel. Försök igen.";
@@ -265,4 +275,104 @@ export async function removeVariantImage(productId: string, variantId: string, u
 
   await deleteProductImage(url);
   revalidatePath(`/products/${productId}`);
+}
+
+function friendlyBundleDbError(err: unknown): string {
+  if (isUniqueViolation(err)) {
+    return "Den komponenten är redan kopplad till det här kitet.";
+  }
+  return "Något gick fel. Försök igen.";
+}
+
+/**
+ * Select-värdet från "Lägg till komponent"-formuläret kodar både produkt
+ * och (om produkten har varianter) vilken variant: "<productId>" eller
+ * "<productId>:<variantId>". Se product-bundle_items-kommentaren i
+ * db/schema/catalog.ts för varför en specifik variant behövs när
+ * komponenten har flera (annars pekar kitet på fel lagerrad).
+ */
+function parseComponentValue(
+  value: FormDataEntryValue | null,
+): { componentProductId: string; componentVariantId: string | null } | null {
+  if (typeof value !== "string" || value.length === 0) return null;
+  const [componentProductId, componentVariantId] = value.split(":");
+  if (!componentProductId) return null;
+  return { componentProductId, componentVariantId: componentVariantId || null };
+}
+
+export async function addBundleItem(productId: string, formData: FormData) {
+  await requireCurrentAdmin();
+  const component = parseComponentValue(formData.get("component"));
+  const parsed = bundleItemInputSchema.safeParse({
+    componentProductId: component?.componentProductId,
+    componentVariantId: component?.componentVariantId ?? null,
+    quantity: formData.get("quantity"),
+  });
+  if (!parsed.success) {
+    redirect(
+      `/products/${productId}?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Ogiltiga uppgifter")}`,
+    );
+  }
+
+  if (parsed.data.componentProductId === productId) {
+    redirect(
+      `/products/${productId}?error=${encodeURIComponent("En produkt kan inte vara sin egen kit-komponent.")}`,
+    );
+  }
+
+  try {
+    await db.insert(schema.productBundleItems).values({
+      bundleProductId: productId,
+      componentProductId: parsed.data.componentProductId,
+      componentVariantId: parsed.data.componentVariantId,
+      quantity: parsed.data.quantity,
+    });
+  } catch (err) {
+    redirect(`/products/${productId}?error=${encodeURIComponent(friendlyBundleDbError(err))}`);
+  }
+
+  revalidatePath(`/products/${productId}`);
+  revalidatePath("/inventory");
+}
+
+export async function updateBundleItemQuantity(
+  productId: string,
+  bundleItemId: string,
+  formData: FormData,
+) {
+  await requireCurrentAdmin();
+  const parsed = bundleItemQuantitySchema.safeParse({ quantity: formData.get("quantity") });
+  if (!parsed.success) {
+    redirect(
+      `/products/${productId}?error=${encodeURIComponent(parsed.error.issues[0]?.message ?? "Ogiltigt antal")}`,
+    );
+  }
+
+  await db
+    .update(schema.productBundleItems)
+    .set({ quantity: parsed.data.quantity })
+    .where(
+      and(
+        eq(schema.productBundleItems.id, bundleItemId),
+        eq(schema.productBundleItems.bundleProductId, productId),
+      ),
+    );
+
+  revalidatePath(`/products/${productId}`);
+  revalidatePath("/inventory");
+}
+
+export async function removeBundleItem(productId: string, bundleItemId: string) {
+  await requireCurrentAdmin();
+  await db
+    .delete(schema.productBundleItems)
+    .where(
+      and(
+        eq(schema.productBundleItems.id, bundleItemId),
+        eq(schema.productBundleItems.bundleProductId, productId),
+      ),
+    );
+
+  revalidatePath(`/products/${productId}`);
+  revalidatePath("/inventory");
 }

@@ -1,19 +1,23 @@
 import Link from "next/link";
 import Image from "next/image";
 import { notFound } from "next/navigation";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, inArray, ne } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { ProductForm } from "@/components/product-form";
 import { StatusChip } from "@/components/status-chip";
 import { formatOre } from "@/lib/format";
+import { computeBundleAvailability } from "@/lib/inventory/bundles";
 import {
+  addBundleItem,
   addProductImage,
   addVariant,
   addVariantImage,
   deleteVariant,
+  removeBundleItem,
   removeProductImage,
   removeVariantImage,
   setProductStatus,
+  updateBundleItemQuantity,
   updateProduct,
   updateVariant,
 } from "../actions";
@@ -42,6 +46,64 @@ export default async function EditProductPage({
     .from(schema.productVariants)
     .where(eq(schema.productVariants.productId, id))
     .orderBy(asc(schema.productVariants.sortOrder));
+
+  const bundleItems = await db
+    .select({
+      id: schema.productBundleItems.id,
+      quantity: schema.productBundleItems.quantity,
+      componentProductName: schema.products.nameSv,
+      componentVariantName: schema.productVariants.nameSv,
+    })
+    .from(schema.productBundleItems)
+    .innerJoin(
+      schema.products,
+      eq(schema.productBundleItems.componentProductId, schema.products.id),
+    )
+    .leftJoin(
+      schema.productVariants,
+      eq(schema.productBundleItems.componentVariantId, schema.productVariants.id),
+    )
+    .where(eq(schema.productBundleItems.bundleProductId, id))
+    .orderBy(asc(schema.products.nameSv));
+
+  const bundleAvailability =
+    bundleItems.length > 0 ? await computeBundleAvailability(db, id) : null;
+
+  const otherProducts = await db
+    .select({ id: schema.products.id, nameSv: schema.products.nameSv, sku: schema.products.sku })
+    .from(schema.products)
+    .where(ne(schema.products.id, id))
+    .orderBy(asc(schema.products.nameSv));
+
+  const otherVariants =
+    otherProducts.length > 0
+      ? await db
+          .select({
+            id: schema.productVariants.id,
+            productId: schema.productVariants.productId,
+            nameSv: schema.productVariants.nameSv,
+            sku: schema.productVariants.sku,
+          })
+          .from(schema.productVariants)
+          .where(
+            inArray(
+              schema.productVariants.productId,
+              otherProducts.map((p) => p.id),
+            ),
+          )
+          .orderBy(asc(schema.productVariants.sortOrder))
+      : [];
+
+  const variantsByProductId = new Map<string, typeof otherVariants>();
+  for (const variant of otherVariants) {
+    const list = variantsByProductId.get(variant.productId) ?? [];
+    list.push(variant);
+    variantsByProductId.set(variant.productId, list);
+  }
+  const componentOptions = otherProducts.map((p) => ({
+    ...p,
+    variants: variantsByProductId.get(p.id) ?? [],
+  }));
 
   return (
     <div className="flex max-w-2xl flex-col gap-10">
@@ -292,6 +354,114 @@ export default async function EditProductPage({
             </button>
           </div>
         </form>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="tran-label text-xs text-tran-muted">Kit-innehåll</h2>
+        <p className="text-sm text-tran-muted">
+          Om den här produkten är ett kit (t.ex. Komplett Kit) kopplar du
+          ihop den med sina beståndsdelar här. Lagersaldot räknas då ut
+          automatiskt från komponenternas fria lager istället för att
+          fyllas i manuellt på lagersidan. Har en komponent egna varianter
+          (t.ex. malet/kaffebönor) måste du välja exakt vilken — annars
+          pekar kitet på fel lagerrad.
+        </p>
+
+        {bundleAvailability !== null ? (
+          <p className="text-sm">
+            <span className="tran-label text-[11px] text-tran-muted">
+              Beräknat lagersaldo just nu:{" "}
+            </span>
+            <span className="tran-tabular font-bold">{bundleAvailability} st</span>
+          </p>
+        ) : null}
+
+        {bundleItems.length > 0 ? (
+          <div className="flex flex-col gap-3">
+            {bundleItems.map((item) => (
+              <div
+                key={item.id}
+                className="flex flex-wrap items-center justify-between gap-3 border border-tran-hairline p-3"
+              >
+                <span className="text-sm">
+                  {item.componentProductName}
+                  {item.componentVariantName ? ` — ${item.componentVariantName}` : ""}
+                </span>
+                <div className="flex items-center gap-3">
+                  <form
+                    action={updateBundleItemQuantity.bind(null, id, item.id)}
+                    className="flex items-center gap-2"
+                  >
+                    <input
+                      name="quantity"
+                      type="number"
+                      min={1}
+                      defaultValue={item.quantity}
+                      className="w-16 border border-tran-hairline bg-tran-white px-2 py-1 text-sm focus:border-tran-black focus:outline-none"
+                    />
+                    <span className="text-xs text-tran-muted">st/kit</span>
+                    <button type="submit" className="tran-label text-[11px] hover:text-tran-red">
+                      Spara
+                    </button>
+                  </form>
+                  <form action={removeBundleItem.bind(null, id, item.id)}>
+                    <button
+                      type="submit"
+                      className="tran-label text-[11px] text-tran-muted hover:text-tran-red"
+                    >
+                      Ta bort
+                    </button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <p className="text-sm text-tran-muted">Inga komponenter kopplade.</p>
+        )}
+
+        {componentOptions.length > 0 ? (
+          <form
+            action={addBundleItem.bind(null, id)}
+            className="flex flex-wrap items-center gap-3 border border-tran-hairline p-4"
+          >
+            <select name="component" required defaultValue="" className={inputClass}>
+              <option value="" disabled>
+                Välj komponent...
+              </option>
+              {componentOptions.map((product) =>
+                product.variants.length > 0 ? (
+                  <optgroup key={product.id} label={`${product.nameSv} (${product.sku})`}>
+                    {product.variants.map((variant) => (
+                      <option key={variant.id} value={`${product.id}:${variant.id}`}>
+                        {variant.nameSv} ({variant.sku})
+                      </option>
+                    ))}
+                  </optgroup>
+                ) : (
+                  <option key={product.id} value={product.id}>
+                    {product.nameSv} ({product.sku})
+                  </option>
+                ),
+              )}
+            </select>
+            <input
+              name="quantity"
+              type="number"
+              min={1}
+              defaultValue={1}
+              placeholder="Antal/kit"
+              required
+              className="w-24 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
+            />
+            <button
+              type="submit"
+              className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
+            >
+              Lägg till komponent
+            </button>
+          </form>
+        ) : null}
       </section>
     </div>
   );
