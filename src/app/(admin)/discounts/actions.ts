@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireOwner } from "@/lib/current-admin";
 import { discountInputSchema } from "@/lib/validation/discount";
+import { kronorToOre, percentToHundredths } from "@/lib/money-input";
 
 function friendlyDbError(err: unknown): string {
   if (err && typeof err === "object" && "code" in err && (err as { code?: string }).code === "23505") {
@@ -15,14 +16,21 @@ function friendlyDbError(err: unknown): string {
 }
 
 function parseForm(formData: FormData) {
+  const type = formData.get("type")?.toString();
+  const rawValue = formData.get("value")?.toString();
+  const value = type === "percentage" ? percentToHundredths(rawValue) : kronorToOre(rawValue);
+
+  const minOrderValueRaw = formData.get("minOrderValue")?.toString().trim();
+  const minOrderValueOre = minOrderValueRaw ? kronorToOre(minOrderValueRaw) : undefined;
+
   return discountInputSchema.safeParse({
     code: formData.get("code"),
-    type: formData.get("type"),
-    value: formData.get("value"),
+    type,
+    value,
     validFrom: formData.get("validFrom") || undefined,
     validUntil: formData.get("validUntil") || undefined,
     maxUses: formData.get("maxUses") || undefined,
-    minOrderValueOre: formData.get("minOrderValueOre") || undefined,
+    minOrderValueOre,
     active: formData.get("active") === "on",
   });
 }

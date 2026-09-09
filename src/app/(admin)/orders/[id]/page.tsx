@@ -3,6 +3,7 @@ import { notFound } from "next/navigation";
 import { asc, desc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatDateTime, formatOre } from "@/lib/format";
+import { oreToKronorInput } from "@/lib/money-input";
 import { OrderStatusChip } from "@/components/order-status-chip";
 import { TestOrderChip } from "@/components/test-order-chip";
 import {
@@ -179,14 +180,15 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
             <form action={captureOrderAction.bind(null, order.id)} className="flex items-end gap-2">
               <div>
                 <label className="tran-label mb-1 block text-[11px] text-tran-muted">
-                  Debitera (öre, valfritt — tomt = {remainingToCapture})
+                  Debitera (kr, valfritt — tomt = {formatOre(remainingToCapture)})
                 </label>
                 <input
                   name="amount"
                   type="number"
-                  min={1}
-                  max={remainingToCapture}
-                  placeholder={String(remainingToCapture)}
+                  min={0.01}
+                  step="0.01"
+                  max={oreToKronorInput(remainingToCapture)}
+                  placeholder={oreToKronorInput(remainingToCapture)}
                   className="w-40 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
                 />
               </div>
@@ -204,13 +206,14 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
               <form action={refundPartialAction.bind(null, order.id)} className="flex items-end gap-2">
                 <div>
                   <label className="tran-label mb-1 block text-[11px] text-tran-muted">
-                    Delåterbetala (öre)
+                    Delåterbetala (kr)
                   </label>
                   <input
                     name="amount"
                     type="number"
-                    min={1}
-                    max={remainingToRefund}
+                    min={0.01}
+                    step="0.01"
+                    max={oreToKronorInput(remainingToRefund)}
                     required
                     className="w-40 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
                   />

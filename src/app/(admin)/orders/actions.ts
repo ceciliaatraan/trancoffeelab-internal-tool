@@ -5,6 +5,7 @@ import { revalidatePath } from "next/cache";
 import { and, eq, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCurrentAdmin, requireOwner } from "@/lib/current-admin";
+import { kronorToOre } from "@/lib/money-input";
 import { expandLineToInventoryTargets } from "@/lib/inventory/bundles";
 import { resolveCartLine } from "@/lib/queries/cart";
 import {
@@ -50,8 +51,8 @@ export async function captureOrderAction(orderId: string, formData: FormData) {
   const order = await getOrderOrRedirect(orderId);
 
   const remaining = order.orderAmountOre - order.capturedAmountOre;
-  const rawAmount = formData.get("amount");
-  const amountOre = rawAmount ? Number(rawAmount) : remaining;
+  const rawAmount = formData.get("amount")?.toString().trim();
+  const amountOre = rawAmount ? kronorToOre(rawAmount) : remaining;
   const description = formData.get("description")?.toString().trim() || undefined;
 
   if (!Number.isInteger(amountOre) || amountOre <= 0 || amountOre > remaining) {
@@ -114,7 +115,7 @@ async function refund(orderId: string, amountOre: number, description?: string) 
 }
 
 export async function refundPartialAction(orderId: string, formData: FormData) {
-  const amountOre = Number(formData.get("amount"));
+  const amountOre = kronorToOre(formData.get("amount")?.toString());
   const description = formData.get("description")?.toString().trim() || undefined;
   await refund(orderId, amountOre, description);
 }

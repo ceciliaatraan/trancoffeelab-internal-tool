@@ -6,6 +6,7 @@ import { db, schema } from "@/db";
 import { ProductForm } from "@/components/product-form";
 import { StatusChip } from "@/components/status-chip";
 import { formatOre } from "@/lib/format";
+import { oreToKronorInput } from "@/lib/money-input";
 import { computeBundleAvailability } from "@/lib/inventory/bundles";
 import {
   addBundleItem,
@@ -229,11 +230,12 @@ export default async function EditProductPage({
                     className={inputClass}
                   />
                   <input
-                    name="priceOre"
+                    name="price"
                     type="number"
                     min={0}
-                    defaultValue={variant.priceOre}
-                    placeholder="Pris (öre)"
+                    step="0.01"
+                    defaultValue={oreToKronorInput(variant.priceOre)}
+                    placeholder="Pris (kr)"
                     required
                     className={inputClass}
                   />
@@ -329,10 +331,11 @@ export default async function EditProductPage({
           <input name="nameEn" placeholder="Namn (en)" required className={inputClass} />
           <input name="sku" placeholder="SKU" required className={inputClass} />
           <input
-            name="priceOre"
+            name="price"
             type="number"
             min={0}
-            placeholder="Pris (öre)"
+            step="0.01"
+            placeholder="Pris (kr)"
             required
             className={inputClass}
           />

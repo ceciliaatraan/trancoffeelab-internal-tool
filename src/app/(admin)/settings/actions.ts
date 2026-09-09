@@ -6,6 +6,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireOwner } from "@/lib/current-admin";
 import { getShopSettings } from "@/lib/settings";
+import { kronorToOre, percentToHundredths } from "@/lib/money-input";
 
 export async function updateShippingSettingsAction(formData: FormData) {
   try {
@@ -14,10 +15,10 @@ export async function updateShippingSettingsAction(formData: FormData) {
     redirect(`/settings?error=${encodeURIComponent("Endast ägare kan ändra inställningar.")}`);
   }
 
-  const flatRate = Number(formData.get("shippingFlatRateOre"));
-  const taxRate = Number(formData.get("shippingTaxRate"));
-  const thresholdRaw = formData.get("freeShippingThresholdOre")?.toString().trim();
-  const threshold = thresholdRaw ? Number(thresholdRaw) : null;
+  const flatRate = kronorToOre(formData.get("shippingFlatRate")?.toString());
+  const taxRate = percentToHundredths(formData.get("shippingTaxRatePercent")?.toString());
+  const thresholdRaw = formData.get("freeShippingThreshold")?.toString().trim();
+  const threshold = thresholdRaw ? kronorToOre(thresholdRaw) : null;
 
   if (!Number.isInteger(flatRate) || flatRate < 0) {
     redirect(`/settings?error=${encodeURIComponent("Ogiltig fraktkostnad.")}`);

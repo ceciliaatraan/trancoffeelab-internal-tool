@@ -2,6 +2,8 @@ import { desc } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCurrentAdmin } from "@/lib/current-admin";
 import { formatOre } from "@/lib/format";
+import { oreToKronorInput, hundredthsToPercentInput } from "@/lib/money-input";
+import { DiscountValueField } from "@/components/discount-value-field";
 import { createDiscountAction, updateDiscountAction } from "./actions";
 
 const inputClass =
@@ -58,26 +60,14 @@ export default async function DiscountsPage({ searchParams }: PageProps<"/discou
                   <label className={labelClass}>Kod</label>
                   <input name="code" defaultValue={discount.code} required className={inputClass} />
                 </div>
-                <div>
-                  <label className={labelClass}>Typ</label>
-                  <select name="type" defaultValue={discount.type} className={inputClass}>
-                    <option value="percentage">Procent</option>
-                    <option value="fixed">Fast belopp</option>
-                  </select>
-                </div>
-                <div>
-                  <label className={labelClass}>
-                    Värde ({discount.type === "percentage" ? "hundradels %" : "öre"})
-                  </label>
-                  <input
-                    name="value"
-                    type="number"
-                    min={1}
-                    defaultValue={discount.value}
-                    required
-                    className={inputClass}
-                  />
-                </div>
+                <DiscountValueField
+                  defaultType={discount.type}
+                  defaultValue={
+                    discount.type === "percentage"
+                      ? hundredthsToPercentInput(discount.value)
+                      : oreToKronorInput(discount.value)
+                  }
+                />
                 <div>
                   <label className={labelClass}>Använd</label>
                   <p className="tran-tabular py-1.5 text-sm">
@@ -114,12 +104,17 @@ export default async function DiscountsPage({ searchParams }: PageProps<"/discou
                   />
                 </div>
                 <div>
-                  <label className={labelClass}>Minsta ordervärde (öre)</label>
+                  <label className={labelClass}>Minsta ordervärde (kr)</label>
                   <input
-                    name="minOrderValueOre"
+                    name="minOrderValue"
                     type="number"
                     min={0}
-                    defaultValue={discount.minOrderValueOre ?? ""}
+                    step="0.01"
+                    defaultValue={
+                      discount.minOrderValueOre != null
+                        ? oreToKronorInput(discount.minOrderValueOre)
+                        : ""
+                    }
                     className={inputClass}
                   />
                 </div>
@@ -169,17 +164,7 @@ export default async function DiscountsPage({ searchParams }: PageProps<"/discou
               <label className={labelClass}>Kod</label>
               <input name="code" required className={inputClass} />
             </div>
-            <div>
-              <label className={labelClass}>Typ</label>
-              <select name="type" defaultValue="percentage" className={inputClass}>
-                <option value="percentage">Procent</option>
-                <option value="fixed">Fast belopp</option>
-              </select>
-            </div>
-            <div>
-              <label className={labelClass}>Värde (hundradels % eller öre)</label>
-              <input name="value" type="number" min={1} required className={inputClass} />
-            </div>
+            <DiscountValueField />
             <div>
               <label className={labelClass}>Giltig från</label>
               <input name="validFrom" type="date" className={inputClass} />
@@ -193,8 +178,8 @@ export default async function DiscountsPage({ searchParams }: PageProps<"/discou
               <input name="maxUses" type="number" min={1} className={inputClass} />
             </div>
             <div>
-              <label className={labelClass}>Minsta ordervärde (öre)</label>
-              <input name="minOrderValueOre" type="number" min={0} className={inputClass} />
+              <label className={labelClass}>Minsta ordervärde (kr)</label>
+              <input name="minOrderValue" type="number" min={0} step="0.01" className={inputClass} />
             </div>
             <div className="flex items-end">
               <label className="flex items-center gap-2 text-sm">

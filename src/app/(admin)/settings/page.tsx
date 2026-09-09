@@ -1,6 +1,7 @@
 import { requireCurrentAdmin } from "@/lib/current-admin";
 import { getShopSettings } from "@/lib/settings";
 import { formatOre } from "@/lib/format";
+import { oreToKronorInput, hundredthsToPercentInput } from "@/lib/money-input";
 import { updateShippingSettingsAction } from "./actions";
 
 const inputClass =
@@ -37,44 +38,51 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         {admin.role === "owner" ? (
           <form action={updateShippingSettingsAction} className="flex flex-wrap gap-6">
             <div>
-              <label className={labelClass} htmlFor="shippingFlatRateOre">
-                Fraktkostnad (öre)
+              <label className={labelClass} htmlFor="shippingFlatRate">
+                Fraktkostnad (kr)
               </label>
               <input
-                id="shippingFlatRateOre"
-                name="shippingFlatRateOre"
+                id="shippingFlatRate"
+                name="shippingFlatRate"
                 type="number"
                 min={0}
-                defaultValue={settings.shippingFlatRateOre}
+                step="0.01"
+                defaultValue={oreToKronorInput(settings.shippingFlatRateOre)}
                 required
                 className={inputClass}
               />
             </div>
             <div>
-              <label className={labelClass} htmlFor="shippingTaxRate">
-                Moms på frakt (hundradels procent, 2500 = 25%)
+              <label className={labelClass} htmlFor="shippingTaxRatePercent">
+                Moms på frakt (%)
               </label>
               <input
-                id="shippingTaxRate"
-                name="shippingTaxRate"
+                id="shippingTaxRatePercent"
+                name="shippingTaxRatePercent"
                 type="number"
                 min={0}
-                max={10000}
-                defaultValue={settings.shippingTaxRate}
+                max={100}
+                step="0.01"
+                defaultValue={hundredthsToPercentInput(settings.shippingTaxRate)}
                 required
                 className={inputClass}
               />
             </div>
             <div>
-              <label className={labelClass} htmlFor="freeShippingThresholdOre">
-                Fri frakt från (öre, tomt = ingen fri frakt)
+              <label className={labelClass} htmlFor="freeShippingThreshold">
+                Fri frakt från (kr, tomt = ingen fri frakt)
               </label>
               <input
-                id="freeShippingThresholdOre"
-                name="freeShippingThresholdOre"
+                id="freeShippingThreshold"
+                name="freeShippingThreshold"
                 type="number"
                 min={0}
-                defaultValue={settings.freeShippingThresholdOre ?? ""}
+                step="0.01"
+                defaultValue={
+                  settings.freeShippingThresholdOre != null
+                    ? oreToKronorInput(settings.freeShippingThresholdOre)
+                    : ""
+                }
                 className={inputClass}
               />
             </div>

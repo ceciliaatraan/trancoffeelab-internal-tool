@@ -6,6 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCurrentAdmin } from "@/lib/current-admin";
 import { uploadProductImage, deleteProductImage } from "@/lib/supabase";
+import { kronorToOre, percentToHundredths } from "@/lib/money-input";
 import {
   bundleItemInputSchema,
   bundleItemQuantitySchema,
@@ -38,8 +39,8 @@ function parseProductForm(formData: FormData) {
     descriptionSv: formData.get("descriptionSv") || undefined,
     descriptionEn: formData.get("descriptionEn") || undefined,
     sku: formData.get("sku"),
-    priceOre: formData.get("priceOre"),
-    taxRate: formData.get("taxRate"),
+    priceOre: kronorToOre(formData.get("price")?.toString()),
+    taxRate: percentToHundredths(formData.get("taxRatePercent")?.toString()),
     weightGrams: formData.get("weightGrams"),
     status: formData.get("status"),
     sortOrder: formData.get("sortOrder") || 0,
@@ -161,7 +162,7 @@ function parseVariantForm(formData: FormData) {
     nameSv: formData.get("nameSv"),
     nameEn: formData.get("nameEn"),
     sku: formData.get("sku"),
-    priceOre: formData.get("priceOre"),
+    priceOre: kronorToOre(formData.get("price")?.toString()),
     weightGrams: formData.get("weightGrams"),
     sortOrder: formData.get("sortOrder") || 0,
   });

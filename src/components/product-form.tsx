@@ -1,3 +1,5 @@
+import { oreToKronorInput, hundredthsToPercentInput } from "@/lib/money-input";
+
 type ProductFormValues = {
   slug?: string;
   nameSv?: string;
@@ -103,30 +105,32 @@ export function ProductForm({
           />
         </div>
         <div>
-          <label className={labelClass} htmlFor="priceOre">
-            Pris i öre (14900 = 149,00 kr)
+          <label className={labelClass} htmlFor="price">
+            Pris (kr)
           </label>
           <input
-            id="priceOre"
-            name="priceOre"
+            id="price"
+            name="price"
             type="number"
             min={0}
-            defaultValue={values?.priceOre}
+            step="0.01"
+            defaultValue={values?.priceOre != null ? oreToKronorInput(values.priceOre) : undefined}
             required
             className={inputClass}
           />
         </div>
         <div>
-          <label className={labelClass} htmlFor="taxRate">
-            Moms i hundradels procent (2500 = 25%)
+          <label className={labelClass} htmlFor="taxRatePercent">
+            Moms (%)
           </label>
           <input
-            id="taxRate"
-            name="taxRate"
+            id="taxRatePercent"
+            name="taxRatePercent"
             type="number"
             min={0}
-            max={10000}
-            defaultValue={values?.taxRate}
+            max={100}
+            step="0.01"
+            defaultValue={values?.taxRate != null ? hundredthsToPercentInput(values.taxRate) : undefined}
             required
             className={inputClass}
           />
