@@ -15,7 +15,7 @@ const dayLabelFormatter = new Intl.DateTimeFormat("sv-SE", {
 
 /**
  * "YYYY-MM-DD" i svensk lokal tid, inte serverns UTC (samma distinktion
- * som formatDateTime i lib/format.ts) — annars hamnar ordrar lagda sent
+ * som formatDateTime i lib/format.ts) - annars hamnar ordrar lagda sent
  * på kvällen i fel dagshink i diagrammet.
  */
 export function stockholmDayKey(date: Date): string {
@@ -24,7 +24,7 @@ export function stockholmDayKey(date: Date): string {
 
 /**
  * Föregående kalenderdag för en "YYYY-MM-DD"-nyckel, räknat rent på
- * datumkomponenterna (inte via en tidszon-omvandlad instant) — så
+ * datumkomponenterna (inte via en tidszon-omvandlad instant) - så
  * sommar-/vintertidsskiften aldrig kan hoppa över eller dubbla en dag.
  */
 export function previousDayKey(dayKey: string): string {
@@ -33,7 +33,7 @@ export function previousDayKey(dayKey: string): string {
   return `${prev.getUTCFullYear()}-${String(prev.getUTCMonth() + 1).padStart(2, "0")}-${String(prev.getUTCDate()).padStart(2, "0")}`;
 }
 
-/** Klockan tolv UTC för en dagsnyckel — långt från midnatt i alla riktiga tidszoner, så formatering av datumet blir aldrig fel dag. */
+/** Klockan tolv UTC för en dagsnyckel - långt från midnatt i alla riktiga tidszoner, så formatering av datumet blir aldrig fel dag. */
 export function dayKeyToNoonUtc(dayKey: string): Date {
   const [y, m, d] = dayKey.split("-").map(Number);
   return new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
@@ -64,7 +64,7 @@ export type DashboardSummary = {
 };
 
 /**
- * Härlett direkt ur samma dagsvisa siffror som diagrammet ritar — så
+ * Härlett direkt ur samma dagsvisa siffror som diagrammet ritar - så
  * KPI-korten och diagrammet ALDRIG kan visa olika "idag"/"denna vecka"
  * på grund av två olika sätt att räkna dagsgränser.
  */

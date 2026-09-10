@@ -17,7 +17,7 @@ export class ForbiddenError extends Error {
   }
 }
 
-/** Kastar om ingen session finns — alla anrop hit sker bakom proxy.ts skydd ändå. */
+/** Kastar om ingen session finns - alla anrop hit sker bakom proxy.ts skydd ändå. */
 export async function requireCurrentAdmin() {
   const session = await auth();
   if (!session?.user?.id) {
@@ -38,7 +38,7 @@ export async function requireCurrentAdmin() {
 
 /**
  * Rabattkoder och inställningar är ägar-only (spec: "staff får inte
- * ändra rabattkoder eller inställningar") — kontrollen sitter här,
+ * ändra rabattkoder eller inställningar") - kontrollen sitter här,
  * server-side, inte bara genom att dölja knappar i UI:t.
  */
 export async function requireOwner() {

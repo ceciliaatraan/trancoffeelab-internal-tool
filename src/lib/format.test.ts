@@ -15,7 +15,7 @@ describe("formatOre", () => {
     expect(normalizeSpaces(formatOre(0))).toBe("0,00 kr");
   });
 
-  it("rundar aldrig — öre är redan heltal", () => {
+  it("rundar aldrig - öre är redan heltal", () => {
     expect(normalizeSpaces(formatOre(100))).toBe("1,00 kr");
   });
 });
@@ -30,7 +30,7 @@ describe("formatTaxRate", () => {
 
 describe("formatDateTime", () => {
   it("visar svensk lokal tid (sommartid, UTC+2), inte serverns UTC-tid", () => {
-    // 2026-09-08T11:18:00Z ska visas som 13:18 i Stockholm-tid — precis
+    // 2026-09-08T11:18:00Z ska visas som 13:18 i Stockholm-tid - precis
     // det scenario som avslöjade att adminet tidigare visade UTC rakt av.
     const utc = new Date("2026-09-08T11:18:00Z");
     expect(formatDateTime(utc)).toContain("13:18");

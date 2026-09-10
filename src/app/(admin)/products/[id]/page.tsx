@@ -196,7 +196,7 @@ export default async function EditProductPage({
       <section className="flex flex-col gap-4">
         <h2 className="tran-label text-xs text-tran-muted">Varianter</h2>
         <p className="text-sm text-tran-muted">
-          Valfritt — t.ex. phin-filter i liten/stor. Varje variant får en
+          Valfritt - t.ex. phin-filter i liten/stor. Varje variant får en
           egen lagerrad.
         </p>
 
@@ -366,7 +366,7 @@ export default async function EditProductPage({
           ihop den med sina beståndsdelar här. Lagersaldot räknas då ut
           automatiskt från komponenternas fria lager istället för att
           fyllas i manuellt på lagersidan. Har en komponent egna varianter
-          (t.ex. malet/kaffebönor) måste du välja exakt vilken — annars
+          (t.ex. malet/kaffebönor) måste du välja exakt vilken - annars
           pekar kitet på fel lagerrad.
         </p>
 
@@ -388,7 +388,7 @@ export default async function EditProductPage({
               >
                 <span className="text-sm">
                   {item.componentProductName}
-                  {item.componentVariantName ? ` — ${item.componentVariantName}` : ""}
+                  {item.componentVariantName ? ` - ${item.componentVariantName}` : ""}
                 </span>
                 <div className="flex items-center gap-3">
                   <form

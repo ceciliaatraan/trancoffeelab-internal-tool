@@ -31,7 +31,7 @@ async function getOrderOrRedirect(orderId: string) {
   return order;
 }
 
-/** Synkar vårt cachade belopp/status från Kustoms Order Management efter varje åtgärd — Kustom är alltid facit. */
+/** Synkar vårt cachade belopp/status från Kustoms Order Management efter varje åtgärd - Kustom är alltid facit. */
 async function syncOrderFromKustom(orderId: string, kustomOrderId: string) {
   const fresh = await getOrderManagementOrder(kustomOrderId);
   await db
@@ -239,12 +239,12 @@ export async function markShippedAction(orderId: string, formData: FormData) {
 }
 
 /**
- * Tar bort en testorder (order.is_test = true) permanent — enda sättet
+ * Tar bort en testorder (order.is_test = true) permanent - enda sättet
  * att bli av med testordrar från Kustom Playground. Blockerad för
  * riktiga ordrar oavsett vem som anropar, som ett extra skydd utöver
  * ägarkravet. Reverserar de lagerförändringar ordern orsakat (reservation
  * och/eller avdrag vid "Markera skickad") innan raden tas bort, så
- * lagersaldot blir precis som om testordern aldrig lagts — annars hade
+ * lagersaldot blir precis som om testordern aldrig lagts - annars hade
  * borttagning bara städat bort ordern och lämnat kvar en felaktig
  * reservation/minskning i lagret.
  */
@@ -257,7 +257,7 @@ export async function deleteTestOrderAction(orderId: string) {
   }
   if (!order.isTest) {
     redirect(
-      `/orders/${orderId}?error=${encodeURIComponent("Endast testordrar kan tas bort — den här är inte markerad som test.")}`,
+      `/orders/${orderId}?error=${encodeURIComponent("Endast testordrar kan tas bort - den här är inte markerad som test.")}`,
     );
   }
 
@@ -287,7 +287,7 @@ export async function deleteTestOrderAction(orderId: string) {
           .where(eq(schema.inventory.id, movement.inventoryId));
       } else {
         throw new Error(
-          `Okänd lagerorsak "${movement.reason}" på testordern — avbryter borttagningen för säkerhets skull.`,
+          `Okänd lagerorsak "${movement.reason}" på testordern - avbryter borttagningen för säkerhets skull.`,
         );
       }
     }

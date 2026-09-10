@@ -4,7 +4,7 @@ import type { MerchantUrls } from "./order-payload";
 /**
  * Byggs från NEXT_PUBLIC_STOREFRONT_URL/NEXT_PUBLIC_ADMIN_URL, aldrig
  * hårdkodat. Sökvägarna själva (t.ex. /villkor) kommer direkt ur specen.
- * `validation` MÅSTE skickas med till Kustom — annars anropas
+ * `validation` MÅSTE skickas med till Kustom - annars anropas
  * /api/kustom/validate aldrig.
  */
 export function getMerchantUrls(): MerchantUrls {

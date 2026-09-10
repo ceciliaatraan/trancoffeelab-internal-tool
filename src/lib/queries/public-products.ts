@@ -4,7 +4,7 @@ import { db, schema } from "@/db";
 import { computeBundleAvailability } from "@/lib/inventory/bundles";
 
 /**
- * Publikt synliga statusar — inte bara "published". "coming_soon" visas
+ * Publikt synliga statusar - inte bara "published". "coming_soon" visas
  * också (sneak peek), men är ALDRIG köpbar: resolveCartLine
  * (lib/queries/cart.ts) accepterar bara status="published", så en
  * coming_soon-produkt kan aldrig läggas i varukorgen eller checkoutas,
@@ -18,7 +18,7 @@ export type PublicVariant = {
   price: { amountOre: number; currency: "SEK" };
   weightGrams: number;
   inStock: boolean;
-  /** Alltid minst produktens egna bilder om varianten saknar egna — aldrig tom om produkten har någon bild. */
+  /** Alltid minst produktens egna bilder om varianten saknar egna - aldrig tom om produkten har någon bild. */
   images: string[];
 };
 
@@ -33,10 +33,10 @@ export type PublicProduct = {
   weightGrams: number;
   inStock: boolean;
   variants: PublicVariant[];
-  /** Alltid från produkten (aldrig varianten) — visas som "Beräknad leverans: ‹expectedShipDate›". */
+  /** Alltid från produkten (aldrig varianten) - visas som "Beräknad leverans: ‹expectedShipDate›". */
   isPreorder: boolean;
   expectedShipDate: string | null;
-  /** status="coming_soon" — synlig för sneak peek, men aldrig köpbar (se resolveCartLine). */
+  /** status="coming_soon" - synlig för sneak peek, men aldrig köpbar (se resolveCartLine). */
   comingSoon: boolean;
 };
 

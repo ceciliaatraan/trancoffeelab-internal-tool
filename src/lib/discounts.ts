@@ -11,7 +11,7 @@ export type DiscountEvaluation =
       code: string;
       type: "percentage" | "fixed";
       appliesTo: DiscountAppliesTo;
-      /** Sum of the two below — convenient when the split doesn't matter. */
+      /** Sum of the two below - convenient when the split doesn't matter. */
       amountOre: number;
       productsDiscountOre: number;
       shippingDiscountOre: number;
@@ -19,11 +19,11 @@ export type DiscountEvaluation =
   | { valid: false; reason: string };
 
 /**
- * Rabattkoder behandlas skiftlägesokänsligt — lagras och slås upp i
+ * Rabattkoder behandlas skiftlägesokänsligt - lagras och slås upp i
  * versaler. `value` är hundradels procent för typ percentage (samma
  * mönster som tax_rate) eller öre för typ fixed. `shippingOre` ska vara
  * det belopp frakten faktiskt skulle kosta (0 om fri frakt redan gäller)
- * — annars kan en "shipping"/"both"-kod inte räknas ut korrekt.
+ * - annars kan en "shipping"/"both"-kod inte räknas ut korrekt.
  */
 export async function evaluateDiscountCode(
   code: string,

@@ -13,7 +13,7 @@ export const adminRoleEnum = pgEnum("admin_role", ["owner", "staff"]);
 
 /**
  * Roller för de inloggade admin-användarna. Separat från Auth.js `users`
- * eftersom `users` bara är identitet — den här tabellen är behörighet.
+ * eftersom `users` bara är identitet - den här tabellen är behörighet.
  * En rad skapas/uppdateras i signIn-callbacken första gången en
  * allowlistad e-post loggar in.
  */
@@ -36,7 +36,7 @@ export const adminUsers = pgTable("admin_users", {
 adminUsers.enableRLS();
 
 /**
- * Alla inloggningsförsök som INTE ledde till en session — fel domän,
+ * Alla inloggningsförsök som INTE ledde till en session - fel domän,
  * saknad allowlist-post, overifierad e-post. Lyckade inloggningar
  * uppdaterar bara admin_users.last_login_at, de loggas inte här.
  */

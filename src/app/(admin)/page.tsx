@@ -144,7 +144,7 @@ export default async function DashboardPage() {
             {lowStock.map((row) => (
               <li key={row.inventoryId} className="border-b border-tran-hairline py-2">
                 {row.productName}
-                {row.variantName ? ` — ${row.variantName}` : ""}: {row.available} i lager
+                {row.variantName ? ` - ${row.variantName}` : ""}: {row.available} i lager
                 (larmnivå {row.alarmLevel})
               </li>
             ))}
@@ -163,7 +163,7 @@ export default async function DashboardPage() {
           <ul className="text-sm">
             {webhookErrors.map((event) => (
               <li key={event.id} className="border-b border-tran-hairline py-2">
-                <span className="text-tran-red">{event.errorMessage}</span> —{" "}
+                <span className="text-tran-red">{event.errorMessage}</span> -{" "}
                 {formatDateTime(event.receivedAt)}
               </li>
             ))}

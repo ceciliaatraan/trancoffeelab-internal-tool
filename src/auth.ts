@@ -7,7 +7,7 @@ import { getAllowedGoogleHd, isEmailAllowed } from "@/lib/allowlist";
 
 /**
  * Google-profilen har fler fält än next-auth's inbyggda Profile-typ
- * exponerar (email_verified, hd) — vi typar bara det vi faktiskt läser.
+ * exponerar (email_verified, hd) - vi typar bara det vi faktiskt läser.
  */
 type GoogleProfile = {
   email?: string;

@@ -16,7 +16,7 @@ import {
 
 /**
  * Drizzle wraps the driver's postgres error in a DrizzleQueryError, so the
- * Postgres error code isn't on `err.code` — it's on `err.cause.code`.
+ * Postgres error code isn't on `err.code` - it's on `err.cause.code`.
  */
 function isUniqueViolation(err: unknown): boolean {
   const code = (err as { code?: string } | undefined)?.code;
@@ -223,7 +223,7 @@ export async function deleteVariant(productId: string, variantId: string) {
 
 /**
  * Samma uppladdningsfunktion som produktbilder (uploadProductImage tar
- * bara ett id att namnge lagringssökvägen efter — inte kopplad till
+ * bara ett id att namnge lagringssökvägen efter - inte kopplad till
  * products-tabellen), men sparas på varianten. Tom bildlista på
  * varianten faller tillbaka på produktens egna bilder, se
  * lib/queries/cart.ts och public-products.ts.

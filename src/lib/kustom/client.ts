@@ -59,7 +59,7 @@ async function kustomFetch<T extends KustomOrderResponse>(
     try {
       body = JSON.parse(text);
     } catch {
-      // Kustom (eller något framför den) svarade med icke-JSON — troligen
+      // Kustom (eller något framför den) svarade med icke-JSON - troligen
       // ett infrastrukturfel. Behåll råtexten så felet går att felsöka.
       body = { raw: text };
     }
@@ -76,7 +76,7 @@ async function kustomFetch<T extends KustomOrderResponse>(
   return (body ?? {}) as T;
 }
 
-/** POST /checkout/v3/orders — skapar en ny checkout-session. */
+/** POST /checkout/v3/orders - skapar en ny checkout-session. */
 export function createOrder(payload: KustomCreateOrderPayload) {
   return kustomFetch<KustomOrderResponse>("/checkout/v3/orders", {
     method: "POST",
@@ -92,7 +92,7 @@ export function readOrder(orderId: string) {
 }
 
 /**
- * POST /checkout/v3/orders/{order_id} — går enligt spec bara medan
+ * POST /checkout/v3/orders/{order_id} - går enligt spec bara medan
  * status är checkout_incomplete.
  */
 export function updateOrder(
@@ -106,7 +106,7 @@ export function updateOrder(
 }
 
 /**
- * ÖPPET — ej verifierat: vi antar fältet heter `order_id` (matchar
+ * ÖPPET - ej verifierat: vi antar fältet heter `order_id` (matchar
  * merchant_urls-templatingen `{checkout.order.id}` i spec) men Kustoms
  * faktiska svar kan använda `id`. Kastar tydligt hellre än att gissa tyst.
  */
@@ -114,7 +114,7 @@ export function extractOrderId(order: KustomOrderResponse): string {
   const value = order.order_id ?? order.id;
   if (typeof value !== "string" || value.length === 0) {
     throw new Error(
-      "Kunde inte hitta order-id i Kustoms svar (förväntade order_id eller id) — se docs/kustom.md.",
+      "Kunde inte hitta order-id i Kustoms svar (förväntade order_id eller id) - se docs/kustom.md.",
     );
   }
   return value;
@@ -130,7 +130,7 @@ export function extractHtmlSnippet(order: KustomOrderResponse): string {
 
 /**
  * Order Management API (bekräftad mot OpenAPI-specifikationen ni
- * skickade, se docs/kustom.md) — en ANNAN API-yta än /checkout/v3/*
+ * skickade, se docs/kustom.md) - en ANNAN API-yta än /checkout/v3/*
  * ovan, för ordrar efter att kunden slutfört checkout.
  */
 export type KustomOrderManagementStatus =
@@ -203,7 +203,7 @@ export function getOrderManagementOrder(orderId: string) {
 }
 
 /**
- * POST /ordermanagement/v1/orders/{order_id}/acknowledge — 204 vid
+ * POST /ordermanagement/v1/orders/{order_id}/acknowledge - 204 vid
  * lyckat anrop. Måste anropas för varje ny order, annars flaggas den
  * som väntande hos Kustom.
  */
@@ -259,7 +259,7 @@ export function refundOrder(
 }
 
 /**
- * POST /ordermanagement/v1/orders/{order_id}/cancel — 204. Går enligt
+ * POST /ordermanagement/v1/orders/{order_id}/cancel - 204. Går enligt
  * OpenAPI-specen inte om ordern redan har captures eller är stängd
  * (403 CANCEL_NOT_ALLOWED).
  */

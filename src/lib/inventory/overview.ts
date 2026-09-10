@@ -26,7 +26,7 @@ export type InventoryOverviewRow = {
 };
 
 /**
- * All lagerdata i katalogen, en rad per lagerförd enhet — bundlar (t.ex.
+ * All lagerdata i katalogen, en rad per lagerförd enhet - bundlar (t.ex.
  * Komplett Kit) får sitt "I lager"-värde beräknat från komponenternas
  * fria lager i stället för sin egen (numera oanvända) lagerrad. Delas av
  * /inventory-sidan och dashboardens "under larmnivå"-widget så de aldrig
@@ -93,7 +93,7 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
         : 0;
       const name = componentRow
         ? componentRow.variantName
-          ? `${componentRow.productName} — ${componentRow.variantName}`
+          ? `${componentRow.productName} - ${componentRow.variantName}`
           : componentRow.productName
         : "Okänd komponent";
       return { name, available, quantityPerBundle: item.quantity };

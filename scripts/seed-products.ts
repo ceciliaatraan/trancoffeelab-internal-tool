@@ -1,8 +1,8 @@
 // Ersätter platshållarprodukterna från tidiga faser (Dancing Dragon /
-// Drunken Tiger / No Regrets Horse — testdata, fanns aldrig på sajten)
+// Drunken Tiger / No Regrets Horse - testdata, fanns aldrig på sajten)
 // med de fem riktiga produkterna som redan finns på trancoffeelab.com
 // (ceciliaatraan/trancoffeelab-website, src/data/products.ts). Källan för
-// namn/beskrivning/pris är sajten — bekräftat av ägaren, se
+// namn/beskrivning/pris är sajten - bekräftat av ägaren, se
 // docs/kustom.md "Designbeslut som INTE kommer från Kustom-dokumentationen".
 //
 // Idempotent: kan köras flera gånger. Upsertar på slug, tar bara bort de
@@ -43,7 +43,7 @@ const PRODUCTS: SeedProduct[] = [
     descriptionEn:
       "Everything you need to start brewing authentic Vietnamese coffee at home. This complete kit includes our signature dark roast coffee, traditional sweetened condensed milk, and a small phin filter.",
     priceOre: 34900,
-    // Blandad leverans (mat + icke-mat) i EN produktrad — admin har bara
+    // Blandad leverans (mat + icke-mat) i EN produktrad - admin har bara
     // ett taxRate-fält per produkt, så vi räknar ut en enda blandad sats
     // som ger samma totala momsbelopp som att dela upp priset, enligt
     // ägarens instruktion: kaffe (179 kr) + kondenserad mjölk (49 kr) =
@@ -56,16 +56,16 @@ const PRODUCTS: SeedProduct[] = [
     // OBS: att lägga HELA kit-rabatten på icke-matvaran (istället för att
     // fördela den proportionerligt på alla tre varorna) är en mer
     // offensiv tolkning av blandad-leverans-moms än Skatteverkets vanliga
-    // proportionering efter marknadsvärde — bekräfta med revisor innan
+    // proportionering efter marknadsvärde - bekräfta med revisor innan
     // skarp drift.
     taxRate: 1190,
-    weightGrams: 800, // Uppskattning (250g kaffe + ~400g mjölk + ~100g filter + emballage) — bekräfta faktisk paketvikt
+    weightGrams: 800, // Uppskattning (250g kaffe + ~400g mjölk + ~100g filter + emballage) - bekräfta faktisk paketvikt
     sortOrder: 0,
   },
   {
     slug: "signature-coffee",
     sku: "COFFEE-SIG-250",
-    // Namnet på själva bönpåsen (bekräftat av ägaren) — "No Regrets Horse"
+    // Namnet på själva bönpåsen (bekräftat av ägaren) - "No Regrets Horse"
     // är TRANs första signaturkaffe, samma namn på svenska och engelska.
     // Slug/SKU är oförändrade (signature-coffee/COFFEE-SIG-250) för att inte
     // ändra produktens URL på sajten i onödan.
@@ -76,7 +76,7 @@ const PRODUCTS: SeedProduct[] = [
     descriptionEn:
       "Our flagship blend, carefully sourced from the highlands of Buôn Ma Thuột. These beans are roasted dark to bring out the bold, chocolatey notes that Vietnamese coffee is famous for.",
     priceOre: 17900,
-    taxRate: 600, // Livsmedel — 6%, enligt ägarens bekräftelse
+    taxRate: 600, // Livsmedel - 6%, enligt ägarens bekräftelse
     weightGrams: 250,
     sortOrder: 1,
   },
@@ -90,8 +90,8 @@ const PRODUCTS: SeedProduct[] = [
     descriptionEn:
       "The secret ingredient that transforms Vietnamese coffee into something magical. This rich, creamy sweetened condensed milk is essential for making authentic cà phê sữa đá.",
     priceOre: 4900,
-    taxRate: 600, // Livsmedel — 6%
-    weightGrams: 400, // Uppskattning (standardburk ~397g) — bekräfta faktisk vikt
+    taxRate: 600, // Livsmedel - 6%
+    weightGrams: 400, // Uppskattning (standardburk ~397g) - bekräfta faktisk vikt
     sortOrder: 2,
   },
   {
@@ -104,8 +104,8 @@ const PRODUCTS: SeedProduct[] = [
     descriptionEn:
       "The phin is the heart of Vietnamese coffee culture. This compact stainless steel filter sits perfectly on top of your cup or glass, slowly dripping rich, concentrated coffee.",
     priceOre: 19900,
-    taxRate: 2500, // Inte livsmedel — 25%
-    weightGrams: 100, // Uppskattning — bekräfta faktisk vikt
+    taxRate: 2500, // Inte livsmedel - 25%
+    weightGrams: 100, // Uppskattning - bekräfta faktisk vikt
     sortOrder: 3,
   },
   {
@@ -118,14 +118,14 @@ const PRODUCTS: SeedProduct[] = [
     descriptionEn:
       "For those who need more coffee (we understand), this larger phin filter brews enough for 2-3 cups at once. Same traditional design, same authentic taste, just more of it.",
     priceOre: 24900,
-    taxRate: 2500, // Inte livsmedel — 25%
-    weightGrams: 150, // Uppskattning — bekräfta faktisk vikt
+    taxRate: 2500, // Inte livsmedel - 25%
+    weightGrams: 150, // Uppskattning - bekräfta faktisk vikt
     sortOrder: 4,
   },
 ];
 
 /**
- * Komplett Kit har inget eget lagersaldo — hur många som går att sätta
+ * Komplett Kit har inget eget lagersaldo - hur många som går att sätta
  * ihop beräknas från komponenternas fria lager (se
  * src/lib/inventory/bundles.ts). Sammansättningen är hämtad direkt ur
  * kitets egen beskrivning ovan: "vårt signaturmörka rostade kaffe,
@@ -204,7 +204,7 @@ async function main() {
 
     // Postgres unique-index behandlar NULL som distinkt från NULL, så
     // ON CONFLICT på (bundle, komponent, variant) skulle inte träffa här
-    // (component_variant_id är alltid null i dagens kit) — läs och
+    // (component_variant_id är alltid null i dagens kit) - läs och
     // uppdatera/infoga manuellt i stället för att lita på ON CONFLICT.
     const [existing] = await db
       .select({ id: schema.productBundleItems.id })
@@ -233,9 +233,9 @@ async function main() {
   console.log(`Satte upp ${KIT_COMPONENTS.length} kit-komponent(er) för Komplett Kit.`);
 
   console.log(
-    "\nKlart. Bilder saknas fortfarande (images: []) — ladda upp de riktiga produktfotona " +
+    "\nKlart. Bilder saknas fortfarande (images: []) - ladda upp de riktiga produktfotona " +
       "(finns lokalt i trancoffeelab-website/src/assets/) via /products/[id] i adminet. " +
-      "is_preorder är satt till false (standard) på alla fem — sätt per produkt i adminet " +
+      "is_preorder är satt till false (standard) på alla fem - sätt per produkt i adminet " +
       "när lanseringsstrategin är bestämd.",
   );
   process.exit(0);

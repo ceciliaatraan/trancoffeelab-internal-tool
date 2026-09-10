@@ -180,7 +180,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
             <form action={captureOrderAction.bind(null, order.id)} className="flex items-end gap-2">
               <div>
                 <label className="tran-label mb-1 block text-[11px] text-tran-muted">
-                  Debitera (kr, valfritt — tomt = {formatOre(remainingToCapture)})
+                  Debitera (kr, valfritt - tomt = {formatOre(remainingToCapture)})
                 </label>
                 <input
                   name="amount"
@@ -262,7 +262,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                 <tr key={event.id} className="border-b border-tran-hairline">
                   <td className="py-2 pr-4">{EVENT_LABELS[event.type] ?? event.type}</td>
                   <td className="tran-tabular py-2 pr-4">
-                    {event.amountOre !== null ? formatOre(event.amountOre) : "—"}
+                    {event.amountOre !== null ? formatOre(event.amountOre) : "-"}
                   </td>
                   <td className="tran-tabular py-2 pr-4 text-tran-muted">
                     {formatDateTime(event.createdAt)}
@@ -280,7 +280,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           <ul className="text-sm">
             {shipmentRows.map((shipment) => (
               <li key={shipment.id}>
-                {shipment.carrier} — {shipment.trackingNumber} ({formatDateTime(shipment.shippedAt)})
+                {shipment.carrier} - {shipment.trackingNumber} ({formatDateTime(shipment.shippedAt)})
               </li>
             ))}
           </ul>

@@ -15,7 +15,7 @@ import { adminUsers } from "./admin";
 
 /**
  * coming_soon: synlig publikt (produktsida + lista, för "sneak peek")
- * men INTE köpbar — samma spärr som draft/archived i resolveCartLine
+ * men INTE köpbar - samma spärr som draft/archived i resolveCartLine
  * (lib/queries/cart.ts), som bara accepterar status="published". Bara
  * getPublishedProducts/getPublishedProductBySlug (lib/queries/public-
  * products.ts) gör undantag och visar den ändå, flaggad som
@@ -29,7 +29,7 @@ export const productStatusEnum = pgEnum("product_status", [
 ]);
 
 /**
- * tax_rate är hundradels procent (25% = 2500, 12% = 1200) — samma
+ * tax_rate är hundradels procent (25% = 2500, 12% = 1200) - samma
  * representation som Kustom förväntar sig i order_lines, så vi slipper
  * konvertera fram och tillbaka. Obligatoriskt fält: moms skiljer sig
  * mellan kaffe/kondenserad mjölk (livsmedel) och phin-filter (inte
@@ -52,7 +52,7 @@ export const products = pgTable("products", {
   /**
    * Förbeställning: en egenskap på produkten, inte på varianten
    * (`product_variants` ska INTE ha motsvarande fält). `expectedShipDate`
-   * är ett ungefärligt datum — visas för kund som "Beräknad leverans:
+   * är ett ungefärligt datum - visas för kund som "Beräknad leverans:
    * ‹månad/period›", aldrig ett exakt löfte.
    */
   isPreorder: boolean("is_preorder").notNull().default(false),
@@ -78,7 +78,7 @@ export const productVariants = pgTable("product_variants", {
   priceOre: integer("price_ore").notNull(),
   weightGrams: integer("weight_grams").notNull(),
   sortOrder: integer("sort_order").notNull().default(0),
-  /** Egna bilder, t.ex. hela bönor kontra malet — tom lista = ingen egen bild, visar produktens bild istället (se lib/queries/cart.ts och public-products.ts). */
+  /** Egna bilder, t.ex. hela bönor kontra malet - tom lista = ingen egen bild, visar produktens bild istället (se lib/queries/cart.ts och public-products.ts). */
   images: jsonb("images").notNull().default([]).$type<string[]>(),
   createdAt: timestamp("created_at", { withTimezone: true })
     .notNull()
@@ -141,10 +141,10 @@ inventoryMovements.enableRLS();
 
 /**
  * Kit-produkter (t.ex. Komplett Kit) har inget eget lagersaldo att fylla i
- * manuellt — hur många som går att sätta ihop beräknas från
+ * manuellt - hur många som går att sätta ihop beräknas från
  * komponenternas fria lager (kvantitet minus reserverat). Bara
  * produktnivå stöds (ingen `componentVariantId` som pekar på en
- * kit-variant), eftersom inga av dagens kit har varianter — enkelt att
+ * kit-variant), eftersom inga av dagens kit har varianter - enkelt att
  * utöka om det behövs.
  */
 export const productBundleItems = pgTable(

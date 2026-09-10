@@ -91,9 +91,9 @@ describe("renderEmail", () => {
     });
     expect(text).toContain("Din order innehåller både lagervaror och en förbeställning");
     expect(text).toContain("1 × Dancing Dragon 250g");
-    expect(text).not.toContain("Dancing Dragon 250g —");
+    expect(text).not.toContain("Dancing Dragon 250g -");
     expect(text).toContain(
-      "1 × No Regrets Horse 250g — förbeställning, beräknad leverans: december 2026",
+      "1 × No Regrets Horse 250g - förbeställning, beräknad leverans: december 2026",
     );
   });
 
@@ -115,7 +115,7 @@ describe("renderEmail", () => {
     expect(html).toContain("298,00");
   });
 
-  it("html-versionen escapar produktnamn — ingen rå HTML/skript slinker igenom", () => {
+  it("html-versionen escapar produktnamn - ingen rå HTML/skript slinker igenom", () => {
     const { html } = renderEmail({
       ...baseInput,
       locale: "sv-SE",
@@ -161,10 +161,10 @@ describe("renderEmail", () => {
     });
     expect(html).toContain('src="https://admin.trancoffeelab.com/uploads/no-regrets-horse.jpg"');
     expect(html).toContain("298,00 kr");
-    expect(text).toContain("2 × No Regrets Horse 250g — 298,00 kr");
+    expect(text).toContain("2 × No Regrets Horse 250g - 298,00 kr");
   });
 
-  it("visar ingen produktbild om raden saknar imageUrl — bara TRAN-loggan finns kvar", () => {
+  it("visar ingen produktbild om raden saknar imageUrl - bara TRAN-loggan finns kvar", () => {
     const { html } = renderEmail({ ...baseInput, locale: "sv-SE" });
     const imgCount = (html.match(/<img/g) ?? []).length;
     expect(imgCount).toBe(1);
@@ -192,7 +192,7 @@ describe("renderEmail", () => {
     expect(text).toContain("Cecilia Tran & Winnie Tran");
     expect(html).toContain("Tack för att ni är med och sprider vietnamesiskt kaffe i Sverige");
     expect(html).toContain("Cecilia Tran &amp; Winnie Tran");
-    expect(text).not.toContain("— TRAN Coffee Lab");
+    expect(text).not.toContain("- TRAN Coffee Lab");
   });
 
   it("avslutar på engelska med översatt hälsning", () => {
@@ -226,7 +226,7 @@ describe("renderEmail", () => {
     expect(text).not.toContain("Frakt:");
   });
 
-  it("visar 'Fri frakt' istället för 0,00 kr när Kustom inte skapade någon fraktrad (shipping: null — gränsen för fri frakt uppnådd)", () => {
+  it("visar 'Fri frakt' istället för 0,00 kr när Kustom inte skapade någon fraktrad (shipping: null - gränsen för fri frakt uppnådd)", () => {
     const { html, text } = renderEmail({ ...baseInput, locale: "sv-SE", shipping: null });
     expect(text).toContain("Frakt: Fri frakt");
     expect(text).not.toContain("0,00 kr");
@@ -272,7 +272,7 @@ describe("renderEmail", () => {
     expect(html).toContain('href="https://trancoffeelab.com/product/signature-coffee"');
   });
 
-  it("länkar inte produktnamnet om raden saknar slug — bara loggan länkas", () => {
+  it("länkar inte produktnamnet om raden saknar slug - bara loggan länkas", () => {
     const { html } = renderEmail({
       ...baseInput,
       locale: "sv-SE",

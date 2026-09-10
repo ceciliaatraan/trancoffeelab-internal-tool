@@ -3,7 +3,7 @@ import { z } from "zod";
 /**
  * Vi modellerar bara de fält vi faktiskt läser ur Kustoms
  * order-representation (validation-callbacken skickar hela ordern i
- * body:en, bekräftat mot docs.kustom.co — se docs/kustom.md). Övriga
+ * body:en, bekräftat mot docs.kustom.co - se docs/kustom.md). Övriga
  * fält i det verkliga svaret ignoreras utan att valideringen underkänns.
  */
 export const kustomOrderLineSchema = z.object({

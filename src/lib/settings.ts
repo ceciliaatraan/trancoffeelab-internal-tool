@@ -3,7 +3,7 @@ import { db, schema } from "@/db";
 
 export type ShopSettings = typeof schema.shopSettings.$inferSelect;
 
-/** Singleton — skapar default-raden om ingen finns än. */
+/** Singleton - skapar default-raden om ingen finns än. */
 export async function getShopSettings(): Promise<ShopSettings> {
   const [existing] = await db.select().from(schema.shopSettings).limit(1);
   if (existing) return existing;

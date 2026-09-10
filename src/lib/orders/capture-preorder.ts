@@ -10,12 +10,12 @@ import { captureOrder, getOrderManagementOrder } from "@/lib/kustom/client";
  * fakturaköp/delbetalning väntar med capture till fysisk leverans (se
  * captureOrderAction i orders/actions.ts, som lämnas helt orörd av det
  * här). Den senareläggningen finns för att skydda kunden vid KORT tid
- * till leverans — den ger ingen mening för en förbeställning där varan
+ * till leverans - den ger ingen mening för en förbeställning där varan
  * inte ens finns i lager än. Ändra INTE detta till att vänta som
  * icke-preorder-ordrar utan att först stämma av med ägaren.
  *
  * Skiljer sig från captureOrderAction (som anropas från en Server Action
- * i adminet) genom att den ALDRIG använder `redirect()` — den körs i
+ * i adminet) genom att den ALDRIG använder `redirect()` - den körs i
  * push-hanterarens `after()`-callback (en Route Handler-kontext), inte i
  * en formulärinlämning.
  */

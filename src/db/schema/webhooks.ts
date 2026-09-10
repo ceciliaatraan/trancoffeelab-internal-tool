@@ -10,7 +10,7 @@ import {
 /**
  * Rått, oförändrat innehåll för varje inkommande webhook-anrop, loggat
  * INNAN bearbetning. push-endpointen skriver raden här, svarar 200, och
- * bearbetar sedan asynkront — så ett fel efter mottagandet aldrig tappar
+ * bearbetar sedan asynkront - så ett fel efter mottagandet aldrig tappar
  * bort att anropet skedde.
  */
 export const webhookEvents = pgTable("webhook_events", {

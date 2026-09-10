@@ -1,7 +1,7 @@
 /**
  * Converts what a human types into a form (kronor, whole/decimal percent)
  * into the integer öre/hundredths-of-a-percent the DB and Kustom's API
- * require — see db/schema/catalog.ts and lib/kustom/tax.ts for why those
+ * require - see db/schema/catalog.ts and lib/kustom/tax.ts for why those
  * stay integers. This file is the ONLY place that conversion happens; the
  * data model and Kustom payloads are never touched.
  */

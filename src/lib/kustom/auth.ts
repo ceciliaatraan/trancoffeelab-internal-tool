@@ -2,7 +2,7 @@
  * Kustom (tidigare Klarna Checkout) autentiserar med HTTP Basic. Enligt
  * spec: nyckeln skickas antingen direkt (base64(<nyckel>:), nyckeln som
  * användarnamn utan lösenord) eller som base64(<MID>-<suffix>:<nyckel>)
- * där <MID>-<suffix> är hela användarnamnet ni fått från Kustom — inte
+ * där <MID>-<suffix> är hela användarnamnet ni fått från Kustom - inte
  * något vi konstruerar själva av KUSTOM_MERCHANT_ID plus en gissad suffix.
  *
  * ÖPPET: vilket format er faktiska nyckel kräver är inte verifierat mot

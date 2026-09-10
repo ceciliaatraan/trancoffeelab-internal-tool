@@ -159,8 +159,8 @@ export default async function DiscountsPage({ searchParams }: PageProps<"/discou
                     : formatOre(discount.value)}
                   {" på "}
                   {appliesToLabels[discount.appliesTo]}
-                  {" — "}
-                  {discount.active ? "Aktiv" : "Inaktiv"} — använd {discount.usedCount}
+                  {" - "}
+                  {discount.active ? "Aktiv" : "Inaktiv"} - använd {discount.usedCount}
                   {discount.maxUses ? ` / ${discount.maxUses}` : ""} gånger
                 </p>
               </div>

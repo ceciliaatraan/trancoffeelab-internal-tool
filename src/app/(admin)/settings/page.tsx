@@ -36,7 +36,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
       <section className="flex flex-col gap-4">
         <h2 className="tran-label text-xs text-tran-muted">Frakt och moms</h2>
         <p className="text-sm text-tran-muted">
-          Frakten har ingen egen momssats att ställa in — den räknas
+          Frakten har ingen egen momssats att ställa in - den räknas
           automatiskt utifrån vad som faktiskt ligger i varukorgen (t.ex.
           rent kaffe blir 6 %, ett phin-filter för sig 25 %, Komplett Kit
           en blandning av båda).
@@ -96,7 +96,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               <dd className="tran-tabular">
                 {settings.freeShippingThresholdOre
                   ? formatOre(settings.freeShippingThresholdOre)
-                  : "—"}
+                  : "-"}
               </dd>
             </div>
           </dl>
@@ -115,7 +115,7 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         </p>
         <p className="text-sm text-tran-muted">
           Byts genom att ändra KUSTOM_API_BASE_URL/KUSTOM_ENV i Vercels
-          miljövariabler — inte här.
+          miljövariabler - inte här.
         </p>
       </section>
 

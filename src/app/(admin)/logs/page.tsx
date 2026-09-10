@@ -38,7 +38,7 @@ export default async function LogsPage() {
                   <tr key={event.id} className="border-b border-tran-hairline">
                     <td className="py-2 pr-4">{event.source}</td>
                     <td className="tran-tabular py-2 pr-4 text-tran-muted">
-                      {event.kustomOrderId ?? "—"}
+                      {event.kustomOrderId ?? "-"}
                     </td>
                     <td className="py-2 pr-4">
                       {event.processed ? (
@@ -52,11 +52,11 @@ export default async function LogsPage() {
                       {formatDateTime(event.receivedAt)}
                     </td>
                     <td className="tran-tabular py-2 pr-4 text-tran-muted">
-                      {event.processedAt ? formatDateTime(event.processedAt) : "—"}
+                      {event.processedAt ? formatDateTime(event.processedAt) : "-"}
                     </td>
                     <td className="tran-tabular py-2 pr-4 text-tran-muted">
                       {processingMs === null
-                        ? "—"
+                        ? "-"
                         : processingMs < 1000
                           ? `${processingMs} ms`
                           : `${(processingMs / 1000).toFixed(1)} s`}
@@ -87,7 +87,7 @@ export default async function LogsPage() {
               {auditLogEntries.map((entry) => (
                 <tr key={entry.id} className="border-b border-tran-hairline">
                   <td className="py-2 pr-4">{entry.action}</td>
-                  <td className="py-2 pr-4 text-tran-muted">{entry.actorEmail ?? "—"}</td>
+                  <td className="py-2 pr-4 text-tran-muted">{entry.actorEmail ?? "-"}</td>
                   <td className="py-2 pr-4">
                     {entry.success ? "OK" : <span className="text-tran-red">Nekad</span>}
                   </td>

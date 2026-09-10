@@ -44,7 +44,7 @@ function makeDaily(entries: [string, number, number][]): DailySales[] {
 
 describe("summarizeDailySales", () => {
   it("summerar idag, denna vecka (måndag-start) och denna månad korrekt", () => {
-    // Tisdag 2026-09-08 — måndagen är 2026-09-07.
+    // Tisdag 2026-09-08 - måndagen är 2026-09-07.
     const daily = makeDaily([
       ["2026-08-31", 10000, 1], // förra veckan/månaden, ska inte räknas med i vecka eller månad
       ["2026-09-01", 5000, 1], // denna månad, förra veckan

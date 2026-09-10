@@ -9,7 +9,7 @@ export type TaxBreakdown = {
  * valutaenhet (öre). taxRate är hundradels procent (25% = 2500).
  *
  * taxAmount härleds som grossAmount - netAmount (inte avrundat separat)
- * så att netAmount + taxAmount ALLTID summerar exakt till grossAmount —
+ * så att netAmount + taxAmount ALLTID summerar exakt till grossAmount -
  * annars blir det bokföringsfel när flera rader summeras till en order.
  */
 export function calculateTaxFromGross(

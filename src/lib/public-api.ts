@@ -45,7 +45,7 @@ type RateLimitBucket = { count: number; resetAt: number };
 
 /**
  * In-memory fast window-räknare, per Node-process. Fungerar för en enda
- * long-lived server men är INTE delad mellan flera Vercel-instanser —
+ * long-lived server men är INTE delad mellan flera Vercel-instanser -
  * tillräckligt för att stoppa enkel missbruk nu, byt till en delad store
  * (t.ex. Upstash Redis) innan trafiken motiverar det.
  */

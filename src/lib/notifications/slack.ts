@@ -3,7 +3,7 @@ import { formatOre } from "@/lib/format";
 import type { PersistedOrder } from "@/lib/orders/persist-order";
 
 /**
- * "Förnamn Efternamn (e-post)" — faller tillbaka till bara namnet eller
+ * "Förnamn Efternamn (e-post)" - faller tillbaka till bara namnet eller
  * bara e-posten om det andra saknas, null om inget alls finns. Ren
  * funktion (inget Kustom-beroende) så den kan testas för sig.
  */
@@ -18,14 +18,14 @@ export function formatCustomerLabel(
 }
 
 /**
- * SLACK_WEBHOOK_URL är en Slack "Incoming Webhook" — kanalen den postar
+ * SLACK_WEBHOOK_URL är en Slack "Incoming Webhook" - kanalen den postar
  * till väljs när webhooken skapas i Slack, inte här. Se README för hur ni
  * skapar en pekandes på #beställningar.
  *
- * Skickar ALDRIG för playground-ordrar (KUSTOM_ENV !== "live") — annars
+ * Skickar ALDRIG för playground-ordrar (KUSTOM_ENV !== "live") - annars
  * pingar varje testköp under utveckling kanalen.
  *
- * Fel här kastas ALDRIG vidare — en trasig/saknad Slack-webhook eller ett
+ * Fel här kastas ALDRIG vidare - en trasig/saknad Slack-webhook eller ett
  * nätverksfel ska aldrig få en riktig order att misslyckas med att sparas,
  * captureas eller mejla kunden. Loggas bara.
  */
@@ -42,7 +42,7 @@ export async function notifyNewOrderInSlack(
     .map((line) => `${line.quantity} × ${line.name}`)
     .join("\n");
   // totalOre kommer redan rabatterad från Kustom (order_amount är beloppet
-  // som faktiskt debiteras — original_order_amount vore pre-rabatt-referensen,
+  // som faktiskt debiteras - original_order_amount vore pre-rabatt-referensen,
   // men den används inte här), så priset i notisen är alltid det kunden
   // faktiskt betalade/checkade ut med.
   const discountText = order.discount
@@ -52,13 +52,13 @@ export async function notifyNewOrderInSlack(
   const orderUrl = `${adminUrl.replace(/\/$/, "")}/orders/${order.id}`;
 
   const payload = {
-    text: `🎉 Ny beställning #${order.orderNumber} — ${formatOre(totalOre)}`,
+    text: `🎉 Ny beställning #${order.orderNumber} - ${formatOre(totalOre)}`,
     blocks: [
       {
         type: "section",
         text: {
           type: "mrkdwn",
-          text: `🎉 *Ny beställning #${order.orderNumber}* — ${formatOre(totalOre)}${
+          text: `🎉 *Ny beställning #${order.orderNumber}* - ${formatOre(totalOre)}${
             order.containsPreorder ? " _(innehåller förbeställning)_" : ""
           }\n${customer ? `👤 ${customer}\n` : ""}${discountText}${itemsText}`,
         },

@@ -18,7 +18,7 @@ export default async function AdminLayout({
 
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
-      {/* Mobil: smal toppbar med hamburgarmeny — synlig under lg */}
+      {/* Mobil: smal toppbar med hamburgarmeny - synlig under lg */}
       <div className="flex items-center justify-between border-b border-tran-black px-4 py-3 lg:hidden">
         <Link href="/" className="flex items-center">
           <TranWordmark className="h-6 w-auto" />
@@ -26,7 +26,7 @@ export default async function AdminLayout({
         <MobileNav email={session?.user?.email} signOutAction={signOutAction} />
       </div>
 
-      {/* Desktop: fast vänsterkolumn — dold under lg */}
+      {/* Desktop: fast vänsterkolumn - dold under lg */}
       <aside className="hidden w-56 shrink-0 flex-col border-r border-tran-black lg:flex">
         <Link
           href="/"

@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * Fristående test mot Kustoms playground-API — skapar EN riktig
+ * Fristående test mot Kustoms playground-API - skapar EN riktig
  * checkout-order med testdata och skriver ut det råa svaret.
  *
  * Använder den riktiga payload-byggaren och auth-header-hjälparen från
  * appen (src/lib/kustom/order-payload.ts och auth.ts) så testet
- * verifierar samma kod som körs i produktion — men gör själva
+ * verifierar samma kod som körs i produktion - men gör själva
  * HTTP-anropet direkt i den här filen (inte via lib/kustom/client.ts)
  * för att slippa Next.js-specifika serverkrav och köras med bara Node.
  *
- * Körs INTE mot databasen och kräver ingen Supabase-uppkoppling —
+ * Körs INTE mot databasen och kräver ingen Supabase-uppkoppling -
  * bara ett Kustom playground-konto.
  *
  * Användning:
@@ -49,7 +49,7 @@ const payload = buildCreateOrderPayload({
     terms: "https://trancoffeelab.com/villkor",
     checkout: "https://trancoffeelab.com/checkout",
     confirmation: "https://trancoffeelab.com/tack?order_id={checkout.order.id}",
-    // Placeholder-URL:er — det här scriptet slutför ingen riktig
+    // Placeholder-URL:er - det här scriptet slutför ingen riktig
     // betalning i iframen, så push/validate anropas aldrig av Kustom.
     push: "https://example.com/api/kustom/push?order_id={checkout.order.id}",
     validation: "https://example.com/api/kustom/validate",
@@ -88,7 +88,7 @@ console.log(`\n--- Svar: HTTP ${response.status} ---`);
 console.log(typeof body === "string" ? body : JSON.stringify(body, null, 2));
 
 if (!response.ok) {
-  console.error("\nAnropet misslyckades — se felmeddelandet ovan.");
+  console.error("\nAnropet misslyckades - se felmeddelandet ovan.");
   process.exit(1);
 }
 

@@ -18,7 +18,7 @@ describe("productInputSchema", () => {
     expect(productInputSchema.safeParse(validInput).success).toBe(true);
   });
 
-  it("kräver tax_rate — tomt fält ska underkännas", () => {
+  it("kräver tax_rate - tomt fält ska underkännas", () => {
     const rest: Partial<typeof validInput> = { ...validInput };
     delete rest.taxRate;
     expect(productInputSchema.safeParse(rest).success).toBe(false);

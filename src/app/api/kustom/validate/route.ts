@@ -4,7 +4,7 @@ import { resolveCartLine } from "@/lib/queries/cart";
 
 /**
  * Kustom POSTar hela orderrepresentationen hit (bekräftat mot
- * docs.kustom.co, se docs/kustom.md) — svarar Kustom förstår som avslag
+ * docs.kustom.co, se docs/kustom.md) - svarar Kustom förstår som avslag
  * är HTTP 400 med { error_type, error_text }. error_type måste vara ett
  * av unsupported_shipping_address/address_error/approval_failed; inget
  * av dem betyder uttryckligen "slut i lager" så vi använder

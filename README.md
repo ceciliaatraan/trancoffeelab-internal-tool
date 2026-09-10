@@ -3,9 +3,9 @@
 Headless commerce-backoffice för [TRAN Coffee Lab](https://trancoffeelab.com)
 (Systrarna TRAN AB, org.nr 559587-6037). Två roller i en app:
 
-1. **Inloggat backoffice** — produkter, lager, ordrar, frakt, rabattkoder,
+1. **Inloggat backoffice** - produkter, lager, ordrar, frakt, rabattkoder,
    returer.
-2. **Headless backend** — publika, CORS-skyddade `/api/public/*`-endpoints
+2. **Headless backend** - publika, CORS-skyddade `/api/public/*`-endpoints
    som den publika sajten (byggd i Lovable) anropar för produktdata och för
    att skapa en [Kustom Checkout](https://docs.kustom.co/contents/api/checkout)
    -session.
@@ -31,11 +31,11 @@ cp .env.example .env.local
 
 Fyll i `.env.local`:
 
-- `DATABASE_URL` / `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` — från ert
+- `DATABASE_URL` / `SUPABASE_URL` / `SUPABASE_SERVICE_ROLE_KEY` - från ert
   Supabase-projekt (Project Settings → Database / API).
-- `AUTH_SECRET` — generera med `npx auth secret`.
-- `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` — se nedan.
-- `ALLOWED_ADMIN_EMAILS` — kommaseparerad lista över Google-adresser som får
+- `AUTH_SECRET` - generera med `npx auth secret`.
+- `AUTH_GOOGLE_ID` / `AUTH_GOOGLE_SECRET` - se nedan.
+- `ALLOWED_ADMIN_EMAILS` - kommaseparerad lista över Google-adresser som får
   logga in.
 
 Kör migrationer mot databasen:
@@ -46,7 +46,7 @@ pnpm db:migrate    # applicera migrationer i drizzle/ mot DATABASE_URL
 ```
 
 Skapa en Storage-bucket i Supabase Dashboard (Storage → New bucket) som
-heter **`product-images`** med publik läsbehörighet — produktbilder laddas
+heter **`product-images`** med publik läsbehörighet - produktbilder laddas
 upp dit av `src/lib/supabase.ts`.
 
 Starta dev-servern:
@@ -80,13 +80,13 @@ i Vercels miljövariabler för produktion. `AUTH_URL` ska vara
 produktion.
 
 Endast adresser i `ALLOWED_ADMIN_EMAILS` (och ev. `ALLOWED_GOOGLE_HD`) får en
-session — spärren sitter server-side i `signIn`-callbacken i `src/auth.ts`,
+session - spärren sitter server-side i `signIn`-callbacken i `src/auth.ts`,
 inte bara i UI:t. Nekade försök loggas i `audit_log`.
 
 ## Testa mot Kustom playground
 
 Den här utvecklingsmiljön (sandboxen Claude byggde i) kan inte nå
-`api.kustom.co`/`docs.kustom.co` alls — nätverksåtkomst dit är blockerad av
+`api.kustom.co`/`docs.kustom.co` alls - nätverksåtkomst dit är blockerad av
 miljöns egress-policy. Inget i koden har därför kunnat köras mot en riktig
 Kustom-miljö, bara verifierats mot en riktig lokal Postgres och med mockade
 HTTP-svar i enhetstesterna. Kör det här steget själva, lokalt, där ni har
@@ -94,7 +94,7 @@ vanlig internetåtkomst.
 
 1. Skaffa ett playground-konto/testnycklar hos Kustom om ni inte redan har
    det (merchant-ID + en `kco_test_api_...`-nyckel).
-2. Kör det fristående testscriptet — det använder samma payload-byggare och
+2. Kör det fristående testscriptet - det använder samma payload-byggare och
    auth-header-logik som appen, men gör själva HTTP-anropet direkt (kräver
    ingen databas, ingen `.env.local`, bara Node och de här två variablerna):
 
@@ -109,12 +109,12 @@ vanlig internetåtkomst.
 
 3. Scriptet skriver ut hela svaret från `POST /checkout/v3/orders` och
    talar om ifall `order_id`/`id` och `html_snippet` hittades. Skicka
-   gärna hela utskriften hit — den löser flera av de öppna punkterna i
+   gärna hela utskriften hit - den löser flera av de öppna punkterna i
    `docs/kustom.md` (exakt fältnamn för order-id, om `html_snippet` finns
    kvar efter att en order lästs igen, m.m.).
 4. För att testa hela flödet (kundvagn → checkout-iframe → betalning med
    Kustoms testkort → push → order i databasen) behöver appen köras någonstans
-   Kustom kan nå — antingen en Vercel-preview av den här branchen, eller
+   Kustom kan nå - antingen en Vercel-preview av den här branchen, eller
    dev-servern lokalt bakom en tunnel (t.ex. ngrok). Då kan `/api/kustom/push`
    och `/api/kustom/validate` faktiskt anropas av Kustom på riktigt. Säg till
    om ni vill ha hjälp att sätta upp det.
@@ -130,7 +130,7 @@ KUSTOM_API_KEY=<er kco_live_-nyckel>
 KUSTOM_MERCHANT_ID=<ert merchant-id>
 ```
 
-`KUSTOM_ENV` styr bara vad som visas skrivskyddat under `/settings` — det är
+`KUSTOM_ENV` styr bara vad som visas skrivskyddat under `/settings` - det är
 `KUSTOM_API_BASE_URL` och nyckeln som faktiskt avgör vilken miljö som
 används. Byt aldrig till `live` innan checkout-flödet är verifierat mot
 playground med Kustoms testkort (fas 3).
@@ -138,7 +138,7 @@ playground med Kustoms testkort (fas 3).
 ## Slack-notiser vid ny beställning
 
 Adminet kan pinga en Slack-kanal (t.ex. `#beställningar`) varje gång en ny,
-riktig beställning kommer in — via Slacks "Incoming Webhooks", inget Slack-app
+riktig beställning kommer in - via Slacks "Incoming Webhooks", inget Slack-app
 eller kodning krävs.
 
 1. Gå till https://api.slack.com/apps → **Create New App** → **From scratch**.
@@ -154,29 +154,29 @@ eller kodning krävs.
    SLACK_WEBHOOK_URL=<webhook-URL:en från steg 4>
    ```
 
-Notisen skickas bara för riktiga beställningar (`KUSTOM_ENV=live`) — aldrig
+Notisen skickas bara för riktiga beställningar (`KUSTOM_ENV=live`) - aldrig
 för testköp i Kustom Playground under utveckling. Saknas `SLACK_WEBHOOK_URL`
-skickas ingen notis alls (ingen krasch) — funktionen är helt valfri. Ett fel
-från Slack (nätverksfel, ogiltig webhook m.m.) stoppar aldrig själva ordern —
+skickas ingen notis alls (ingen krasch) - funktionen är helt valfri. Ett fel
+från Slack (nätverksfel, ogiltig webhook m.m.) stoppar aldrig själva ordern -
 den sparas, captureas och mejlar kunden precis som vanligt, felet loggas bara.
 
 ## Byggordning
 
 Projektet byggs i faser, med avstämning efter varje fas:
 
-1. **Repo, Next.js, Tailwind, Supabase-schema, Google-inloggning** — klar.
-2. **Produkter, lager, bilder, publika produkt-endpoints** — klar.
+1. **Repo, Next.js, Tailwind, Supabase-schema, Google-inloggning** - klar.
+2. **Produkter, lager, bilder, publika produkt-endpoints** - klar.
 3. **Kustom-klient (checkout v3 + Order Management), checkout-session,
    cart/validate, /api/kustom/validate, /api/kustom/push, ordermodell,
-   orderbekräftelsemail** — klar. `createOrder` verifierad live mot
-   playground (körd av er lokalt) — se docs/kustom.md för exakt vad
+   orderbekräftelsemail** - klar. `createOrder` verifierad live mot
+   playground (körd av er lokalt) - se docs/kustom.md för exakt vad
    som är verifierat och vad som fortfarande kräver ett helt
    testköp end-to-end.
 4. **Orderhantering i backofficet: capture/refund/cancel-knappar i
    `/orders`, markera som skickad, plocklista, frakt/momsinställningar
-   i `/settings`** — klar.
+   i `/settings`** - klar.
 5. **Rabattkoder (admin-CRUD), dashboard-statistik, loggvyer
-   (`/logs`), kunder och GDPR-export** — klar.
+   (`/logs`), kunder och GDPR-export** - klar.
 
 Se `docs/branding.md` för öppna punkter kring varumärkesprofilen (bl.a.
 spacing/typsteg/brytpunkter som inte kunnat läsas av trancoffeelab.com än,

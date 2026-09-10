@@ -40,7 +40,7 @@ export async function adjustInventory(formData: FormData) {
     const bundleItems = await getBundleItemsForProduct(tx, row.productId);
     if (bundleItems.length > 0) {
       throw new Error(
-        "Det här är ett kit — lagersaldot beräknas automatiskt utifrån komponenterna och kan inte ändras manuellt.",
+        "Det här är ett kit - lagersaldot beräknas automatiskt utifrån komponenterna och kan inte ändras manuellt.",
       );
     }
 

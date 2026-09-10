@@ -6,7 +6,7 @@ import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
 import { formatCustomerLabel, notifyNewOrderInSlack } from "@/lib/notifications/slack";
 
 /**
- * Läser en order från Kustom och sparar/bekräftar/mejlar den — delad
+ * Läser en order från Kustom och sparar/bekräftar/mejlar den - delad
  * mellan push-webhooken och bekräftelsesidans "eager"-anrop (se
  * confirmation/route.ts). persistOrderFromKustom är idempotent på
  * kustom_order_id, så det är säkert att kalla den här funktionen flera
@@ -20,7 +20,7 @@ export async function processKustomOrder(orderId: string): Promise<PersistedOrde
   if (!persisted.alreadyExisted) {
     await acknowledgeOrder(orderId, orderId);
 
-    // Preorder-ordrar captureas direkt, oavsett betalmetod — se den
+    // Preorder-ordrar captureas direkt, oavsett betalmetod - se den
     // förklarande kommentaren i capture-preorder.ts. Icke-preorder-
     // ordrar rörs INTE här; de captureas fortsatt manuellt via
     // "Debitera"-knappen i /orders/[id] (captureOrderAction).

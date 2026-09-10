@@ -37,14 +37,14 @@ export type ValidatedCart = {
   /** Alla rader hittades och finns i tillräcklig mängd. */
   valid: boolean;
   subtotalOre: number;
-  /** 0 om fri frakt gäller (se freeShipping) — annars shop_settings flatrate. */
+  /** 0 om fri frakt gäller (se freeShipping) - annars shop_settings flatrate. */
   shippingOre: number;
   freeShipping: boolean;
   discount: ValidatedCartDiscount | null;
 };
 
 /**
- * Enda källan till varukorgsvalidering — används av både
+ * Enda källan till varukorgsvalidering - används av både
  * /api/public/cart/validate och /api/public/checkout/session så de
  * aldrig kan komma fram till olika priser eller lagerbesked.
  */

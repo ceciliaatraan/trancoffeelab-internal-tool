@@ -14,16 +14,16 @@ export type OrderConfirmationEmailInput = {
     quantity: number;
     isPreorder?: boolean;
     expectedShipDate?: string | null;
-    /** Produktbild — visas bara om satt, se docstringen på renderEmail. */
+    /** Produktbild - visas bara om satt, se docstringen på renderEmail. */
     imageUrl?: string | null;
     /** Radens totalpris (kvantitet × pris), inte à-pris. Visas bara om satt. */
     lineTotalOre?: number;
-    /** Produktens slug på trancoffeelab.com — bild/namn länkas dit om satt. */
+    /** Produktens slug på trancoffeelab.com - bild/namn länkas dit om satt. */
     slug?: string | null;
   }[];
 };
 
-/** "Beräknad leverans: ‹månad/period›" — aldrig ett exakt datumlöfte. */
+/** "Beräknad leverans: ‹månad/period›" - aldrig ett exakt datumlöfte. */
 function formatShipPeriod(expectedShipDate: string | null | undefined, isEnglish: boolean): string {
   const date = expectedShipDate ? new Date(expectedShipDate) : null;
   if (!date || Number.isNaN(date.getTime())) {
@@ -52,7 +52,7 @@ function escapeHtml(value: string): string {
 }
 
 /**
- * Skrivet som handskriven, inline-stylad HTML (inte JSX/Tailwind) — det
+ * Skrivet som handskriven, inline-stylad HTML (inte JSX/Tailwind) - det
  * enda som fungerar tillförlitligt över e-postklienter, som inte kör
  * någon byggprocess och ofta saknar stöd för <style>/flexbox/grid
  * (särskilt Outlook). Speglar adminets hairline/versal-formspråk
@@ -77,31 +77,31 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
   const mixed = hasPreorder && hasInStock;
 
   // Blandade ordrar (förbeställning + lagervara) förklaras rad för rad
-  // nedan — klumpas ALDRIG ihop som ett generellt "skickas senare".
+  // nedan - klumpas ALDRIG ihop som ett generellt "skickas senare".
   const lines = input.lines
     .map((line) => {
       const withPrice =
         line.lineTotalOre === undefined
           ? `${line.quantity} × ${line.name}`
-          : `${line.quantity} × ${line.name} — ${formatPrice(line.lineTotalOre, isEnglish)} kr`;
+          : `${line.quantity} × ${line.name} - ${formatPrice(line.lineTotalOre, isEnglish)} kr`;
       if (!line.isPreorder) return withPrice;
       const period = formatShipPeriod(line.expectedShipDate, isEnglish);
       return isEnglish
-        ? `${withPrice} — preorder, estimated ship: ${period}`
-        : `${withPrice} — förbeställning, beräknad leverans: ${period}`;
+        ? `${withPrice} - preorder, estimated ship: ${period}`
+        : `${withPrice} - förbeställning, beräknad leverans: ${period}`;
     })
     .join("\n");
 
   const intro = isEnglish
     ? mixed
-      ? "Your order contains both in-stock items and a preorder. The in-stock items ship as usual. The preorder has been charged now and ships separately once it's in stock — see the estimated ship date per line below."
+      ? "Your order contains both in-stock items and a preorder. The in-stock items ship as usual. The preorder has been charged now and ships separately once it's in stock - see the estimated ship date per line below."
       : hasPreorder
-        ? "This is a preorder. You've been charged now — the item ships once it's in stock, see the estimated ship date below."
+        ? "This is a preorder. You've been charged now - the item ships once it's in stock, see the estimated ship date below."
         : "Thank you for your order."
     : mixed
-      ? "Din order innehåller både lagervaror och en förbeställning. Lagervarorna skickas som vanligt. Förbeställningen är betald nu och skickas separat när den finns i lager — se beräknad leverans per rad nedan."
+      ? "Din order innehåller både lagervaror och en förbeställning. Lagervarorna skickas som vanligt. Förbeställningen är betald nu och skickas separat när den finns i lager - se beräknad leverans per rad nedan."
       : hasPreorder
-        ? "Det här är en förbeställning. Du har betalat nu — varan skickas när den finns i lager, se beräknad leverans nedan."
+        ? "Det här är en förbeställning. Du har betalat nu - varan skickas när den finns i lager, se beräknad leverans nedan."
         : "Tack för din beställning.";
 
   const heading = isEnglish ? "Thank you for your order" : "Tack för din beställning";
@@ -113,10 +113,10 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
   const freeShippingLabel = isEnglish ? "Free shipping" : "Fri frakt";
   /**
    * `shipping` är null (inte undefined) för en riktig order utan
-   * fraktkostnad — Kustom fick då ingen shipping_fee-rad alls (t.ex.
+   * fraktkostnad - Kustom fick då ingen shipping_fee-rad alls (t.ex.
    * gränsen för fri frakt uppnådd, se checkout/session/route.ts). En
    * rad på exakt 0 kr räknas likadant. undefined betyder att anroparen
-   * inte skickat med fraktinfo alls (äldre anrop/tester) — då visas
+   * inte skickat med fraktinfo alls (äldre anrop/tester) - då visas
    * ingen rad, för att inte ljuga om en order vi inte vet något om.
    */
   function shippingValueText(shipping: { amountOre: number } | null): string {
@@ -149,7 +149,7 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
             ${url ? `<a href="${escapeHtml(url)}" style="color:#000000;text-decoration:none;">${nameText}</a>` : nameText}
             ${
               period
-                ? `<br/><span style="display:inline-block;margin-top:4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#EB1C24;">${escapeHtml(preorderLabel)} — ${escapeHtml(shipLabel)}: ${escapeHtml(period)}</span>`
+                ? `<br/><span style="display:inline-block;margin-top:4px;font-size:10px;font-weight:700;letter-spacing:0.08em;text-transform:uppercase;color:#EB1C24;">${escapeHtml(preorderLabel)} - ${escapeHtml(shipLabel)}: ${escapeHtml(period)}</span>`
                 : ""
             }
           </td>
@@ -230,14 +230,14 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
 
   if (isEnglish) {
     return {
-      subject: `Order confirmation #${input.orderNumber} — TRAN Coffee Lab`,
+      subject: `Order confirmation #${input.orderNumber} - TRAN Coffee Lab`,
       text: `${intro}\n\nOrder #${input.orderNumber}\n\n${lines}\n\n${shippingText}Total: ${total} kr\n\n${footer}`,
       html,
     };
   }
 
   return {
-    subject: `Orderbekräftelse #${input.orderNumber} — TRAN Coffee Lab`,
+    subject: `Orderbekräftelse #${input.orderNumber} - TRAN Coffee Lab`,
     text: `${intro}\n\nOrder #${input.orderNumber}\n\n${lines}\n\n${shippingText}Totalt: ${total} kr\n\n${footer}`,
     html,
   };
@@ -245,7 +245,7 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
 
 /**
  * RESEND_FROM_EMAIL måste vara en avsändaradress på en domän som är
- * verifierad i ert Resend-konto — annars avvisas mejlet av Resend.
+ * verifierad i ert Resend-konto - annars avvisas mejlet av Resend.
  * Ingen adress gissas här.
  */
 export async function sendOrderConfirmationEmail(

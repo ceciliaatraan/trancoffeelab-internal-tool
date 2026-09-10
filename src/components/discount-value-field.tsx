@@ -8,7 +8,7 @@ const labelClass = "tran-label mb-1 block text-[11px] text-tran-muted";
 
 /**
  * The discount's "value" field means different units depending on "type"
- * (percent off, or a fixed kronor amount) — see discountInputSchema. This
+ * (percent off, or a fixed kronor amount) - see discountInputSchema. This
  * keeps the unit label in sync with whichever type is currently selected,
  * so "Värde" never shows the wrong unit.
  */

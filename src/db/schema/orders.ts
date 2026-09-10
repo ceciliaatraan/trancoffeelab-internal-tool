@@ -17,7 +17,7 @@ import { adminUsers } from "./admin";
  * `status` och `paymentStatus` är fritext, inte enum, tills vidare: Kustoms
  * faktiska statusvärden (t.ex. checkout_incomplete/checkout_complete,
  * capture-status) verifieras mot docs.kustom.co i fas 3 och dokumenteras i
- * docs/kustom.md innan de låses till en enum — se den filen för status.
+ * docs/kustom.md innan de låses till en enum - se den filen för status.
  * fulfillmentStatus är vårt EGET fraktbegrepp och kan definieras nu.
  */
 export const orderFulfillmentStatusEnum = pgEnum("order_fulfillment_status", [
@@ -49,14 +49,14 @@ export const orders = pgTable("orders", {
 
   orderAmountOre: integer("order_amount_ore").notNull(),
   orderTaxAmountOre: integer("order_tax_amount_ore").notNull(),
-  /** Cachat från Kustoms Order Management — källan till sanning är alltid Kustom, vi synkar efter varje capture/refund/cancel. */
+  /** Cachat från Kustoms Order Management - källan till sanning är alltid Kustom, vi synkar efter varje capture/refund/cancel. */
   capturedAmountOre: integer("captured_amount_ore").notNull().default(0),
   refundedAmountOre: integer("refunded_amount_ore").notNull().default(0),
 
   /**
    * Sätts av push-hanteraren: true om NÅGON orderrad pekade på en produkt
    * med `products.is_preorder = true` vid ordertillfället. Preorder-ordrar
-   * captureas alltid direkt (se persist-order.ts/push/route.ts) — det
+   * captureas alltid direkt (se persist-order.ts/push/route.ts) - det
    * avviker medvetet från Klarnas normala "vänta med capture till fysisk
    * leverans"-mönster, eftersom varan inte finns i lager än.
    */
@@ -64,7 +64,7 @@ export const orders = pgTable("orders", {
 
   /**
    * Sätts av push-hanteraren utifrån KUSTOM_ENV vid ordertillfället
-   * (allt utom exakt "live" räknas som test) — låter testordrar från
+   * (allt utom exakt "live" räknas som test) - låter testordrar från
    * Kustom Playground märkas ut i gränssnittet och tas bort separat,
    * utan att kunna blandas ihop med eller av misstag radera riktiga
    * ordrar. Se deleteTestOrderAction i orders/actions.ts.
@@ -136,7 +136,7 @@ export const orderEventTypeEnum = pgEnum("order_event_type", [
   "cancel",
 ]);
 
-/** Betalningshändelser (capture/refund/cancel) — visas i orderdetaljen. */
+/** Betalningshändelser (capture/refund/cancel) - visas i orderdetaljen. */
 export const orderEvents = pgTable("order_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   orderId: uuid("order_id")

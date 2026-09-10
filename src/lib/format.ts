@@ -5,7 +5,7 @@ const currencyFormatter = new Intl.NumberFormat("sv-SE", {
 
 /**
  * Utan explicit timeZone används körtidens egen (UTC på Vercels
- * serverless-funktioner) — inte besökarens, eftersom det här renderas
+ * serverless-funktioner) - inte besökarens, eftersom det här renderas
  * server-side. Låst till svensk tid så klockslag i adminet stämmer med
  * väggklockan, oavsett var koden faktiskt körs.
  */

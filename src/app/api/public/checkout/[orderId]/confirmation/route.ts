@@ -7,17 +7,17 @@ import { processKustomOrder } from "@/lib/orders/process-kustom-order";
 
 /**
  * ÖPPET/eget antagande: readOrder (checkout v3) antas returnera samma
- * html_snippet-fält efter att ordern slutförts som vid skapandet — det
+ * html_snippet-fält efter att ordern slutförts som vid skapandet - det
  * är samma resurs i samma API-yta (checkout v3), inte bekräftat separat
  * mot docs.kustom.co. Se docs/kustom.md.
  *
  * Bearbetar ordern (spara/reservera lager/mejla) direkt här också,
- * istället för att bara vänta på push-webhooken — webbläsaren hamnar
+ * istället för att bara vänta på push-webhooken - webbläsaren hamnar
  * på den här sidan i samma sekund som betalningen slutförs, medan
  * Kustoms server-till-server-push i praktiken kan dröja ett par
  * minuter. persistOrderFromKustom är idempotent på kustom_order_id, så
  * det är ofarligt att bearbeta ordern både här och (senare, igen) från
- * push — den andra gången ser bara att den redan finns och hoppar över
+ * push - den andra gången ser bara att den redan finns och hoppar över
  * capture/mejl. Push-webhooken behålls som facit/fallback ifall kunden
  * stänger fliken innan den här sidan hinner ladda klart.
  */

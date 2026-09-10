@@ -1,10 +1,10 @@
 @import "tailwindcss";
 
 /*
- * TRAN Coffee Lab — brand tokens.
+ * TRAN Coffee Lab - brand tokens.
  * Källa: grafisk profil (facit för färg/typsnitt/logotyp) + docs/branding.md.
  * Spacing- och typsteg nedan är ANTAGNA i väntan på avläsning av
- * trancoffeelab.com — se docs/branding.md "Avvikelser att bekräfta".
+ * trancoffeelab.com - se docs/branding.md "Avvikelser att bekräfta".
  */
 
 @font-face {
@@ -16,7 +16,7 @@
 }
 
 :root {
-  /* Varumärkesfärger — de enda som finns. */
+  /* Varumärkesfärger - de enda som finns. */
   --tran-white: #ffffff;
   --tran-black: #000000;
   --tran-red: #eb1c24;
@@ -63,7 +63,7 @@
   --font-display: var(--font-display);
   --font-body: var(--font-body);
 
-  /* Border-radius 0 rakt igenom — hairline-rutnätet har inga rundade hörn. */
+  /* Border-radius 0 rakt igenom - hairline-rutnätet har inga rundade hörn. */
   --radius-none: 0px;
   --radius-sm: 0px;
   --radius-md: 0px;
@@ -74,7 +74,7 @@
 }
 
 /*
- * TRAN är ett fast varumärke, inte en systemtema-anpassad UI — vi följer
+ * TRAN är ett fast varumärke, inte en systemtema-anpassad UI - vi följer
  * INTE prefers-color-scheme. Vitt/svart/rött/blått gäller oavsett
  * besökarens systeminställning.
  */

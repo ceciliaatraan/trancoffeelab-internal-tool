@@ -11,7 +11,7 @@ export type PersistedOrder = {
   alreadyExisted: boolean;
   /** True om NÅGON fysisk orderrad pekade på en produkt med is_preorder=true vid ordertillfället. */
   containsPreorder: boolean;
-  /** Fysiska rader, för orderbekräftelsemailet — annat innehåll för preorder- kontra lagerrader. */
+  /** Fysiska rader, för orderbekräftelsemailet - annat innehåll för preorder- kontra lagerrader. */
   physicalLines: {
     name: string;
     quantity: number;
@@ -21,9 +21,9 @@ export type PersistedOrder = {
     lineTotalOre: number;
     slug: string | null;
   }[];
-  /** Fraktraden (type=shipping_fee) om Kustom-ordern hade en — för orderbekräftelsemailets radbrytning. */
+  /** Fraktraden (type=shipping_fee) om Kustom-ordern hade en - för orderbekräftelsemailets radbrytning. */
   shippingLine: { name: string; amountOre: number } | null;
-  /** Rabattraden (type=discount) om en rabattkod användes — amountOre är ett positivt belopp (raden själv är negativ hos Kustom). */
+  /** Rabattraden (type=discount) om en rabattkod användes - amountOre är ett positivt belopp (raden själv är negativ hos Kustom). */
   discount: { code: string; amountOre: number } | null;
 };
 
@@ -32,11 +32,11 @@ function sumTaxAmount(order: KustomOrderManagementOrder): number {
 }
 
 /**
- * Sparar en order från Kustom FÖRSTA gången den ses — idempotent på
+ * Sparar en order från Kustom FÖRSTA gången den ses - idempotent på
  * kustom_order_id (INSERT ... ON CONFLICT DO NOTHING, sedan en läsning
  * om raden redan fanns). Reserverar lager och sparar orderrader bara om
  * det verkligen var första gången. Anropas från push-hanteraren, ALDRIG
- * med data från push-bodyn direkt — bara med det som lästs från Kustom
+ * med data från push-bodyn direkt - bara med det som lästs från Kustom
  * via getOrderManagementOrder.
  *
  * `changeAmount` i inventory_movements tolkas olika beroende på `reason`

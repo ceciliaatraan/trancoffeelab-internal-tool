@@ -43,7 +43,7 @@ export default async function InventoryPage({
                 <tr key={row.inventoryId} className="border-b border-tran-hairline">
                   <td className="py-4 pr-4 align-top">
                     {row.productName}
-                    {row.variantName ? ` — ${row.variantName}` : ""}
+                    {row.variantName ? ` - ${row.variantName}` : ""}
                     {row.isBundle && row.bundleBreakdown ? (
                       <ul className="mt-1 text-xs text-tran-muted">
                         {row.bundleBreakdown.map((component) => (
@@ -64,10 +64,10 @@ export default async function InventoryPage({
                     className={`tran-tabular py-4 pr-4 align-top ${belowAlarm ? "text-tran-red" : ""}`}
                   >
                     {row.available}
-                    {belowAlarm ? " — Slut i lager" : ""}
+                    {belowAlarm ? " - Slut i lager" : ""}
                   </td>
                   <td className="tran-tabular py-4 pr-4 align-top text-tran-muted">
-                    {row.isBundle ? "—" : row.reservedQuantity}
+                    {row.isBundle ? "-" : row.reservedQuantity}
                   </td>
                   <td className="tran-tabular py-4 pr-4 align-top text-tran-muted">
                     {row.alarmLevel}

@@ -57,7 +57,7 @@ describe("computeDiscountSplit", () => {
     });
   });
 
-  describe("fixed, appliesTo: both — waterfall (products first, remainder to shipping)", () => {
+  describe("fixed, appliesTo: both - waterfall (products first, remainder to shipping)", () => {
     it("a small fixed amount only reduces products", () => {
       const result = computeDiscountSplit("fixed", 2000, "both", 34900, 4900);
       expect(result).toEqual({ productsDiscountOre: 2000, shippingDiscountOre: 0 });

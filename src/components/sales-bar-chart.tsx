@@ -2,7 +2,7 @@ import type { DailySales } from "@/lib/dashboard/stats";
 import { formatOre } from "@/lib/format";
 
 /**
- * Handskriven, server-renderad SVG — inget diagram-bibliotek, matchar
+ * Handskriven, server-renderad SVG - inget diagram-bibliotek, matchar
  * hur adminet i övrigt bygger UI (inga klientkomponenter för sånt som
  * kan renderas rent). viewBox + preserveAspectRatio="none" gör staplarna
  * responsiva utan JS; exakt belopp/datum kommer via <title> (nativ

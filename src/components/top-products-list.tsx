@@ -1,7 +1,7 @@
 import type { TopProduct } from "@/lib/dashboard/stats";
 import { formatOre } from "@/lib/format";
 
-/** Horisontella stapelrader byggda med vanliga divs (inte SVG) — proportionerna kräver ingen viewBox-matematik här. */
+/** Horisontella stapelrader byggda med vanliga divs (inte SVG) - proportionerna kräver ingen viewBox-matematik här. */
 export function TopProductsList({ products }: { products: TopProduct[] }) {
   if (products.length === 0) {
     return <p className="text-sm text-tran-muted">Inga sålda produkter i perioden.</p>;

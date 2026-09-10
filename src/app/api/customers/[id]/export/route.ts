@@ -6,7 +6,7 @@ import { requireCurrentAdmin } from "@/lib/current-admin";
 /**
  * GDPR-export: all data vi har om en kund, som JSON-nedladdning.
  * Skyddad av proxy.ts (allt utom /api/public/* och /api/kustom/* kräver
- * inloggning) — requireCurrentAdmin här är ett extra, explicit skydd.
+ * inloggning) - requireCurrentAdmin här är ett extra, explicit skydd.
  */
 export async function GET(
   _request: Request,

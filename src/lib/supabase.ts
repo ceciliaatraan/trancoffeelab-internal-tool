@@ -3,7 +3,7 @@ import { createClient } from "@supabase/supabase-js";
 import sharp from "sharp";
 
 /**
- * Service role-klienten. Kringgår RLS helt — används ENDAST server-side
+ * Service role-klienten. Kringgår RLS helt - används ENDAST server-side
  * (Server Actions/Route Handlers), aldrig i klientkod.
  */
 function getSupabaseAdmin() {
@@ -24,7 +24,7 @@ function getSupabaseAdmin() {
 export const PRODUCT_IMAGES_BUCKET = "product-images";
 
 /**
- * Största tillåtna bildmått (längsta sidan) — gott om marginal för
+ * Största tillåtna bildmått (längsta sidan) - gott om marginal för
  * produktsidans stora hero-bild på en retina-skärm, men klipper bort de
  * 4000px+ originalen en telefonkamera producerar rakt av. Kvalitet 82 är
  * en beprövad avvägning: praktiskt oskiljbar från originalet men en
@@ -35,7 +35,7 @@ const WEBP_QUALITY = 82;
 
 /**
  * Skalar ner och komprimerar en uppladdad bild till WebP innan den
- * lagras — telefonkamerabilder (ofta 4000px+, flera MB) skulle annars
+ * lagras - telefonkamerabilder (ofta 4000px+, flera MB) skulle annars
  * gå raka vägen till produktionssajten okomprimerade. Förstorar aldrig
  * en redan liten bild.
  */
@@ -56,7 +56,7 @@ async function compressImage(file: File): Promise<Buffer> {
 /**
  * Laddar upp en produktbild till Supabase Storage och returnerar den
  * publika URL:en. Bucketen `product-images` måste finnas och ha publik
- * läsbehörighet — skapas manuellt i Supabase Dashboard (se README).
+ * läsbehörighet - skapas manuellt i Supabase Dashboard (se README).
  */
 export async function uploadProductImage(
   productId: string,

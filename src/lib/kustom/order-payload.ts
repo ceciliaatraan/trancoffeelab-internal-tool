@@ -22,7 +22,7 @@ export type ShippingInput = {
 
 export type DiscountInput = {
   code: string;
-  /** Rabattens storlek som ett positivt belopp i öre — läggs på ordern som en negativ rad. */
+  /** Rabattens storlek som ett positivt belopp i öre - läggs på ordern som en negativ rad. */
   amountOre: number;
   taxRateHundredthsPercent: number;
 };

@@ -13,12 +13,12 @@ export type ResolvedCartLine = {
   available: number;
   productId: string;
   variantId: string | null;
-  /** Alltid från produkten, aldrig från varianten — se src/db/schema/catalog.ts. */
+  /** Alltid från produkten, aldrig från varianten - se src/db/schema/catalog.ts. */
   isPreorder: boolean;
   expectedShipDate: string | null;
   /** Variantens egen första bild om den har någon, annars produktens första bild. */
   imageUrl: string | null;
-  /** Produktens slug på trancoffeelab.com — för länkar till produktsidan, t.ex. i orderbekräftelsemailet. */
+  /** Produktens slug på trancoffeelab.com - för länkar till produktsidan, t.ex. i orderbekräftelsemailet. */
   slug: string;
 };
 
@@ -52,7 +52,7 @@ async function resolveBaseProduct(sku: string): Promise<ResolvedCartLine | null>
   if (!row) return null;
 
   /**
-   * Kit (t.ex. Komplett Kit) har inget eget lagersaldo — hur många som
+   * Kit (t.ex. Komplett Kit) har inget eget lagersaldo - hur många som
    * går att sätta ihop beräknas från komponenternas fria lager. Returnerar
    * null för vanliga produkter, så de faller tillbaka på sin egen rad.
    */
@@ -119,7 +119,7 @@ async function resolveVariant(sku: string): Promise<ResolvedCartLine | null> {
   };
 }
 
-/** Slår upp en varukorgsrad på SKU — provar produkt, sedan variant. Priser/moms/lager kommer alltid härifrån, aldrig från klienten. */
+/** Slår upp en varukorgsrad på SKU - provar produkt, sedan variant. Priser/moms/lager kommer alltid härifrån, aldrig från klienten. */
 export async function resolveCartLine(sku: string): Promise<ResolvedCartLine | null> {
   return (await resolveBaseProduct(sku)) ?? (await resolveVariant(sku));
 }

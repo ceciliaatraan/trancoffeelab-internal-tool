@@ -23,7 +23,7 @@ export async function getAllBundleItems(dbOrTx: DbOrTx = db): Promise<BundleItem
     .from(schema.productBundleItems);
 }
 
-/** Komponenterna för EN produkt — tom lista betyder att produkten inte är ett kit. */
+/** Komponenterna för EN produkt - tom lista betyder att produkten inte är ett kit. */
 export async function getBundleItemsForProduct(
   dbOrTx: DbOrTx,
   bundleProductId: string,
@@ -112,7 +112,7 @@ export type InventoryTarget = {
 /**
  * Expanderar en orderrad till de konkreta lagerrader som ska justeras.
  * En kit-rad sprids ut på sina komponenter (kvantitet per kit gånger
- * antal beställda kit) — kitets egen lagerrad rörs aldrig. En vanlig
+ * antal beställda kit) - kitets egen lagerrad rörs aldrig. En vanlig
  * rad pekar direkt på sin egen lagerrad, precis som tidigare.
  */
 export async function expandLineToInventoryTargets(

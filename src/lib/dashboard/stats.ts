@@ -9,7 +9,7 @@ export { summarizeDailySales } from "./day-buckets";
 /**
  * Senaste `days` dagarna (inklusive idag), i svensk lokal tid, med 0 för
  * dagar utan ordrar. Exkluderar testordrar (is_test) och
- * avbrutna/utgångna ordrar — de ska inte synas i "hur går det"-vyer.
+ * avbrutna/utgångna ordrar - de ska inte synas i "hur går det"-vyer.
  */
 export async function getDailySales(days: number): Promise<DailySales[]> {
   const since = new Date(Date.now() - (days + 2) * 24 * 60 * 60 * 1000);
@@ -66,7 +66,7 @@ export type RecentOrder = {
   createdAt: Date;
 };
 
-/** Senaste riktiga (icke-test) ordrarna, nyast först — för "hur går det"-översikten. */
+/** Senaste riktiga (icke-test) ordrarna, nyast först - för "hur går det"-översikten. */
 export async function getRecentOrders(limit: number): Promise<RecentOrder[]> {
   return db
     .select({

@@ -1,7 +1,7 @@
 /**
  * Riktig logotypfil, mottagen från er (samma fil används redan på
- * trancoffeelab.com — se trancoffeelab-website/src/assets/tran-logo.webp).
- * Rastergrafik, inte vektor-SVG — den här sandboxen har ingen
+ * trancoffeelab.com - se trancoffeelab-website/src/assets/tran-logo.webp).
+ * Rastergrafik, inte vektor-SVG - den här sandboxen har ingen
  * bildspårningsverktyg (potrace/imagemagick m.fl. är blockerade av
  * nätverkspolicyn) för att göra en riktig SVG-spårning. Om ni har
  * originalfilen som vektor (AI/EPS/SVG) hör av er, annars fungerar den

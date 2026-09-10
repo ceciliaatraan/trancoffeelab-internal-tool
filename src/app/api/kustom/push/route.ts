@@ -6,10 +6,10 @@ import { processKustomOrder } from "@/lib/orders/process-kustom-order";
 /**
  * order_id kommer som query-parameter (bekräftat i AGENTS.md:s
  * merchant_urls.push-mall). Metoden (GET/POST) är INTE bekräftad mot
- * docs.kustom.co — POST antas i linje med validation-callbacken, se
+ * docs.kustom.co - POST antas i linje med validation-callbacken, se
  * docs/kustom.md.
  *
- * Vi litar ALDRIG på request-bodyn för orderdata — den läses alltid på
+ * Vi litar ALDRIG på request-bodyn för orderdata - den läses alltid på
  * nytt från Kustom via getOrderManagementOrder. Bodyn loggas ändå rått
  * i webhook_events innan bearbetning, per spec.
  */

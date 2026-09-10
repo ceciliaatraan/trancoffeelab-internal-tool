@@ -62,7 +62,7 @@ export async function POST(request: Request) {
   }));
 
   // A "shipping"/"both"-scoped discount reduces the shipping line's own
-  // amount directly rather than needing a second Kustom discount line —
+  // amount directly rather than needing a second Kustom discount line -
   // see computeDiscountSplit in lib/discount-split.ts.
   const shippingDiscountOre =
     cart.discount?.valid && cart.discount.shippingDiscountOre > 0
@@ -74,7 +74,7 @@ export async function POST(request: Request) {
         nameSv: "Frakt",
         nameEn: "Shipping",
         amountOre: cart.shippingOre - shippingDiscountOre,
-        // Frakten har ingen egen momssats — den ärver kundvagnens
+        // Frakten har ingen egen momssats - den ärver kundvagnens
         // kvantitetsviktade snitt, precis som rabattraden nedan.
         taxRateHundredthsPercent: weightedAverageTaxRate(cart.items),
       };
@@ -100,7 +100,7 @@ export async function POST(request: Request) {
       {
         html_snippet: extractHtmlSnippet(order),
         order_id: extractOrderId(order),
-        // The discount was already resolved into the Kustom payload above —
+        // The discount was already resolved into the Kustom payload above -
         // echoed back here so the storefront's own order summary (which has
         // no other way to know the amount) can actually show it.
         discount:
@@ -126,7 +126,7 @@ export async function POST(request: Request) {
 /**
  * Rabatt- och fraktraden behöver en representativ momssats var och en
  * (ingen av dem tillhör ett enskilt varuslag). Vi använder ett
- * kvantitetsviktat snitt av kundvagnens rader — en egen designbeslut
+ * kvantitetsviktat snitt av kundvagnens rader - en egen designbeslut
  * (inte hämtat från Kustom-dokumentationen), dokumenterat i docs/kustom.md.
  */
 function weightedAverageTaxRate(items: { taxRate: number; quantity: number }[]): number {

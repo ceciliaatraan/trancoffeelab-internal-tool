@@ -137,7 +137,7 @@ describe("notifyNewOrderInSlack", () => {
       discount: { code: "SOMMAR20", amountOre: 5000 },
     };
 
-    // 29800 är redan Kustoms `order_amount` — det rabatterade totalbeloppet
+    // 29800 är redan Kustoms `order_amount` - det rabatterade totalbeloppet
     // kunden faktiskt betalade, inte listpriset före rabatt.
     await notifyNewOrderInSlack(orderWithDiscount, 29800, "Cecilia Tran");
 

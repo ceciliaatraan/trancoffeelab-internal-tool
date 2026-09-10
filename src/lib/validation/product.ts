@@ -3,7 +3,7 @@ import { z } from "zod";
 const slugPattern = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
 /**
- * taxRate är obligatoriskt utan default — moms skiljer sig mellan kaffe/
+ * taxRate är obligatoriskt utan default - moms skiljer sig mellan kaffe/
  * kondenserad mjölk (livsmedel) och phin-filter (inte livsmedel), så varje
  * produkt måste ta aktivt ställning. 0–10000 = 0–100% i hundradels procent.
  */
@@ -29,7 +29,7 @@ export const productInputSchema = z.object({
   sortOrder: z.coerce.number().int().default(0),
   /** Förbeställning: egenskap på PRODUKTEN, inte på varianten. */
   isPreorder: z.coerce.boolean().default(false),
-  /** Ungefärligt datum — visas för kund som "Beräknad leverans: ‹månad/period›". */
+  /** Ungefärligt datum - visas för kund som "Beräknad leverans: ‹månad/period›". */
   expectedShipDate: z
     .string()
     .trim()
