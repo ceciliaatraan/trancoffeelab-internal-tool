@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { notifyNewOrderInSlack } from "./slack";
+import { formatCustomerLabel, notifyNewOrderInSlack } from "./slack";
 import type { PersistedOrder } from "@/lib/orders/persist-order";
 
 const ORIGINAL_ENV = { ...process.env };
@@ -40,11 +40,35 @@ function mockFetch(ok = true) {
   return fetchMock;
 }
 
+describe("formatCustomerLabel", () => {
+  it("kombinerar namn och e-post", () => {
+    expect(formatCustomerLabel("Cecilia", "Tran", "cecilia@example.com")).toBe(
+      "Cecilia Tran (cecilia@example.com)",
+    );
+  });
+
+  it("faller tillbaka till bara namnet om e-post saknas", () => {
+    expect(formatCustomerLabel("Cecilia", "Tran", null)).toBe("Cecilia Tran");
+  });
+
+  it("faller tillbaka till bara e-posten om namn saknas", () => {
+    expect(formatCustomerLabel(null, null, "cecilia@example.com")).toBe("cecilia@example.com");
+  });
+
+  it("hanterar bara förnamn utan efternamn", () => {
+    expect(formatCustomerLabel("Cecilia", null, null)).toBe("Cecilia");
+  });
+
+  it("returnerar null om varken namn eller e-post finns", () => {
+    expect(formatCustomerLabel(null, undefined, null)).toBeNull();
+  });
+});
+
 describe("notifyNewOrderInSlack", () => {
-  it("POSTar till SLACK_WEBHOOK_URL med ordernummer, totalpris och rader", async () => {
+  it("POSTar till SLACK_WEBHOOK_URL med ordernummer, totalpris, kund och rader", async () => {
     const fetchMock = mockFetch();
 
-    await notifyNewOrderInSlack(baseOrder, 29800);
+    await notifyNewOrderInSlack(baseOrder, 29800, "Cecilia Tran (cecilia@example.com)");
 
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
@@ -53,14 +77,24 @@ describe("notifyNewOrderInSlack", () => {
     expect(body.text).toContain("#1042");
     expect(body.text).toContain("298,00");
     expect(JSON.stringify(body)).toContain("No Regrets Horse 250g");
+    expect(JSON.stringify(body)).toContain("Cecilia Tran (cecilia@example.com)");
     expect(JSON.stringify(body)).toContain("https://admin.trancoffeelab.com/orders/order-1");
+  });
+
+  it("utelämnar kundraden helt om customer är null", async () => {
+    const fetchMock = mockFetch();
+
+    await notifyNewOrderInSlack(baseOrder, 29800, null);
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(JSON.stringify(body)).not.toContain("👤");
   });
 
   it("skickar INTE om KUSTOM_ENV inte är 'live' (playground-ordrar ska inte pinga kanalen)", async () => {
     process.env.KUSTOM_ENV = "playground";
     const fetchMock = mockFetch();
 
-    await notifyNewOrderInSlack(baseOrder, 29800);
+    await notifyNewOrderInSlack(baseOrder, 29800, "Cecilia Tran");
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -69,7 +103,7 @@ describe("notifyNewOrderInSlack", () => {
     delete process.env.SLACK_WEBHOOK_URL;
     const fetchMock = mockFetch();
 
-    await notifyNewOrderInSlack(baseOrder, 29800);
+    await notifyNewOrderInSlack(baseOrder, 29800, "Cecilia Tran");
 
     expect(fetchMock).not.toHaveBeenCalled();
   });
@@ -77,19 +111,19 @@ describe("notifyNewOrderInSlack", () => {
   it("kastar ALDRIG vidare om Slack svarar med fel", async () => {
     mockFetch(false);
 
-    await expect(notifyNewOrderInSlack(baseOrder, 29800)).resolves.toBeUndefined();
+    await expect(notifyNewOrderInSlack(baseOrder, 29800, "Cecilia Tran")).resolves.toBeUndefined();
   });
 
   it("kastar ALDRIG vidare om fetch självt kastar (nätverksfel)", async () => {
     vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new Error("network down")));
 
-    await expect(notifyNewOrderInSlack(baseOrder, 29800)).resolves.toBeUndefined();
+    await expect(notifyNewOrderInSlack(baseOrder, 29800, "Cecilia Tran")).resolves.toBeUndefined();
   });
 
   it("markerar förbeställningar i meddelandet", async () => {
     const fetchMock = mockFetch();
 
-    await notifyNewOrderInSlack({ ...baseOrder, containsPreorder: true }, 29800);
+    await notifyNewOrderInSlack({ ...baseOrder, containsPreorder: true }, 29800, "Cecilia Tran");
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(JSON.stringify(body)).toContain("förbeställning");
