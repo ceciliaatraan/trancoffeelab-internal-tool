@@ -21,6 +21,7 @@ const baseOrder: PersistedOrder = {
     },
   ],
   shippingLine: null,
+  discount: null,
 };
 
 beforeEach(() => {
@@ -127,5 +128,31 @@ describe("notifyNewOrderInSlack", () => {
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(JSON.stringify(body)).toContain("förbeställning");
+  });
+
+  it("visar rabattkod och rabattbelopp när en rabatt använts, och priset är det rabatterade totalbeloppet", async () => {
+    const fetchMock = mockFetch();
+    const orderWithDiscount: PersistedOrder = {
+      ...baseOrder,
+      discount: { code: "SOMMAR20", amountOre: 5000 },
+    };
+
+    // 29800 är redan Kustoms `order_amount` — det rabatterade totalbeloppet
+    // kunden faktiskt betalade, inte listpriset före rabatt.
+    await notifyNewOrderInSlack(orderWithDiscount, 29800, "Cecilia Tran");
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(body.text).toContain("298,00");
+    expect(JSON.stringify(body)).toContain("SOMMAR20");
+    expect(JSON.stringify(body)).toContain("50,00");
+  });
+
+  it("utelämnar rabattraden helt om ingen rabatt användes", async () => {
+    const fetchMock = mockFetch();
+
+    await notifyNewOrderInSlack(baseOrder, 29800, "Cecilia Tran");
+
+    const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
+    expect(JSON.stringify(body)).not.toContain("🏷️");
   });
 });

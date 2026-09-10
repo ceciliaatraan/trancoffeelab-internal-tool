@@ -23,6 +23,8 @@ export type PersistedOrder = {
   }[];
   /** Fraktraden (type=shipping_fee) om Kustom-ordern hade en — för orderbekräftelsemailets radbrytning. */
   shippingLine: { name: string; amountOre: number } | null;
+  /** Rabattraden (type=discount) om en rabattkod användes — amountOre är ett positivt belopp (raden själv är negativ hos Kustom). */
+  discount: { code: string; amountOre: number } | null;
 };
 
 function sumTaxAmount(order: KustomOrderManagementOrder): number {
@@ -105,6 +107,11 @@ export async function persistOrderFromKustom(
     const shippingLine = shippingKustomLine
       ? { name: shippingKustomLine.name, amountOre: shippingKustomLine.total_amount }
       : null;
+    const discountKustomLine = order.order_lines.find((line) => line.type === "discount");
+    const discount =
+      discountKustomLine && discountKustomLine.reference
+        ? { code: discountKustomLine.reference, amountOre: Math.abs(discountKustomLine.total_amount) }
+        : null;
 
     const [inserted] = await tx
       .insert(schema.orders)
@@ -145,6 +152,7 @@ export async function persistOrderFromKustom(
         containsPreorder: existing.containsPreorder,
         physicalLines: [],
         shippingLine: null,
+        discount: null,
       };
     }
 
@@ -228,6 +236,7 @@ export async function persistOrderFromKustom(
       containsPreorder,
       physicalLines,
       shippingLine,
+      discount,
     };
   });
 }

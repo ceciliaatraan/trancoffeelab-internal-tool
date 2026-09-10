@@ -41,6 +41,13 @@ export async function notifyNewOrderInSlack(
   const itemsText = order.physicalLines
     .map((line) => `${line.quantity} × ${line.name}`)
     .join("\n");
+  // totalOre kommer redan rabatterad från Kustom (order_amount är beloppet
+  // som faktiskt debiteras — original_order_amount vore pre-rabatt-referensen,
+  // men den används inte här), så priset i notisen är alltid det kunden
+  // faktiskt betalade/checkade ut med.
+  const discountText = order.discount
+    ? `🏷️ Rabattkod ${order.discount.code} (−${formatOre(order.discount.amountOre)})\n`
+    : "";
   const adminUrl = process.env.NEXT_PUBLIC_ADMIN_URL ?? "https://admin.trancoffeelab.com";
   const orderUrl = `${adminUrl.replace(/\/$/, "")}/orders/${order.id}`;
 
@@ -53,7 +60,7 @@ export async function notifyNewOrderInSlack(
           type: "mrkdwn",
           text: `🎉 *Ny beställning #${order.orderNumber}* — ${formatOre(totalOre)}${
             order.containsPreorder ? " _(innehåller förbeställning)_" : ""
-          }\n${customer ? `👤 ${customer}\n` : ""}${itemsText}`,
+          }\n${customer ? `👤 ${customer}\n` : ""}${discountText}${itemsText}`,
         },
       },
       {
