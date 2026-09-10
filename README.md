@@ -135,6 +135,31 @@ KUSTOM_MERCHANT_ID=<ert merchant-id>
 används. Byt aldrig till `live` innan checkout-flödet är verifierat mot
 playground med Kustoms testkort (fas 3).
 
+## Slack-notiser vid ny beställning
+
+Adminet kan pinga en Slack-kanal (t.ex. `#beställningar`) varje gång en ny,
+riktig beställning kommer in — via Slacks "Incoming Webhooks", inget Slack-app
+eller kodning krävs.
+
+1. Gå till https://api.slack.com/apps → **Create New App** → **From scratch**.
+   Ge appen ett namn (t.ex. "TRAN-ordrar") och välj er Slack-arbetsyta.
+2. I appens meny, klicka **Incoming Webhooks** → slå på **Activate Incoming
+   Webhooks** → **Add New Webhook to Workspace**.
+3. Välj kanalen `#beställningar` (skapa kanalen i Slack först om den inte
+   redan finns) och godkänn.
+4. Kopiera webhook-URL:en (ser ut som
+   `https://hooks.slack.com/services/T000/B000/xxxxxxxx`).
+5. Sätt den i Vercels miljövariabler (produktionsmiljön):
+   ```
+   SLACK_WEBHOOK_URL=<webhook-URL:en från steg 4>
+   ```
+
+Notisen skickas bara för riktiga beställningar (`KUSTOM_ENV=live`) — aldrig
+för testköp i Kustom Playground under utveckling. Saknas `SLACK_WEBHOOK_URL`
+skickas ingen notis alls (ingen krasch) — funktionen är helt valfri. Ett fel
+från Slack (nätverksfel, ogiltig webhook m.m.) stoppar aldrig själva ordern —
+den sparas, captureas och mejlar kunden precis som vanligt, felet loggas bara.
+
 ## Byggordning
 
 Projektet byggs i faser, med avstämning efter varje fas:

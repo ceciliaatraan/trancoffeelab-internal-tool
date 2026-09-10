@@ -3,6 +3,7 @@ import { acknowledgeOrder, getOrderManagementOrder } from "@/lib/kustom/client";
 import { persistOrderFromKustom, type PersistedOrder } from "@/lib/orders/persist-order";
 import { capturePreorderOrder } from "@/lib/orders/capture-preorder";
 import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
+import { notifyNewOrderInSlack } from "@/lib/notifications/slack";
 
 /**
  * Läser en order från Kustom och sparar/bekräftar/mejlar den — delad
@@ -37,6 +38,8 @@ export async function processKustomOrder(orderId: string): Promise<PersistedOrde
         shipping: persisted.shippingLine,
       });
     }
+
+    await notifyNewOrderInSlack(persisted, order.order_amount);
   }
 
   return persisted;
