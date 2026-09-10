@@ -1,6 +1,7 @@
 import { desc, eq, ilike, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatOre } from "@/lib/format";
+import { SubmitButton } from "@/components/submit-button";
 
 export default async function CustomersPage({ searchParams }: PageProps<"/customers">) {
   const params = await searchParams;
@@ -39,12 +40,9 @@ export default async function CustomersPage({ searchParams }: PageProps<"/custom
             className="w-64 border border-tran-hairline bg-tran-white px-3 py-2 text-sm focus:border-tran-black focus:outline-none"
           />
         </div>
-        <button
-          type="submit"
-          className="border border-tran-black px-4 py-2 text-sm font-medium transition-colors hover:border-tran-red hover:text-tran-red"
-        >
+        <SubmitButton className="border border-tran-black px-4 py-2 text-sm font-medium transition-colors hover:border-tran-red hover:text-tran-red">
           Sök
-        </button>
+        </SubmitButton>
       </form>
 
       {customers.length === 0 ? (

@@ -6,6 +6,7 @@ import { formatDateTime, formatOre } from "@/lib/format";
 import { oreToKronorInput } from "@/lib/money-input";
 import { OrderStatusChip } from "@/components/order-status-chip";
 import { TestOrderChip } from "@/components/test-order-chip";
+import { SubmitButton } from "@/components/submit-button";
 import {
   cancelOrderAction,
   captureOrderAction,
@@ -192,12 +193,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                   className="w-40 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
                 />
               </div>
-              <button
-                type="submit"
-                className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
-              >
+              <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
                 Debitera
-              </button>
+              </SubmitButton>
             </form>
           ) : null}
 
@@ -218,32 +216,23 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                     className="w-40 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
                   />
                 </div>
-                <button
-                  type="submit"
-                  className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
-                >
+                <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
                   Återbetala
-                </button>
+                </SubmitButton>
               </form>
               <form action={refundFullAction.bind(null, order.id)}>
-                <button
-                  type="submit"
-                  className="tran-label self-end border border-tran-red px-3 py-1.5 text-xs text-tran-red transition-colors hover:bg-tran-red hover:text-tran-white"
-                >
+                <SubmitButton className="tran-label self-end border border-tran-red px-3 py-1.5 text-xs text-tran-red transition-colors hover:bg-tran-red hover:text-tran-white">
                   Full återbetalning ({formatOre(remainingToRefund)})
-                </button>
+                </SubmitButton>
               </form>
             </>
           ) : null}
 
           {canCancel ? (
             <form action={cancelOrderAction.bind(null, order.id)}>
-              <button
-                type="submit"
-                className="tran-label border border-tran-red px-3 py-1.5 text-xs text-tran-red transition-colors hover:bg-tran-red hover:text-tran-white"
-              >
+              <SubmitButton className="tran-label border border-tran-red px-3 py-1.5 text-xs text-tran-red transition-colors hover:bg-tran-red hover:text-tran-white">
                 Annullera order
-              </button>
+              </SubmitButton>
             </form>
           ) : null}
         </div>
@@ -313,12 +302,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                 className="w-52 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
               />
             </div>
-            <button
-              type="submit"
-              className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
-            >
+            <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
               Markera som skickad
-            </button>
+            </SubmitButton>
           </form>
         ) : null}
       </section>
@@ -332,12 +318,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
             återställer det lagersaldo den påverkade.
           </p>
           <form action={deleteTestOrderAction.bind(null, order.id)}>
-            <button
-              type="submit"
-              className="tran-label border border-tran-red px-3 py-1.5 text-xs text-tran-red transition-colors hover:bg-tran-red hover:text-tran-white"
-            >
+            <SubmitButton className="tran-label border border-tran-red px-3 py-1.5 text-xs text-tran-red transition-colors hover:bg-tran-red hover:text-tran-white">
               Ta bort testorder (permanent)
-            </button>
+            </SubmitButton>
           </form>
         </section>
       ) : null}

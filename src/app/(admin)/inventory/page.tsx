@@ -1,5 +1,6 @@
 import { getInventoryOverview } from "@/lib/inventory/overview";
 import { adjustInventory } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 const inputClass =
   "w-20 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none";
@@ -101,12 +102,9 @@ export default async function InventoryPage({
                           placeholder="Anteckning (valfritt)"
                           className="w-36 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
                         />
-                        <button
-                          type="submit"
-                          className="tran-label border border-tran-black px-2 py-1.5 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red"
-                        >
+                        <SubmitButton className="tran-label border border-tran-black px-2 py-1.5 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red">
                           Spara
-                        </button>
+                        </SubmitButton>
                       </form>
                     )}
                   </td>

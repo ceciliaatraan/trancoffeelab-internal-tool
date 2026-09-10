@@ -8,6 +8,7 @@ import { StatusChip } from "@/components/status-chip";
 import { formatOre } from "@/lib/format";
 import { oreToKronorInput } from "@/lib/money-input";
 import { computeBundleAvailability } from "@/lib/inventory/bundles";
+import { SubmitButton } from "@/components/submit-button";
 import {
   addBundleItem,
   addProductImage,
@@ -124,10 +125,7 @@ export default async function EditProductPage({
             .filter((status) => status !== product.status)
             .map((status) => (
               <form key={status} action={setProductStatus.bind(null, id, status)}>
-                <button
-                  type="submit"
-                  className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
-                >
+                <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
                   {status === "draft"
                     ? "Sätt som utkast"
                     : status === "published"
@@ -135,7 +133,7 @@ export default async function EditProductPage({
                       : status === "coming_soon"
                         ? "Sätt som 'Kommer snart'"
                         : "Arkivera"}
-                </button>
+                </SubmitButton>
               </form>
             ))}
         </div>
@@ -166,12 +164,9 @@ export default async function EditProductPage({
                   <Image src={url} alt="" fill className="object-cover" unoptimized />
                 </div>
                 <form action={removeProductImage.bind(null, id, url)}>
-                  <button
-                    type="submit"
-                    className="tran-label text-[11px] text-tran-muted hover:text-tran-red"
-                  >
+                  <SubmitButton className="tran-label text-[11px] text-tran-muted hover:text-tran-red">
                     Ta bort
-                  </button>
+                  </SubmitButton>
                 </form>
               </div>
             ))}
@@ -184,12 +179,9 @@ export default async function EditProductPage({
           className="flex items-center gap-3"
         >
           <input type="file" name="image" accept="image/*" required className="text-sm" />
-          <button
-            type="submit"
-            className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
-          >
+          <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
             Ladda upp
-          </button>
+          </SubmitButton>
         </form>
       </section>
 
@@ -259,12 +251,9 @@ export default async function EditProductPage({
                     <span className="tran-tabular text-xs text-tran-muted">
                       {formatOre(variant.priceOre)}
                     </span>
-                    <button
-                      type="submit"
-                      className="tran-label text-[11px] hover:text-tran-red"
-                    >
+                    <SubmitButton className="tran-label text-[11px] hover:text-tran-red">
                       Spara variant
-                    </button>
+                    </SubmitButton>
                   </div>
                 </form>
 
@@ -285,12 +274,9 @@ export default async function EditProductPage({
                             <Image src={url} alt="" fill className="object-cover" unoptimized />
                           </div>
                           <form action={removeVariantImage.bind(null, id, variant.id, url)}>
-                            <button
-                              type="submit"
-                              className="tran-label text-[11px] text-tran-muted hover:text-tran-red"
-                            >
+                            <SubmitButton className="tran-label text-[11px] text-tran-muted hover:text-tran-red">
                               Ta bort
-                            </button>
+                            </SubmitButton>
                           </form>
                         </div>
                       ))}
@@ -301,22 +287,16 @@ export default async function EditProductPage({
                     className="flex items-center gap-3"
                   >
                     <input type="file" name="image" accept="image/*" required className="text-sm" />
-                    <button
-                      type="submit"
-                      className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
-                    >
+                    <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
                       Ladda upp
-                    </button>
+                    </SubmitButton>
                   </form>
                 </div>
 
                 <form action={deleteVariant.bind(null, id, variant.id)} className="mt-4">
-                  <button
-                    type="submit"
-                    className="tran-label text-[11px] text-tran-muted hover:text-tran-red"
-                  >
+                  <SubmitButton className="tran-label text-[11px] text-tran-muted hover:text-tran-red">
                     Ta bort variant
-                  </button>
+                  </SubmitButton>
                 </form>
               </div>
             ))}
@@ -349,12 +329,9 @@ export default async function EditProductPage({
           />
           <input name="sortOrder" type="number" placeholder="Sortering" className={inputClass} />
           <div className="col-span-2 sm:col-span-3">
-            <button
-              type="submit"
-              className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
-            >
+            <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
               Lägg till variant
-            </button>
+            </SubmitButton>
           </div>
         </form>
       </section>
@@ -403,17 +380,14 @@ export default async function EditProductPage({
                       className="w-16 border border-tran-hairline bg-tran-white px-2 py-1 text-sm focus:border-tran-black focus:outline-none"
                     />
                     <span className="text-xs text-tran-muted">st/kit</span>
-                    <button type="submit" className="tran-label text-[11px] hover:text-tran-red">
+                    <SubmitButton className="tran-label text-[11px] hover:text-tran-red">
                       Spara
-                    </button>
+                    </SubmitButton>
                   </form>
                   <form action={removeBundleItem.bind(null, id, item.id)}>
-                    <button
-                      type="submit"
-                      className="tran-label text-[11px] text-tran-muted hover:text-tran-red"
-                    >
+                    <SubmitButton className="tran-label text-[11px] text-tran-muted hover:text-tran-red">
                       Ta bort
-                    </button>
+                    </SubmitButton>
                   </form>
                 </div>
               </div>
@@ -457,12 +431,9 @@ export default async function EditProductPage({
               required
               className="w-24 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
             />
-            <button
-              type="submit"
-              className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
-            >
+            <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
               Lägg till komponent
-            </button>
+            </SubmitButton>
           </form>
         ) : null}
       </section>

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { AdminNav } from "./admin-nav";
+import { SubmitButton } from "./submit-button";
 
 export function MobileNav({
   email,
@@ -44,12 +45,9 @@ export function MobileNav({
           <div className="mt-auto flex flex-col gap-3 border-t border-tran-black px-6 py-5 text-xs text-tran-muted">
             <span className="truncate">{email}</span>
             <form action={signOutAction}>
-              <button
-                type="submit"
-                className="tran-label w-full border border-tran-black px-3 py-1.5 text-left transition-colors hover:border-tran-red hover:text-tran-red"
-              >
+              <SubmitButton className="tran-label w-full border border-tran-black px-3 py-1.5 text-left transition-colors hover:border-tran-red hover:text-tran-red">
                 Logga ut
-              </button>
+              </SubmitButton>
             </form>
           </div>
         </div>

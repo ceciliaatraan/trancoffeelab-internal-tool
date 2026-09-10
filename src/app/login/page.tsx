@@ -1,5 +1,6 @@
 import { signIn } from "@/auth";
 import { TranWordmark } from "@/components/tran-wordmark";
+import { SubmitButton } from "@/components/submit-button";
 
 export default async function LoginPage({
   searchParams,
@@ -25,12 +26,9 @@ export default async function LoginPage({
           }}
           className="w-full"
         >
-          <button
-            type="submit"
-            className="w-full border border-tran-black bg-tran-black px-6 py-3 text-sm font-medium text-tran-white transition-colors hover:bg-tran-red hover:border-tran-red"
-          >
+          <SubmitButton className="w-full border border-tran-black bg-tran-black px-6 py-3 text-sm font-medium text-tran-white transition-colors hover:bg-tran-red hover:border-tran-red">
             Logga in med Google
-          </button>
+          </SubmitButton>
         </form>
       </div>
     </div>

@@ -5,6 +5,7 @@ import { formatOre } from "@/lib/format";
 import { oreToKronorInput, hundredthsToPercentInput } from "@/lib/money-input";
 import { DiscountValueField } from "@/components/discount-value-field";
 import { createDiscountAction, updateDiscountAction } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 const inputClass =
   "w-full border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none";
@@ -142,12 +143,9 @@ export default async function DiscountsPage({ searchParams }: PageProps<"/discou
                     />
                     Aktiv
                   </label>
-                  <button
-                    type="submit"
-                    className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
-                  >
+                  <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
                     Spara
-                  </button>
+                  </SubmitButton>
                 </div>
               </form>
             ) : (
@@ -212,12 +210,9 @@ export default async function DiscountsPage({ searchParams }: PageProps<"/discou
               </label>
             </div>
             <div className="col-span-2 sm:col-span-4">
-              <button
-                type="submit"
-                className="border border-tran-black bg-tran-black px-6 py-2.5 text-sm font-medium text-tran-white transition-colors hover:border-tran-red hover:bg-tran-red"
-              >
+              <SubmitButton className="border border-tran-black bg-tran-black px-6 py-2.5 text-sm font-medium text-tran-white transition-colors hover:border-tran-red hover:bg-tran-red">
                 Skapa rabattkod
-              </button>
+              </SubmitButton>
             </div>
           </form>
         </section>

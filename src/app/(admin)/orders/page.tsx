@@ -5,6 +5,7 @@ import { formatOre, formatDateTime } from "@/lib/format";
 import { OrderStatusChip } from "@/components/order-status-chip";
 import { PreorderChip } from "@/components/preorder-chip";
 import { TestOrderChip } from "@/components/test-order-chip";
+import { SubmitButton } from "@/components/submit-button";
 
 const FULFILLMENT_LABELS: Record<string, string> = {
   unfulfilled: "Ej skickad",
@@ -81,12 +82,9 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
             <option value="cancelled">Avbruten</option>
           </select>
         </div>
-        <button
-          type="submit"
-          className="border border-tran-black px-4 py-2 text-sm font-medium transition-colors hover:border-tran-red hover:text-tran-red"
-        >
+        <SubmitButton className="border border-tran-black px-4 py-2 text-sm font-medium transition-colors hover:border-tran-red hover:text-tran-red">
           Filtrera
-        </button>
+        </SubmitButton>
       </form>
 
       {orders.length === 0 ? (

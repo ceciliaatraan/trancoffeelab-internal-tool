@@ -3,6 +3,7 @@ import { getShopSettings } from "@/lib/settings";
 import { formatOre } from "@/lib/format";
 import { oreToKronorInput } from "@/lib/money-input";
 import { updateShippingSettingsAction } from "./actions";
+import { SubmitButton } from "@/components/submit-button";
 
 const inputClass =
   "w-48 border border-tran-hairline bg-tran-white px-3 py-2 text-sm focus:border-tran-black focus:outline-none";
@@ -77,12 +78,9 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
               />
             </div>
             <div className="w-full">
-              <button
-                type="submit"
-                className="border border-tran-black bg-tran-black px-6 py-2.5 text-sm font-medium text-tran-white transition-colors hover:border-tran-red hover:bg-tran-red"
-              >
+              <SubmitButton className="border border-tran-black bg-tran-black px-6 py-2.5 text-sm font-medium text-tran-white transition-colors hover:border-tran-red hover:bg-tran-red">
                 Spara
-              </button>
+              </SubmitButton>
             </div>
           </form>
         ) : (

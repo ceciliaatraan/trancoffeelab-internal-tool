@@ -1,4 +1,5 @@
 import { oreToKronorInput, hundredthsToPercentInput } from "@/lib/money-input";
+import { SubmitButton } from "@/components/submit-button";
 
 type ProductFormValues = {
   slug?: string;
@@ -204,12 +205,9 @@ export function ProductForm({
       </div>
 
       <div>
-        <button
-          type="submit"
-          className="border border-tran-black bg-tran-black px-6 py-2.5 text-sm font-medium text-tran-white transition-colors hover:border-tran-red hover:bg-tran-red"
-        >
+        <SubmitButton className="border border-tran-black bg-tran-black px-6 py-2.5 text-sm font-medium text-tran-white transition-colors hover:border-tran-red hover:bg-tran-red">
           {submitLabel}
-        </button>
+        </SubmitButton>
       </div>
     </form>
   );
