@@ -59,7 +59,7 @@ const PRODUCTS: SeedProduct[] = [
     // proportionering efter marknadsvärde - bekräfta med revisor innan
     // skarp drift.
     taxRate: 1190,
-    weightGrams: 800, // Uppskattning (250g kaffe + ~400g mjölk + ~100g filter + emballage) - bekräfta faktisk paketvikt
+    weightGrams: 1000, // Bekräftat av ägaren 2026-09-21
     sortOrder: 0,
   },
   {
@@ -91,7 +91,7 @@ const PRODUCTS: SeedProduct[] = [
       "The secret ingredient that transforms Vietnamese coffee into something magical. This rich, creamy sweetened condensed milk is essential for making authentic cà phê sữa đá.",
     priceOre: 4900,
     taxRate: 600, // Livsmedel - 6%
-    weightGrams: 400, // Uppskattning (standardburk ~397g) - bekräfta faktisk vikt
+    weightGrams: 397, // Bekräftat av ägaren 2026-09-21
     sortOrder: 2,
   },
   {
@@ -105,7 +105,7 @@ const PRODUCTS: SeedProduct[] = [
       "The phin is the heart of Vietnamese coffee culture. This compact stainless steel filter sits perfectly on top of your cup or glass, slowly dripping rich, concentrated coffee.",
     priceOre: 19900,
     taxRate: 2500, // Inte livsmedel - 25%
-    weightGrams: 100, // Uppskattning - bekräfta faktisk vikt
+    weightGrams: 100, // Bekräftat av ägaren 2026-09-21
     sortOrder: 3,
   },
   {

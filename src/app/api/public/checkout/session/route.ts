@@ -65,6 +65,7 @@ export async function POST(request: Request) {
     quantity: item.quantity,
     unitPriceOre: item.unitPriceOre,
     taxRateHundredthsPercent: item.taxRate,
+    weightGrams: item.weightGrams,
   }));
 
   // A "shipping"/"both"-scoped discount reduces the shipping line's own

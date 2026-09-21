@@ -99,6 +99,23 @@ ett antagande):
   sätts nu alltid till `true`, och en `shipping_options`-fallback (vårt
   vanliga fraktpris, eller 0 kr vid fri frakt) skickas alltid med - se
   `checkout/session/route.ts`.
+- **`order_lines[].attributes.weight`** - bekräftat i Kustoms egen
+  "Shipping API Integration"-guide (delad av er 2026-09-21), exempel:
+  `"attributes": { "weight": 890, "tags": [...] }` - skickas vidare till
+  TMS/Shipping API (PostNord) så vikten följer med. Tolkat som vikt PER
+  STYCK i gram (matchar hur `unit_price` också är per styck) - INTE
+  uttryckligen bekräftat av Kustom att det är per styck och inte radens
+  totalvikt, men det är den rimligaste tolkningen givet hur resten av
+  radformatet fungerar. Satt på varje physical-rad från
+  `products.weightGrams`/`product_variants.weightGrams` (samma fält som
+  redan fanns för lager-/fraktberäkningar, se `src/lib/queries/cart.ts`).
+  Vikter bekräftade av ägaren 2026-09-21: Komplett Kit 1000 g,
+  No Regrets Horse 250 g, Kondenserad Mjölk 397 g, Litet Phin-filter
+  100 g - satta i `scripts/seed-products.ts` (lokal dev-seed). **Värdena
+  i produktionens databas är INTE ändrade av Claude** (ingen
+  databasåtkomst dit från den här sandboxen) - måste sättas manuellt via
+  "Vikt (gram)"-fältet på respektive produkt/variant i `/products/[id]`
+  i adminet innan detta faktiskt får effekt live.
 
 ### Order validation (er inklistrade dokumentationstext)
 

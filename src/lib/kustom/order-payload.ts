@@ -10,6 +10,8 @@ export type CartItemInput = {
   /** Bruttopris (inkl. moms) per styck, i öre. */
   unitPriceOre: number;
   taxRateHundredthsPercent: number;
+  /** Per styck, i gram - läggs på raden som attributes.weight, se KustomOrderLine. */
+  weightGrams: number;
 };
 
 export type ShippingInput = {
@@ -38,6 +40,14 @@ export type KustomOrderLine = {
   total_amount: number;
   total_discount_amount: number;
   total_tax_amount: number;
+  /**
+   * "Shipping attributes" - bekräftat fält i Kustoms Shipping API-guide
+   * (delad av er 2026-09-21, exempel: `"attributes": { "weight": 890,
+   * "tags": [...] }`) - skickas vidare till TMS/Shipping API (PostNord)
+   * så vikten följer med ordern. Bara på physical-rader; weight är
+   * per styck i gram (matchar hur unit_price också är per styck).
+   */
+  attributes?: { weight: number };
 };
 
 /**
@@ -85,6 +95,7 @@ export function buildOrderLines({
       total_amount: totalAmount,
       total_discount_amount: 0,
       total_tax_amount: taxAmount,
+      attributes: { weight: item.weightGrams },
     };
   });
 

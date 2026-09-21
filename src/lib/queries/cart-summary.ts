@@ -11,6 +11,8 @@ export type ValidatedCartItem = {
   quantity: number;
   unitPriceOre: number;
   taxRate: number;
+  /** Per styck, i gram - skickas vidare till Kustom (order_lines[].attributes.weight) för Kustom Shipping Assistant/PostNord. */
+  weightGrams: number;
   available: boolean;
   maxAvailable: number;
   productId: string | null;
@@ -62,6 +64,7 @@ export async function buildValidatedCart(request: CartRequest): Promise<Validate
         quantity: line.quantity,
         unitPriceOre: 0,
         taxRate: 0,
+        weightGrams: 0,
         available: false,
         maxAvailable: 0,
         productId: null,
@@ -79,6 +82,7 @@ export async function buildValidatedCart(request: CartRequest): Promise<Validate
       quantity: line.quantity,
       unitPriceOre: resolved.priceOre,
       taxRate: resolved.taxRate,
+      weightGrams: resolved.weightGrams,
       available: resolved.available >= line.quantity,
       maxAvailable: resolved.available,
       productId: resolved.productId,

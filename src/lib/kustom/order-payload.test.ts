@@ -20,6 +20,7 @@ describe("buildOrderLines", () => {
           quantity: 2,
           unitPriceOre: 14900,
           taxRateHundredthsPercent: 1200,
+          weightGrams: 250,
         },
       ],
       locale: "sv-SE",
@@ -34,6 +35,7 @@ describe("buildOrderLines", () => {
       unit_price: 14900,
       tax_rate: 1200,
       total_amount: 29800,
+      attributes: { weight: 250 },
     });
     expect(lines[0].total_tax_amount).toBeGreaterThan(0);
   });
@@ -48,6 +50,7 @@ describe("buildOrderLines", () => {
           quantity: 1,
           unitPriceOre: 100,
           taxRateHundredthsPercent: 0,
+          weightGrams: 250,
         },
       ],
       locale: "en-SE",
@@ -82,6 +85,36 @@ describe("buildOrderLines", () => {
     expect(lines[0].total_amount).toBe(-1000);
     expect(lines[0].total_tax_amount).toBeLessThan(0);
   });
+
+  it("sätter attributes.weight per styck (inte multiplicerat med quantity) på varje physical-rad, så vikten följer med till Kustom Shipping Assistant/PostNord", () => {
+    const lines = buildOrderLines({
+      items: [
+        {
+          sku: "KIT-FULL",
+          nameSv: "Komplett Kit",
+          nameEn: "The Full Kit",
+          quantity: 3,
+          unitPriceOre: 34900,
+          taxRateHundredthsPercent: 1190,
+          weightGrams: 1000,
+        },
+        {
+          sku: "PHIN-S",
+          nameSv: "Phin-filter Liten",
+          nameEn: "Phin Filter Small",
+          quantity: 1,
+          unitPriceOre: 19900,
+          taxRateHundredthsPercent: 2500,
+          weightGrams: 100,
+        },
+      ],
+      locale: "sv-SE",
+    });
+
+    expect(lines).toHaveLength(2);
+    expect(lines[0].attributes).toEqual({ weight: 1000 });
+    expect(lines[1].attributes).toEqual({ weight: 100 });
+  });
 });
 
 const standardShippingOption = {
@@ -103,6 +136,7 @@ describe("buildCreateOrderPayload", () => {
           quantity: 1,
           unitPriceOre: 14900,
           taxRateHundredthsPercent: 1200,
+          weightGrams: 250,
         },
       ],
       shipping: {
@@ -136,6 +170,7 @@ describe("buildCreateOrderPayload", () => {
           quantity: 1,
           unitPriceOre: 10000,
           taxRateHundredthsPercent: 1200,
+          weightGrams: 250,
         },
       ],
       shippingOption: standardShippingOption,
@@ -152,6 +187,7 @@ describe("buildCreateOrderPayload", () => {
           quantity: 1,
           unitPriceOre: 10000,
           taxRateHundredthsPercent: 1200,
+          weightGrams: 250,
         },
       ],
       discount: { code: "TEST", amountOre: 1000, taxRateHundredthsPercent: 1200 },
@@ -173,6 +209,7 @@ describe("buildCreateOrderPayload", () => {
           quantity: 1,
           unitPriceOre: 10000,
           taxRateHundredthsPercent: 1200,
+          weightGrams: 250,
         },
       ],
       shippingOption: standardShippingOption,
@@ -193,6 +230,7 @@ describe("buildCreateOrderPayload", () => {
           quantity: 1,
           unitPriceOre: 10000,
           taxRateHundredthsPercent: 1200,
+          weightGrams: 250,
         },
       ],
       shippingOption: standardShippingOption,
@@ -214,6 +252,7 @@ describe("buildCreateOrderPayload", () => {
           quantity: 1,
           unitPriceOre: 10000,
           taxRateHundredthsPercent: 1200,
+          weightGrams: 250,
         },
       ],
       shippingOption: freeShippingOption,
