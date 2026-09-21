@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { getInventoryOverview } from "@/lib/inventory/overview";
-import { getRecentStockReceipts } from "@/lib/inventory/recent-receipts";
+import { getRecentStockBatches } from "@/lib/inventory/recent-receipts";
 import { formatDateTime } from "@/lib/format";
 import { receiveBatchAction } from "../actions";
 import { SubmitButton } from "@/components/submit-button";
@@ -11,11 +11,12 @@ export default async function NewBatchPage({
   const search = await searchParams;
   const error = typeof search.error === "string" ? search.error : null;
 
-  const [rows, recentReceipts] = await Promise.all([
+  const [rows, recentBatches] = await Promise.all([
     getInventoryOverview(),
-    getRecentStockReceipts(),
+    getRecentStockBatches(),
   ]);
   const sellableRows = rows.filter((row) => !row.isBundle && !row.hasVariants);
+  const rowByInventoryId = new Map(rows.map((row) => [row.inventoryId, row]));
 
   return (
     <div className="flex flex-col gap-8">
@@ -64,7 +65,7 @@ export default async function NewBatchPage({
               <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
                 <th className="py-3 pr-4 font-medium">Produkt</th>
                 <th className="py-3 pr-4 font-medium">SKU</th>
-                <th className="py-3 pr-4 font-medium">I lager just nu</th>
+                <th className="py-3 pr-4 font-medium">Tillgängligt just nu</th>
                 <th className="py-3 pr-4 font-medium">Antal som kom in</th>
               </tr>
             </thead>
@@ -77,7 +78,7 @@ export default async function NewBatchPage({
                   </td>
                   <td className="tran-tabular py-3 pr-4 align-top text-tran-muted">{row.sku}</td>
                   <td className="tran-tabular py-3 pr-4 align-top text-tran-muted">
-                    {row.quantity}
+                    {row.sellableQuantity ?? row.quantity}
                   </td>
                   <td className="py-3 pr-4 align-top">
                     <input
@@ -101,34 +102,56 @@ export default async function NewBatchPage({
         </form>
       )}
 
-      {recentReceipts.length > 0 ? (
-        <div className="flex flex-col gap-3">
-          <h2 className="tran-label text-xs text-tran-muted">Senaste leveranser/justeringar</h2>
-          <table className="w-full max-w-2xl border-collapse text-sm">
-            <thead>
-              <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
-                <th className="py-2 pr-4 font-medium">Produkt</th>
-                <th className="py-2 pr-4 font-medium">Antal</th>
-                <th className="py-2 pr-4 font-medium">Anteckning</th>
-                <th className="py-2 pr-4 font-medium">Datum</th>
-              </tr>
-            </thead>
-            <tbody>
-              {recentReceipts.map((receipt, index) => (
-                <tr key={index} className="border-b border-tran-hairline">
-                  <td className="py-2 pr-4 text-tran-muted">
-                    {receipt.productName}
-                    {receipt.variantName ? ` - ${receipt.variantName}` : ""}
-                  </td>
-                  <td className="tran-tabular py-2 pr-4">+{receipt.changeAmount}</td>
-                  <td className="py-2 pr-4 text-tran-muted">{receipt.note ?? "-"}</td>
-                  <td className="tran-tabular py-2 pr-4 text-tran-muted">
-                    {formatDateTime(receipt.createdAt)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {recentBatches.length > 0 ? (
+        <div className="flex flex-col gap-6">
+          <div>
+            <h2 className="tran-label text-xs text-tran-muted">Tidigare batcher/leveranser</h2>
+            <p className="mt-1 max-w-xl text-xs text-tran-muted">
+              Visar vad som kom in i varje batch och produktens NUVARANDE totala lager bredvid -
+              inte exakt hur mycket som är kvar just från den batchen (det kräver att varje
+              försändelse spåras för sig, vilket vi inte gör).
+            </p>
+          </div>
+          {recentBatches.map((batch, index) => (
+            <div key={index} className="border border-tran-hairline p-4">
+              <div className="mb-3 flex flex-wrap items-baseline justify-between gap-2">
+                <p className="tran-label text-xs">{batch.note ?? "Ny leverans"}</p>
+                <p className="tran-tabular text-xs text-tran-muted">
+                  {formatDateTime(batch.createdAt)}
+                </p>
+              </div>
+              <table className="w-full max-w-2xl border-collapse text-sm">
+                <thead>
+                  <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
+                    <th className="py-2 pr-4 font-medium">Produkt</th>
+                    <th className="py-2 pr-4 font-medium">Kom in</th>
+                    <th className="py-2 pr-4 font-medium">I lager nu</th>
+                    <th className="py-2 pr-4 font-medium">Tillgängligt nu</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {batch.lines.map((line) => {
+                    const current = rowByInventoryId.get(line.inventoryId);
+                    return (
+                      <tr key={line.inventoryId} className="border-b border-tran-hairline last:border-0">
+                        <td className="py-2 pr-4 text-tran-muted">
+                          {line.productName}
+                          {line.variantName ? ` - ${line.variantName}` : ""}
+                        </td>
+                        <td className="tran-tabular py-2 pr-4">+{line.receivedQuantity}</td>
+                        <td className="tran-tabular py-2 pr-4 text-tran-muted">
+                          {current ? current.available : "-"}
+                        </td>
+                        <td className="tran-tabular py-2 pr-4 text-tran-muted">
+                          {current?.sellableQuantity ?? "-"}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          ))}
         </div>
       ) : null}
     </div>
