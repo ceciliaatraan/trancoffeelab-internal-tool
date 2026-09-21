@@ -116,6 +116,23 @@ ett antagande):
   databasåtkomst dit från den här sandboxen) - måste sättas manuellt via
   "Vikt (gram)"-fältet på respektive produkt/variant i `/products/[id]`
   i adminet innan detta faktiskt får effekt live.
+- **Dubbel fraktdebitering upptäckt 2026-09-21, samma dag som ni kopplade
+  in PostNord-integrationen i Kustoms portal.** Fram tills dess skickade
+  vi ALLTID (utöver `shipping_options`-fallbacken ovan) en egen
+  `shipping_fee`-rad i `order_lines` med samma fraktpris - fungerade fint
+  så länge KSA inte var aktivt (raden var det enda Kustom hade att gå
+  på), men så fort en riktig KSA-profil kopplades mot PostNord började
+  Kustoms egen checkout-widget lägga på det VALDA fraktpriset ovanpå
+  `order_amount` - som redan innehöll vår egen fraktrad. Resultat: 49 kr
+  (vår rad, med i summan) + 49 kr (Kustoms widget, ovanpå) + produktpris.
+  **Fixat:** `checkout/session/route.ts` skickar inte längre någon egen
+  `shipping_fee`-rad alls - `shipping_options`/KSA är nu den ENDA källan
+  till fraktpris, både fallbacken och PostNords live-pris. Inte
+  uttryckligen bekräftat av Kustoms dokumentation att detta är rätt
+  modell (dokumentationen beskrev aldrig hur en egen fraktrad OCH
+  `shipping_options` samverkar), men beteendet innan/efter matchar exakt
+  vad ni rapporterade, så det är en välgrundad slutsats snarare än en
+  gissning.
 
 ### Order validation (er inklistrade dokumentationstext)
 

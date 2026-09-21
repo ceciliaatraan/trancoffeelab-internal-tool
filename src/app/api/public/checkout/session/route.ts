@@ -5,7 +5,6 @@ import { buildValidatedCart } from "@/lib/queries/cart-summary";
 import {
   buildCreateOrderPayload,
   type CartItemInput,
-  type ShippingInput,
   type KustomShippingOption,
 } from "@/lib/kustom/order-payload";
 import { calculateTaxFromGross } from "@/lib/kustom/tax";
@@ -77,22 +76,15 @@ export async function POST(request: Request) {
       : 0;
   const shippingTaxRate = weightedAverageTaxRate(cart.items);
   const shippingAmountOre = cart.freeShipping ? 0 : cart.shippingOre - shippingDiscountOre;
-  const shipping: ShippingInput | undefined = cart.freeShipping
-    ? undefined
-    : {
-        nameSv: "Frakt",
-        nameEn: "Shipping",
-        amountOre: shippingAmountOre,
-        // Frakten har ingen egen momssats - den ärver kundvagnens
-        // kvantitetsviktade snitt, precis som rabattraden nedan.
-        taxRateHundredthsPercent: shippingTaxRate,
-      };
 
-  // Fallback-alternativet Kustom Shipping Assistant (KSA) visar om
-  // PostNord-integrationen (TMS/Shipping API) inte svarar - speglar
-  // `shipping` ovan (samma pris, samma moms), inte en egen beräkning.
-  // Skickas ALLTID med (även vid fri frakt, då som 0 kr) - se
-  // buildCreateOrderPayload/KustomShippingOption.
+  // Frakten skickas ALDRIG som en egen shipping_fee-rad i order_lines
+  // (och alltså inte heller med i order_amount) - sedan Kustom Shipping
+  // Assistant/PostNord-integrationen kopplades in 2026-09-21 lägger
+  // Kustom SJÄLVA på det valda fraktpriset ovanpå ordersumman i sin
+  // egen checkout-widget. Skickade vi en egen fraktrad OCH shipping_
+  // options dubbelräknades frakten (49 kr + 49 kr) - se docs/kustom.md.
+  // KSA:s fallback-alternativ (nedan) är nu den ENDA källan till
+  // fraktpris, tillsammans med PostNords live-pris när TMS-anropet lyckas.
   const shippingOption: KustomShippingOption = {
     id: "standard",
     name: cart.freeShipping
@@ -109,7 +101,6 @@ export async function POST(request: Request) {
 
   const payload = buildCreateOrderPayload({
     items,
-    shipping,
     shippingOption,
     discount:
       cart.discount?.valid && cart.discount.productsDiscountOre > 0
