@@ -29,7 +29,11 @@ export async function adjustInventory(formData: FormData) {
 
   await db.transaction(async (tx) => {
     const [row] = await tx
-      .select({ productId: schema.inventory.productId, quantity: schema.inventory.quantity })
+      .select({
+        productId: schema.inventory.productId,
+        variantId: schema.inventory.variantId,
+        quantity: schema.inventory.quantity,
+      })
       .from(schema.inventory)
       .where(eq(schema.inventory.id, inventoryId))
       .for("update");
@@ -43,6 +47,19 @@ export async function adjustInventory(formData: FormData) {
       throw new Error(
         "Det här är ett kit - lagersaldot beräknas automatiskt utifrån komponenterna och kan inte ändras manuellt.",
       );
+    }
+
+    if (!row.variantId) {
+      const [existingVariant] = await tx
+        .select({ id: schema.productVariants.id })
+        .from(schema.productVariants)
+        .where(eq(schema.productVariants.productId, row.productId))
+        .limit(1);
+      if (existingVariant) {
+        throw new Error(
+          "Den här produkten säljs bara som variant - lagersaldot beräknas automatiskt utifrån varianterna och kan inte ändras manuellt.",
+        );
+      }
     }
 
     const delta = newQuantity - row.quantity;
@@ -152,12 +169,30 @@ export async function receiveBatchAction(formData: FormData) {
   await db.transaction(async (tx) => {
     for (const line of linesToApply) {
       const [row] = await tx
-        .select({ quantity: schema.inventory.quantity })
+        .select({
+          productId: schema.inventory.productId,
+          variantId: schema.inventory.variantId,
+          quantity: schema.inventory.quantity,
+        })
         .from(schema.inventory)
         .where(eq(schema.inventory.id, line.inventoryId))
         .for("update");
 
       if (!row) continue;
+
+      // Skyddar mot att räkna en kit- eller variant-förälders egen rad -
+      // formuläret på /inventory/batch listar dem aldrig, men detta är
+      // ett extra skydd om något ändå försöker skicka in deras id.
+      const bundleItems = await getBundleItemsForProduct(tx, row.productId);
+      if (bundleItems.length > 0) continue;
+      if (!row.variantId) {
+        const [existingVariant] = await tx
+          .select({ id: schema.productVariants.id })
+          .from(schema.productVariants)
+          .where(eq(schema.productVariants.productId, row.productId))
+          .limit(1);
+        if (existingVariant) continue;
+      }
 
       await tx
         .update(schema.inventory)

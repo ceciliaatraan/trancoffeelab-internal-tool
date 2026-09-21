@@ -95,6 +95,11 @@ export default async function InventoryPage({
                         ))}
                       </ul>
                     ) : null}
+                    {row.hasVariants ? (
+                      <p className="mt-1 text-xs text-tran-muted">
+                        Summan av varianterna nedan - säljs bara som variant, inte för sig.
+                      </p>
+                    ) : null}
                   </td>
                   <td className="tran-tabular py-4 pr-4 align-top text-tran-muted">
                     {row.sku}
@@ -106,10 +111,10 @@ export default async function InventoryPage({
                     {belowAlarm ? " - Slut i lager" : ""}
                   </td>
                   <td className="tran-tabular py-4 pr-4 align-top text-tran-muted">
-                    {row.isBundle ? "-" : row.reservedQuantity}
+                    {row.isBundle || row.hasVariants ? "-" : row.reservedQuantity}
                   </td>
                   <td className="tran-tabular py-4 pr-4 align-top text-tran-muted">
-                    {row.isBundle ? "-" : row.shippedQuantity}
+                    {row.isBundle || row.hasVariants ? "-" : row.shippedQuantity}
                   </td>
                   <td className="tran-tabular py-4 pr-4 align-top font-medium">
                     {row.sellableQuantity === null ? "-" : row.sellableQuantity}
@@ -121,6 +126,10 @@ export default async function InventoryPage({
                     {row.isBundle ? (
                       <p className="text-xs text-tran-muted">
                         Beräknas automatiskt utifrån komponenterna till vänster.
+                      </p>
+                    ) : row.hasVariants ? (
+                      <p className="text-xs text-tran-muted">
+                        Beräknas automatiskt utifrån varianterna nedan.
                       </p>
                     ) : (
                       <form action={adjustInventory} className="flex items-center gap-2">

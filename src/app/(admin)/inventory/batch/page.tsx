@@ -15,7 +15,7 @@ export default async function NewBatchPage({
     getInventoryOverview(),
     getRecentStockReceipts(),
   ]);
-  const sellableRows = rows.filter((row) => !row.isBundle);
+  const sellableRows = rows.filter((row) => !row.isBundle && !row.hasVariants);
 
   return (
     <div className="flex flex-col gap-8">
@@ -32,7 +32,9 @@ export default async function NewBatchPage({
       <p className="max-w-xl text-sm text-tran-muted">
         Fyll i hur många av varje produkt som kom in i den här leveransen/batchen. Antalet läggs
         TILL det du redan har i lager - du behöver inte räkna ut den nya totalsumman själv. Kit
-        (t.ex. Komplett Kit) räknas automatiskt utifrån komponenterna och listas inte här.
+        (t.ex. Komplett Kit) räknas automatiskt utifrån komponenterna och listas inte här. Samma
+        gäller produkter med varianter (t.ex. No Regrets Horse) - fyll i antalet på varianterna
+        (Malet kaffe, Kaffebönor osv.) var för sig nedan.
       </p>
 
       {error ? (
