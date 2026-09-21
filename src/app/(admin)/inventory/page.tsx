@@ -1,5 +1,5 @@
 import { getInventoryOverview } from "@/lib/inventory/overview";
-import { adjustInventory } from "./actions";
+import { adjustInventory, reconcileReservedQuantitiesAction } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
 
 const inputClass =
@@ -10,15 +10,34 @@ export default async function InventoryPage({
 }: PageProps<"/inventory">) {
   const search = await searchParams;
   const error = typeof search.error === "string" ? search.error : null;
+  const reconciled = typeof search.reconciled === "string" ? Number(search.reconciled) : null;
 
   const rows = await getInventoryOverview();
 
   return (
     <div className="flex flex-col gap-8">
-      <h1 className="text-4xl font-bold uppercase tracking-tight">Lager</h1>
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <h1 className="text-4xl font-bold uppercase tracking-tight">Lager</h1>
+        <form action={reconcileReservedQuantitiesAction}>
+          <SubmitButton className="tran-label border border-tran-black px-4 py-2.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
+            Synka reserverat
+          </SubmitButton>
+          <p className="mt-1.5 max-w-xs text-xs text-tran-muted">
+            Räknar om Reserverat utifrån ordrar som faktiskt är öppna just nu och rättar siffran om
+            den inte stämmer.
+          </p>
+        </form>
+      </div>
 
       {error ? (
         <p className="border border-tran-red px-4 py-3 text-sm text-tran-red">{error}</p>
+      ) : null}
+      {reconciled !== null ? (
+        <p className="border border-tran-hairline px-4 py-3 text-sm text-tran-muted">
+          {reconciled === 0
+            ? "Reserverat stämde redan - inga rader behövde rättas."
+            : `Reserverat synkat - ${reconciled} ${reconciled === 1 ? "rad" : "rader"} rättades.`}
+        </p>
       ) : null}
 
       {rows.length === 0 ? (

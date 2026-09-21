@@ -132,20 +132,82 @@ export async function cancelOrderAction(orderId: string) {
 
   try {
     await cancelOrder(order.kustomOrderId, crypto.randomUUID());
-    await db
-      .update(schema.orders)
-      .set({
-        status: "CANCELLED",
-        paymentStatus: "CANCELLED",
-        fulfillmentStatus: "cancelled",
-        cancelledAt: new Date(),
-        updatedAt: new Date(),
-      })
-      .where(eq(schema.orders.id, orderId));
-    await db.insert(schema.orderEvents).values({
-      orderId,
-      type: "cancel",
-      causedByAdminId: admin.id,
+
+    const lines = await db
+      .select()
+      .from(schema.orderLines)
+      .where(eq(schema.orderLines.orderId, orderId));
+
+    await db.transaction(async (tx) => {
+      await tx
+        .update(schema.orders)
+        .set({
+          status: "CANCELLED",
+          paymentStatus: "CANCELLED",
+          fulfillmentStatus: "cancelled",
+          cancelledAt: new Date(),
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.orders.id, orderId));
+      await tx.insert(schema.orderEvents).values({
+        orderId,
+        type: "cancel",
+        causedByAdminId: admin.id,
+      });
+
+      // Ordern var reserverad (canCancel tillåter bara avbokning innan
+      // något fångats/skickats) - släpp reservationen så lagret blir
+      // rätt igen, precis som markShippedAction gör vid leverans.
+      for (const line of lines) {
+        if (line.type !== "physical" || !line.reference) continue;
+        const resolved = await resolveCartLine(line.reference, { requirePublished: false });
+        if (!resolved) continue;
+
+        const targets = await expandLineToInventoryTargets(
+          tx,
+          resolved.productId,
+          resolved.variantId,
+          line.quantity,
+        );
+
+        for (const target of targets) {
+          const condition = target.variantId
+            ? and(
+                eq(schema.inventory.productId, target.productId),
+                eq(schema.inventory.variantId, target.variantId),
+              )
+            : and(
+                eq(schema.inventory.productId, target.productId),
+                isNull(schema.inventory.variantId),
+              );
+
+          const [inventoryRow] = await tx
+            .select({ id: schema.inventory.id })
+            .from(schema.inventory)
+            .where(condition);
+
+          if (!inventoryRow) continue;
+
+          await tx
+            .update(schema.inventory)
+            .set({
+              reservedQuantity: sql`${schema.inventory.reservedQuantity} - ${target.quantity}`,
+              updatedAt: new Date(),
+            })
+            .where(eq(schema.inventory.id, inventoryRow.id));
+
+          await tx.insert(schema.inventoryMovements).values({
+            inventoryId: inventoryRow.id,
+            changeAmount: -target.quantity,
+            reason: "order_released",
+            orderId,
+            note:
+              target.productId === resolved.productId
+                ? "Reservation släppt: ordern avbruten"
+                : `Reservation släppt: ordern avbruten (komponent i "${resolved.nameSv}")`,
+          });
+        }
+      }
     });
   } catch (err) {
     redirect(`/orders/${orderId}?error=${encodeURIComponent(kustomErrorMessage(err))}`);
@@ -153,6 +215,7 @@ export async function cancelOrderAction(orderId: string) {
 
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders");
+  revalidatePath("/inventory");
   redirect(`/orders/${orderId}?saved=1`);
 }
 
