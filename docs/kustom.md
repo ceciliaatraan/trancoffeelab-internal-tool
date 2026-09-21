@@ -254,6 +254,28 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
   ens finns i lager än. Icke-preorder-ordrar är helt orörda av detta:
   de captureas fortsatt manuellt via "Debitera"-knappen i
   `/orders/[id]` (`captureOrderAction`), precis som innan.
+- **En "shipping"/"both"-rabattkod diskonterade inte det faktiska
+  fraktpriset, upptäckt av ägaren 2026-09-21.** Innan detta datum
+  reducerade en sådan rabatt bara `shippingOption.price` (fallback-
+  fraktalternativet för Kustom Shipping Assistant) - men sedan en riktig
+  KSA/PostNord-profil kopplades in använder Kustom i praktiken sitt LIVE
+  PostNord-pris, som INTE känner till vår rabattkod alls och läggs på
+  odiskonterat oavsett. Kunden såg t.ex. "-49 kr" i vår egen
+  sammanfattning men betalade ändå fullt pris. **Löst** utan att gissa
+  på Kustoms odokumenterade rabatt/live-fraktpris-samspel: hela rabatten
+  (produkter OCH frakt, `cart.discount.amountOre`) läggs numera på
+  rabattraden i `order_lines`, som drar av från `order_amount` - det
+  ENDA vi själva helt kontrollerar (se `checkout/session/route.ts`).
+  `shippingOption.price` skickas alltid odiskonterat. Total = vårt
+  rabatterade `order_amount` + Kustoms fraktpris (odiskonterat men
+  korrekt) blir alltid rätt. **Känd kvarvarande begränsning:** en
+  rabattkod värd MER än produkternas delsumma (t.ex. en "100 % på allt
+  inklusive frakt"-kod) kan inte tvinga fram gratis frakt - `order_amount`
+  kan inte bli negativt, och Kustom lägger sitt fraktpris UTANFÖR
+  `order_amount`. Det är en gräns i hur Kustom Shipping Assistant
+  fungerar, inte något vår payload kan runda - skulle kräva svar från
+  Kustom support (se tidigare utkast till supportmejl) om det blir
+  aktuellt.
 
 ## Status i koden
 

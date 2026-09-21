@@ -67,16 +67,6 @@ export async function POST(request: Request) {
     weightGrams: item.weightGrams,
   }));
 
-  // A "shipping"/"both"-scoped discount reduces the shipping line's own
-  // amount directly rather than needing a second Kustom discount line -
-  // see computeDiscountSplit in lib/discount-split.ts.
-  const shippingDiscountOre =
-    cart.discount?.valid && cart.discount.shippingDiscountOre > 0
-      ? cart.discount.shippingDiscountOre
-      : 0;
-  const shippingTaxRate = weightedAverageTaxRate(cart.items);
-  const shippingAmountOre = cart.freeShipping ? 0 : cart.shippingOre - shippingDiscountOre;
-
   // Frakten skickas ALDRIG som en egen shipping_fee-rad i order_lines
   // (och alltså inte heller med i order_amount) - sedan Kustom Shipping
   // Assistant/PostNord-integrationen kopplades in 2026-09-21 lägger
@@ -85,6 +75,23 @@ export async function POST(request: Request) {
   // options dubbelräknades frakten (49 kr + 49 kr) - se docs/kustom.md.
   // KSA:s fallback-alternativ (nedan) är nu den ENDA källan till
   // fraktpris, tillsammans med PostNords live-pris när TMS-anropet lyckas.
+  //
+  // shippingOption.price skickas ALLTID odiskonterat (inte fraktens
+  // shippingDiscountOre-andel avdragen) - en "shipping"/"both"-rabatt
+  // hade tidigare bara reducerat det HÄR priset, men Kustoms live
+  // PostNord-pris (det som faktiskt debiteras när TMS-anropet lyckas,
+  // vilket det gör nu) känner inte alls till vår rabattkod och lades på
+  // ordersumman odiskonterat ändå - kunden såg "-49 kr" i vår egen
+  // sammanfattning men betalade ändå fullt pris (upptäckt av ägaren
+  // 2026-09-21). Löst genom att i stället lägga HELA rabatten
+  // (produkter + frakt, cart.discount.amountOre) på rabattraden nedan,
+  // som drar av från order_amount - det är det ENDA vi själva helt
+  // kontrollerar. Total = order_amount (vårt, rätt rabatterat) +
+  // Kustoms fraktpris (odiskonterat men KORREKT) blir alltid rätt,
+  // oavsett om Kustom använder sitt live-pris eller fallbacken nedan.
+  const shippingTaxRate = weightedAverageTaxRate(cart.items);
+  const shippingAmountOre = cart.freeShipping ? 0 : cart.shippingOre;
+
   const shippingOption: KustomShippingOption = {
     id: "standard",
     name: cart.freeShipping
@@ -99,14 +106,28 @@ export async function POST(request: Request) {
     tax_rate: shippingTaxRate,
   };
 
+  // Rabattraden kan aldrig göra order_amount negativt - frakten är inte
+  // längre med i order_amount alls (se ovan), så taket är produkternas
+  // egen delsumma. En rabattkod värd mer än det (t.ex. en "100 % på allt,
+  // inklusive frakt"-kod) kan alltså inte tvinga fram gratis frakt när
+  // Kustom hämtar ett live PostNord-pris - det är en gräns i hur Kustom
+  // Shipping Assistant fungerar (fraktpriset läggs på UTANFÖR
+  // order_amount), inte något vi kan runda via payloaden. Vanliga
+  // rabatter (mindre än ordersumman) blir alltid rätt.
+  const discountAmountOre = cart.discount?.valid
+    ? Math.min(cart.discount.amountOre, cart.subtotalOre)
+    : 0;
+
   const payload = buildCreateOrderPayload({
     items,
     shippingOption,
+    // Hela rabatten (produkter + frakt, inom taket ovan) hamnar på den
+    // här raden - se kommentaren vid shippingAmountOre ovan för varför.
     discount:
-      cart.discount?.valid && cart.discount.productsDiscountOre > 0
+      discountAmountOre > 0 && cart.discount?.valid
         ? {
             code: cart.discount.code,
-            amountOre: cart.discount.productsDiscountOre,
+            amountOre: discountAmountOre,
             taxRateHundredthsPercent: shippingTaxRate,
           }
         : undefined,
@@ -122,10 +143,12 @@ export async function POST(request: Request) {
         order_id: extractOrderId(order),
         // The discount was already resolved into the Kustom payload above -
         // echoed back here so the storefront's own order summary (which has
-        // no other way to know the amount) can actually show it.
+        // no other way to know the amount) can actually show it. Uses the
+        // capped discountAmountOre so the summary never shows a bigger
+        // discount than what was actually applied to order_amount.
         discount:
-          cart.discount?.valid && cart.discount.amountOre > 0
-            ? { code: cart.discount.code, amountOre: cart.discount.amountOre }
+          discountAmountOre > 0 && cart.discount?.valid
+            ? { code: cart.discount.code, amountOre: discountAmountOre }
             : null,
       },
       { headers: corsHeaders(origin) },
