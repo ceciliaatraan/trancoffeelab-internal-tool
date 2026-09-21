@@ -6,16 +6,35 @@ import type { orderFulfillmentStatusEnum } from "@/db/schema/orders";
 
 type FulfillmentStatus = (typeof orderFulfillmentStatusEnum.enumValues)[number];
 
+export type OrderLineTotals = {
+  /**
+   * Bundle-expanderat - en kit-rad sprids ut på sina komponenter (så
+   * komponenternas EGNA reserverat/skickat inkluderar det som gått åt
+   * via kit-köp). Detta är vad kassans/lagrets Tillgängligt-beräkning
+   * (lib/queries/cart.ts, lib/inventory/bundles.ts) och de lagrade
+   * reserved_quantity/shipped_quantity-kolumnerna ska stämma mot.
+   */
+  expanded: Map<string, number>;
+  /**
+   * OEXPANDERAT - hur många av just den SKU:n (t.ex. kitets EGEN SKU)
+   * som beställts/skickats direkt, utan att spridas ut på komponenter.
+   * Det är det här en kit-rad ska visa som sitt eget Reserverat/Skickat
+   * på /inventory - kitet har inget eget lagersaldo, men VI VET
+   * fortfarande hur många kit som faktiskt sålts, från samma ordrar.
+   */
+  direct: Map<string, number>;
+};
+
 /**
- * Summerar bundle-expanderade kvantiteter för fysiska orderrader på
- * ordrar med en given fulfillment_status, per (produkt, variant) -
- * grunden för Reserverat (unfulfilled) och Skickat (shipped) nedan.
- * Facit hämtas alltid direkt från ordrarna själva i stället för att
- * lita på ackumulerade räknare (inventory.reserved_quantity) eller
- * rörelseloggar (inventory_movements), som båda kan hamna fel om en
- * enskild kod-väg missar att uppdateras (se markShippedAction/
- * cancelOrderAction-buggarna, 2026-09-21) - detta självläker alltid,
- * även för ordrar som drabbades INNAN de buggarna fixades.
+ * Summerar kvantiteter för fysiska orderrader på ordrar med en given
+ * fulfillment_status, per (produkt, variant) - grunden för Reserverat
+ * (unfulfilled) och Skickat (shipped) nedan. Facit hämtas alltid direkt
+ * från ordrarna själva i stället för att lita på ackumulerade räknare
+ * (inventory.reserved_quantity) eller rörelseloggar
+ * (inventory_movements), som båda kan hamna fel om en enskild kod-väg
+ * missar att uppdateras (se markShippedAction/cancelOrderAction-
+ * buggarna, 2026-09-21) - detta självläker alltid, även för ordrar som
+ * drabbades INNAN de buggarna fixades.
  *
  * VIKTIGT: allt SKU-uppslag och all kit-expansion görs här i ett par
  * batchade frågor (en produkt-fråga, en variant-fråga, en bundle-fråga),
@@ -29,7 +48,7 @@ type FulfillmentStatus = (typeof orderFulfillmentStatusEnum.enumValues)[number];
  */
 async function sumOrderLineQuantitiesByFulfillmentStatus(
   fulfillmentStatus: FulfillmentStatus,
-): Promise<Map<string, number>> {
+): Promise<OrderLineTotals> {
   const lines = await db
     .select({
       reference: schema.orderLines.reference,
@@ -45,8 +64,9 @@ async function sumOrderLineQuantitiesByFulfillmentStatus(
       line.type === "physical" && !!line.reference,
   );
 
-  const totals = new Map<string, number>();
-  if (physicalLines.length === 0) return totals;
+  const expanded = new Map<string, number>();
+  const direct = new Map<string, number>();
+  if (physicalLines.length === 0) return { expanded, direct };
 
   const skus = [...new Set(physicalLines.map((line) => line.reference))];
 
@@ -86,34 +106,35 @@ async function sumOrderLineQuantitiesByFulfillmentStatus(
     const resolved = resolvedBySku.get(line.reference);
     if (!resolved) continue;
 
+    const directKey = `${resolved.productId}|${resolved.variantId ?? ""}`;
+    direct.set(directKey, (direct.get(directKey) ?? 0) + line.quantity);
+
     if (resolved.variantId) {
-      const key = `${resolved.productId}|${resolved.variantId}`;
-      totals.set(key, (totals.get(key) ?? 0) + line.quantity);
+      expanded.set(directKey, (expanded.get(directKey) ?? 0) + line.quantity);
       continue;
     }
 
     const components = bundlesByProductId.get(resolved.productId);
     if (!components || components.length === 0) {
-      const key = `${resolved.productId}|`;
-      totals.set(key, (totals.get(key) ?? 0) + line.quantity);
+      expanded.set(directKey, (expanded.get(directKey) ?? 0) + line.quantity);
       continue;
     }
 
     for (const component of components) {
       const key = `${component.componentProductId}|${component.componentVariantId ?? ""}`;
-      totals.set(key, (totals.get(key) ?? 0) + line.quantity * component.quantity);
+      expanded.set(key, (expanded.get(key) ?? 0) + line.quantity * component.quantity);
     }
   }
 
-  return totals;
+  return { expanded, direct };
 }
 
 /** Verkligt reserverat lager per (produkt, variant) - ordrar som varken skickats eller avbokats. */
-export function computeTrueReservedQuantities(): Promise<Map<string, number>> {
+export function computeTrueReservedQuantities(): Promise<OrderLineTotals> {
   return sumOrderLineQuantitiesByFulfillmentStatus("unfulfilled");
 }
 
 /** Verkligt skickat/levererat lager per (produkt, variant), totalt genom tiderna. */
-export function computeTrueShippedQuantities(): Promise<Map<string, number>> {
+export function computeTrueShippedQuantities(): Promise<OrderLineTotals> {
   return sumOrderLineQuantitiesByFulfillmentStatus("shipped");
 }

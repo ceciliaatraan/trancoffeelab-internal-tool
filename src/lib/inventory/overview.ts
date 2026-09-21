@@ -23,24 +23,31 @@ export type InventoryOverviewRow = {
   reservedQuantity: number;
   alarmLevel: number;
   isBundle: boolean;
-  /** Samma som `quantity` för vanliga rader, komponent-beräknat antal kit för bundlar (som redan drar ifrån komponenternas reserverat OCH skickat, se bundles.ts). */
+  /**
+   * Komponent-beräknat antal kit för bundlar (används för larmnivå-
+   * jämförelsen) - samma som `quantity` för vanliga rader. Ett kit har
+   * inget eget ursprungslager (det byggs av komponenter), så bundlar
+   * visar "-" i "I lager"-kolumnen på sidan trots att fältet finns här.
+   */
   available: number;
   /**
    * Totalt skickat/levererat genom tiderna - alltid det VERKLIGA antalet
    * räknat direkt från ordrar med fulfillment_status = shipped (se
    * order-line-totals.ts), inte den ackumulerade inventory.shipped_
    * quantity-kolumnen (som bara används internt för kassan, av samma
-   * skäl som reserved_quantity ovan).
+   * skäl som reserved_quantity ovan). För en kit-rad är det här det
+   * OEXPANDERADE antalet - hur många kit som faktiskt sålts/skickats
+   * som HELA kit, inte utspritt på komponenterna.
    */
   shippedQuantity: number;
   /**
-   * "Tillgängligt": hur många som är fria att sälja RIGHT NOW - I lager
-   * minus Reserverat minus Skickat. Beräknas automatiskt, aldrig satt
-   * manuellt. Bundlar visar "-" här (samma som Reserverat/Skickat), för
-   * "I lager" på en kit-rad är redan det komponent-beräknade antalet,
-   * som redan tar hänsyn till komponenternas reserverat/skickat.
+   * "Tillgängligt": hur många som är fria att sälja RIGHT NOW.
+   * För vanliga rader: I lager minus Reserverat minus Skickat. För en
+   * kit-rad: det komponent-beräknade antalet (`available` ovan) - kitet
+   * har inget eget ursprungslager, så "I lager - reserverat - skickat"
+   * gäller inte, men vad som går att BYGGA OCH SÄLJA just nu gör det.
    */
-  sellableQuantity: number | null;
+  sellableQuantity: number;
   bundleBreakdown: BundleComponentStatus[] | null;
 };
 
@@ -111,11 +118,11 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
     if (hasVariants) return [];
 
     const key = `${row.productId}|${row.variantId ?? ""}`;
-    const reservedQuantity = trueReserved.get(key) ?? 0;
-    const shippedQuantity = trueShipped.get(key) ?? 0;
     const components = row.variantId ? undefined : bundlesByProduct.get(row.productId);
 
     if (!components || components.length === 0) {
+      const reservedQuantity = trueReserved.expanded.get(key) ?? 0;
+      const shippedQuantity = trueShipped.expanded.get(key) ?? 0;
       return [
         {
           inventoryId: row.inventoryId,
@@ -145,8 +152,8 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
         ? Math.max(
             0,
             componentRow.quantity -
-              (trueReserved.get(componentKey) ?? 0) -
-              (trueShipped.get(componentKey) ?? 0),
+              (trueReserved.expanded.get(componentKey) ?? 0) -
+              (trueShipped.expanded.get(componentKey) ?? 0),
           )
         : 0;
       const name = componentRow
@@ -162,6 +169,11 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
       Math.min(...breakdown.map((c) => Math.floor(c.available / c.quantityPerBundle))),
     );
 
+    // Kitet har inget eget ursprungslager, men VI VET hur många kit som
+    // faktiskt beställts/skickats som HELA kit (oexpanderat - se
+    // order-line-totals.ts) - så Reserverat/Skickat behöver inte visas
+    // som "-" längre, bara "I lager"/Tillgängligt (som i stället visar
+    // det komponent-beräknade "hur många går att bygga OCH sälja nu").
     return [
       {
         inventoryId: row.inventoryId,
@@ -171,12 +183,12 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
         variantName: row.variantName,
         sku: row.variantSku ?? row.productSku,
         quantity: row.quantity,
-        reservedQuantity,
+        reservedQuantity: trueReserved.direct.get(key) ?? 0,
         alarmLevel: row.alarmLevel,
         isBundle: true,
         available,
-        shippedQuantity,
-        sellableQuantity: null,
+        shippedQuantity: trueShipped.direct.get(key) ?? 0,
+        sellableQuantity: available,
         bundleBreakdown: breakdown,
       },
     ];

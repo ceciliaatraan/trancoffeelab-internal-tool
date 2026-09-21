@@ -101,19 +101,22 @@ export default async function InventoryPage({
                     {row.sku}
                   </td>
                   <td
-                    className={`tran-tabular py-4 pr-4 align-top ${belowAlarm ? "text-tran-red" : ""}`}
+                    className={`tran-tabular py-4 pr-4 align-top ${!row.isBundle && belowAlarm ? "text-tran-red" : ""}`}
                   >
-                    {row.available}
-                    {belowAlarm ? " - Slut i lager" : ""}
+                    {row.isBundle ? "-" : row.available}
+                    {!row.isBundle && belowAlarm ? " - Slut i lager" : ""}
                   </td>
                   <td className="tran-tabular py-4 pr-4 align-top text-tran-muted">
-                    {row.isBundle ? "-" : row.reservedQuantity}
+                    {row.reservedQuantity}
                   </td>
                   <td className="tran-tabular py-4 pr-4 align-top text-tran-muted">
-                    {row.isBundle ? "-" : row.shippedQuantity}
+                    {row.shippedQuantity}
                   </td>
-                  <td className="tran-tabular py-4 pr-4 align-top font-medium">
-                    {row.sellableQuantity === null ? "-" : row.sellableQuantity}
+                  <td
+                    className={`tran-tabular py-4 pr-4 align-top font-medium ${row.isBundle && belowAlarm ? "text-tran-red" : ""}`}
+                  >
+                    {row.sellableQuantity}
+                    {row.isBundle && belowAlarm ? " - Slut i lager" : ""}
                   </td>
                   <td className="tran-tabular py-4 pr-4 align-top text-tran-muted">
                     {row.alarmLevel}

@@ -78,7 +78,7 @@ export default async function NewBatchPage({
                   </td>
                   <td className="tran-tabular py-3 pr-4 align-top text-tran-muted">{row.sku}</td>
                   <td className="tran-tabular py-3 pr-4 align-top text-tran-muted">
-                    {row.sellableQuantity ?? row.quantity}
+                    {row.sellableQuantity}
                   </td>
                   <td className="py-3 pr-4 align-top">
                     <input

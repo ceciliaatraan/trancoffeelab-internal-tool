@@ -125,8 +125,8 @@ export async function reconcileReservedQuantitiesAction() {
   await db.transaction(async (tx) => {
     for (const row of rows) {
       const key = `${row.productId}|${row.variantId ?? ""}`;
-      const trueReservedValue = trueReserved.get(key) ?? 0;
-      const trueShippedValue = trueShipped.get(key) ?? 0;
+      const trueReservedValue = trueReserved.expanded.get(key) ?? 0;
+      const trueShippedValue = trueShipped.expanded.get(key) ?? 0;
       const reservedDelta = trueReservedValue - row.reservedQuantity;
       const shippedDelta = trueShippedValue - row.shippedQuantity;
       if (reservedDelta === 0 && shippedDelta === 0) continue;
