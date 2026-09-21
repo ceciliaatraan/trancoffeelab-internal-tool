@@ -40,6 +40,22 @@ export type KustomOrderLine = {
   total_tax_amount: number;
 };
 
+/**
+ * Statisk fallback-rad Kustom Shipping Assistant (KSA) visar om er
+ * TMS/Shipping API (PostNord-integrationen) inte svarar - se
+ * "Kustom Shipping Assistant"-guiden (delad av er 2026-09-21). Byggs av
+ * samma fraktberäkning som `shipping_fee`-raden nedan, INTE en egen
+ * separat momssats.
+ */
+export type KustomShippingOption = {
+  id: string;
+  name: string;
+  /** Bruttopris (inkl. moms), i öre - fältet heter `price` i KSA:s spec, inte `amount`. */
+  price: number;
+  tax_amount: number;
+  tax_rate: number;
+};
+
 function localizedName(sv: string, en: string, locale: Locale): string {
   return locale === "en-SE" ? en : sv;
 }
@@ -130,17 +146,36 @@ export type KustomCreateOrderPayload = {
   order_tax_amount: number;
   order_lines: KustomOrderLine[];
   merchant_urls: MerchantUrls;
+  /**
+   * Triggar Kustom Shipping Assistant (KSA) tillsammans med
+   * `shipping_options` nedan - utan `allow_separate_shipping_address:
+   * true` visas ALDRIG PostNords fraktalternativ i checkouten, oavsett
+   * KSA-konfiguration i Kustom-portalen. Satt till true alltid (er sajt
+   * säljer bara fysiska varor - inget digitalt-only-fall att hantera).
+   */
+  options: { allow_separate_shipping_address: true };
+  /**
+   * Statisk fallback KSA visar om TMS/Shipping API-anropet till PostNord
+   * misslyckas - se KustomShippingOption ovan. Alltid exakt en post
+   * (vårt vanliga fraktpris/fri frakt), aldrig utelämnad - Kustoms guide
+   * rekommenderar att alltid skicka den tillsammans med
+   * allow_separate_shipping_address.
+   */
+  shipping_options: KustomShippingOption[];
 };
 
 export function buildCreateOrderPayload({
   items,
   shipping,
+  shippingOption,
   discount,
   locale,
   merchantUrls,
 }: {
   items: CartItemInput[];
   shipping?: ShippingInput;
+  /** Fallback-alternativet för KSA - se KustomShippingOption. Skickas alltid med, oavsett om `shipping` (fri frakt) är satt. */
+  shippingOption: KustomShippingOption;
   discount?: DiscountInput;
   locale: Locale;
   merchantUrls: MerchantUrls;
@@ -157,5 +192,7 @@ export function buildCreateOrderPayload({
     order_tax_amount: orderTaxAmount,
     order_lines: orderLines,
     merchant_urls: merchantUrls,
+    options: { allow_separate_shipping_address: true },
+    shipping_options: [shippingOption],
   };
 }

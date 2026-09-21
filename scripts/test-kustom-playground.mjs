@@ -44,6 +44,17 @@ const payload = buildCreateOrderPayload({
       taxRateHundredthsPercent: 1200,
     },
   ],
+  // Krävs för att Kustom Shipping Assistant (KSA) - PostNord-integrationen
+  // - ska visas i checkouten (se options.allow_separate_shipping_address
+  // i order-payload.ts). En fast testrad räcker här, samma som appens
+  // egen fallback ser ut.
+  shippingOption: {
+    id: "standard",
+    name: "Frakt",
+    price: 4900,
+    tax_amount: 980,
+    tax_rate: 2500,
+  },
   locale: "sv-SE",
   merchantUrls: {
     terms: "https://trancoffeelab.com/villkor",

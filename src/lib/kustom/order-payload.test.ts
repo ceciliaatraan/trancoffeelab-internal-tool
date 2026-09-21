@@ -84,6 +84,14 @@ describe("buildOrderLines", () => {
   });
 });
 
+const standardShippingOption = {
+  id: "standard",
+  name: "Frakt",
+  price: 4900,
+  tax_amount: 980,
+  tax_rate: 2500,
+};
+
 describe("buildCreateOrderPayload", () => {
   it("summerar order_amount och order_tax_amount över alla rader", () => {
     const payload = buildCreateOrderPayload({
@@ -103,6 +111,7 @@ describe("buildCreateOrderPayload", () => {
         amountOre: 4900,
         taxRateHundredthsPercent: 2500,
       },
+      shippingOption: standardShippingOption,
       locale: "sv-SE",
       merchantUrls,
     });
@@ -129,6 +138,7 @@ describe("buildCreateOrderPayload", () => {
           taxRateHundredthsPercent: 1200,
         },
       ],
+      shippingOption: standardShippingOption,
       locale: "sv-SE",
       merchantUrls,
     });
@@ -145,10 +155,72 @@ describe("buildCreateOrderPayload", () => {
         },
       ],
       discount: { code: "TEST", amountOre: 1000, taxRateHundredthsPercent: 1200 },
+      shippingOption: standardShippingOption,
       locale: "sv-SE",
       merchantUrls,
     });
 
     expect(withDiscount.order_amount).toBe(withoutDiscount.order_amount - 1000);
+  });
+
+  it("sätter options.allow_separate_shipping_address = true, alltid - annars triggas aldrig Kustom Shipping Assistant (KSA)", () => {
+    const payload = buildCreateOrderPayload({
+      items: [
+        {
+          sku: "NRH-250",
+          nameSv: "x",
+          nameEn: "x",
+          quantity: 1,
+          unitPriceOre: 10000,
+          taxRateHundredthsPercent: 1200,
+        },
+      ],
+      shippingOption: standardShippingOption,
+      locale: "sv-SE",
+      merchantUrls,
+    });
+
+    expect(payload.options).toEqual({ allow_separate_shipping_address: true });
+  });
+
+  it("skickar med det angivna shipping_option som KSA:s fallback, alltid exakt en post", () => {
+    const payload = buildCreateOrderPayload({
+      items: [
+        {
+          sku: "NRH-250",
+          nameSv: "x",
+          nameEn: "x",
+          quantity: 1,
+          unitPriceOre: 10000,
+          taxRateHundredthsPercent: 1200,
+        },
+      ],
+      shippingOption: standardShippingOption,
+      locale: "sv-SE",
+      merchantUrls,
+    });
+
+    expect(payload.shipping_options).toEqual([standardShippingOption]);
+  });
+
+  it("skickar shipping_options även vid fri frakt (0 kr), inte utelämnat", () => {
+    const freeShippingOption = { ...standardShippingOption, price: 0, tax_amount: 0 };
+    const payload = buildCreateOrderPayload({
+      items: [
+        {
+          sku: "NRH-250",
+          nameSv: "x",
+          nameEn: "x",
+          quantity: 1,
+          unitPriceOre: 10000,
+          taxRateHundredthsPercent: 1200,
+        },
+      ],
+      shippingOption: freeShippingOption,
+      locale: "sv-SE",
+      merchantUrls,
+    });
+
+    expect(payload.shipping_options).toEqual([freeShippingOption]);
   });
 });

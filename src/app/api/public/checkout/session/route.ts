@@ -2,7 +2,13 @@ import { NextResponse } from "next/server";
 import { checkRateLimit, corsHeaders, getClientIp, resolveAllowedOrigin } from "@/lib/public-api";
 import { cartRequestSchema } from "@/lib/validation/cart";
 import { buildValidatedCart } from "@/lib/queries/cart-summary";
-import { buildCreateOrderPayload, type CartItemInput, type ShippingInput } from "@/lib/kustom/order-payload";
+import {
+  buildCreateOrderPayload,
+  type CartItemInput,
+  type ShippingInput,
+  type KustomShippingOption,
+} from "@/lib/kustom/order-payload";
+import { calculateTaxFromGross } from "@/lib/kustom/tax";
 import { getMerchantUrls } from "@/lib/kustom/merchant-urls";
 import { createOrder, extractHtmlSnippet, extractOrderId, KustomApiError } from "@/lib/kustom/client";
 
@@ -68,26 +74,48 @@ export async function POST(request: Request) {
     cart.discount?.valid && cart.discount.shippingDiscountOre > 0
       ? cart.discount.shippingDiscountOre
       : 0;
+  const shippingTaxRate = weightedAverageTaxRate(cart.items);
+  const shippingAmountOre = cart.freeShipping ? 0 : cart.shippingOre - shippingDiscountOre;
   const shipping: ShippingInput | undefined = cart.freeShipping
     ? undefined
     : {
         nameSv: "Frakt",
         nameEn: "Shipping",
-        amountOre: cart.shippingOre - shippingDiscountOre,
+        amountOre: shippingAmountOre,
         // Frakten har ingen egen momssats - den ärver kundvagnens
         // kvantitetsviktade snitt, precis som rabattraden nedan.
-        taxRateHundredthsPercent: weightedAverageTaxRate(cart.items),
+        taxRateHundredthsPercent: shippingTaxRate,
       };
+
+  // Fallback-alternativet Kustom Shipping Assistant (KSA) visar om
+  // PostNord-integrationen (TMS/Shipping API) inte svarar - speglar
+  // `shipping` ovan (samma pris, samma moms), inte en egen beräkning.
+  // Skickas ALLTID med (även vid fri frakt, då som 0 kr) - se
+  // buildCreateOrderPayload/KustomShippingOption.
+  const shippingOption: KustomShippingOption = {
+    id: "standard",
+    name: cart.freeShipping
+      ? parsed.data.locale === "en-SE"
+        ? "Free shipping"
+        : "Fri frakt"
+      : parsed.data.locale === "en-SE"
+        ? "Shipping"
+        : "Frakt",
+    price: shippingAmountOre,
+    tax_amount: calculateTaxFromGross(shippingAmountOre, shippingTaxRate).taxAmount,
+    tax_rate: shippingTaxRate,
+  };
 
   const payload = buildCreateOrderPayload({
     items,
     shipping,
+    shippingOption,
     discount:
       cart.discount?.valid && cart.discount.productsDiscountOre > 0
         ? {
             code: cart.discount.code,
             amountOre: cart.discount.productsDiscountOre,
-            taxRateHundredthsPercent: weightedAverageTaxRate(cart.items),
+            taxRateHundredthsPercent: shippingTaxRate,
           }
         : undefined,
     locale: parsed.data.locale,

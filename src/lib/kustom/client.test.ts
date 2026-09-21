@@ -57,6 +57,8 @@ describe("createOrder", () => {
       order_amount: 100,
       order_tax_amount: 10,
       order_lines: [],
+      options: { allow_separate_shipping_address: true },
+      shipping_options: [],
       merchant_urls: {
         terms: "t",
         checkout: "c",
@@ -86,6 +88,8 @@ describe("createOrder", () => {
         order_amount: 0,
         order_tax_amount: 0,
         order_lines: [],
+        options: { allow_separate_shipping_address: true },
+        shipping_options: [],
         merchant_urls: { terms: "t", checkout: "c", confirmation: "conf", push: "p", validation: "v" },
       });
     } catch (err) {
@@ -107,6 +111,8 @@ describe("createOrder", () => {
         order_amount: 0,
         order_tax_amount: 0,
         order_lines: [],
+        options: { allow_separate_shipping_address: true },
+        shipping_options: [],
         merchant_urls: { terms: "t", checkout: "c", confirmation: "conf", push: "p", validation: "v" },
       }),
     ).rejects.toBeInstanceOf(KustomApiError);

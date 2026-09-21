@@ -73,6 +73,33 @@ fortfarande (oberoende av vilket auth-format som råkar krävas):
   query-parameter.
 - `merchant_urls.validation`: `.../api/kustom/validate`
 
+### Kustom Shipping Assistant (KSA) - PostNord-integrationen - 2026-09-21
+
+Ni delade Kustoms egen guide "How to Set Up Shipping Assistant in Kustom
+Checkout" 2026-09-21. Bekräftat därifrån (officiell dokumentation, inte
+ett antagande):
+
+- KSA visar PostNords fraktalternativ (hämtade live från er TMS/Shipping
+  API) direkt i checkouten - men bara om **båda** dessa håller:
+  1. Ni har en KSA-profil konfigurerad på ert Merchant ID (MID) i Kustom-
+     portalen (ni gör det själva där - inte något i den här koden).
+  2. Create-order-anropet triggar KSA genom **antingen**
+     `options.allow_separate_shipping_address: true` **eller** en
+     `shipping_options`-array - Kustoms egen rekommendation är att alltid
+     skicka BÅDA.
+- `shipping_options[]`-formatet (statisk fallback som visas om
+  TMS/Shipping API inte svarar): `{ id, name, price, tax_amount,
+  tax_rate }` - notera `price`, inte `amount_ore`/`total_amount` som
+  övriga rader i vår egen `KustomOrderLine`-typ.
+- **Innan detta datum skickade vår kod varken `options` eller
+  `shipping_options` alls** - `buildCreateOrderPayload`
+  (`src/lib/kustom/order-payload.ts`) saknade båda fälten helt, vilket
+  betyder att KSA aldrig kan ha triggats, oavsett KSA-konfiguration i
+  portalen. Fixat samma dag: `options.allow_separate_shipping_address`
+  sätts nu alltid till `true`, och en `shipping_options`-fallback (vårt
+  vanliga fraktpris, eller 0 kr vid fri frakt) skickas alltid med - se
+  `checkout/session/route.ts`.
+
 ### Order validation (er inklistrade dokumentationstext)
 
 - **`POST {merchant_urls.validation}`.** Kustom POSTar HELA
@@ -140,6 +167,20 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
    → betalning med Kustoms testkort → Kustom anropar `/api/kustom/push`
    och `/api/kustom/validate` → order sparad i databasen). Kräver att
    appen är nåbar från internet, se README.
+4. **Om PostNord faktiskt tar emot korrekt adress och vikt via Kustom
+   Shipping Assistant (KSA).** 2026-09-21 fixades att create-order-
+   anropet nu triggar KSA (`options.allow_separate_shipping_address:
+   true` + en `shipping_options`-fallback, se "Kustom Shipping
+   Assistant"-sektionen ovan under Bekräftat) - men det bekräftar bara
+   att TRIGGER-villkoret uppfylls, inte att fraktalternativen faktiskt
+   visas, att PostNord får rätt leveransadress, eller hur vikt (som vi
+   fortfarande aldrig skickar någonstans i payloaden - inget viktfält
+   finns i Kustoms `order_lines`-spec såvitt vi sett) hanteras. Kan bara
+   stämmas av genom ett riktigt testköp i Playground (Kustoms guide steg
+   5) och en titt i PostNords "Obekräftade"-vy efteråt - inget Claude kan
+   göra från den här sandboxen (ingen nätverksåtkomst till
+   trancoffeelab.com eller PostNords portal, ingen inloggning till
+   någotdera).
 
 ## Designbeslut som INTE kommer från Kustom-dokumentationen
 
