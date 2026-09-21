@@ -6,7 +6,7 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCurrentAdmin } from "@/lib/current-admin";
 import { getBundleItemsForProduct } from "@/lib/inventory/bundles";
-import { computeTrueReservedQuantities } from "@/lib/inventory/reconcile-reserved";
+import { computeTrueReservedQuantities } from "@/lib/inventory/order-line-totals";
 import { inventoryAdjustSchema } from "@/lib/validation/product";
 
 export async function adjustInventory(formData: FormData) {

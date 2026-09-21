@@ -23,8 +23,8 @@ export default async function InventoryPage({
             Synka reserverat
           </SubmitButton>
           <p className="mt-1.5 max-w-xs text-xs text-tran-muted">
-            Räknar om Reserverat utifrån ordrar som faktiskt är öppna just nu och rättar siffran om
-            den inte stämmer.
+            Siffrorna nedan är alltid rätträknade. Den här knappen rättar bara vad hemsidans kassa
+            internt tror är ledigt att sälja - klicka om något nyligen kändes fel där.
           </p>
         </form>
       </div>

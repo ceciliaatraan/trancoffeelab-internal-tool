@@ -1,7 +1,8 @@
 import "server-only";
-import { asc, eq, sql } from "drizzle-orm";
+import { asc, eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { getAllBundleItems } from "./bundles";
+import { computeTrueReservedQuantities, computeTrueShippedQuantities } from "./order-line-totals";
 
 export type BundleComponentStatus = {
   name: string;
@@ -17,16 +18,19 @@ export type InventoryOverviewRow = {
   variantName: string | null;
   sku: string;
   quantity: number;
+  /** Alltid det VERKLIGA antalet öppna ordrar just nu (se order-line-totals.ts) - inte den ackumulerade inventory.reserved_quantity-kolumnen, som bara används internt för butikens snabba lagerkoll i kassan. */
   reservedQuantity: number;
   alarmLevel: number;
   isBundle: boolean;
   /** "I lager": rå kvantitet för vanliga rader, komponent-beräknat antal kit för bundlar. */
   available: number;
   /**
-   * Totalt skickat/levererat genom tidens - summan av alla order_shipped-
-   * rörelser för lagerraden. "Reserverat" ingår redan i "I lager" (den dras
-   * bara ifrån vid faktisk leverans), så det som en gång togs emot i lager
-   * = I lager + Skickat (INTE + Reserverat, det vore dubbelräkning).
+   * Totalt skickat/levererat genom tiderna - alltid det VERKLIGA antalet
+   * räknat direkt från ordrar med fulfillment_status = shipped (se
+   * order-line-totals.ts), inte en rörelselogg-summa. "Reserverat" ingår
+   * redan i "I lager" (den dras bara ifrån vid faktisk leverans), så det
+   * som en gång togs emot i lager = I lager + Skickat (INTE + Reserverat,
+   * det vore dubbelräkning).
    */
   shippedQuantity: number;
   bundleBreakdown: BundleComponentStatus[] | null;
@@ -38,6 +42,12 @@ export type InventoryOverviewRow = {
  * fria lager i stället för sin egen (numera oanvända) lagerrad. Delas av
  * /inventory-sidan och dashboardens "under larmnivå"-widget så de aldrig
  * kan råka räkna olika.
+ *
+ * Reserverat/Skickat visas alltid som det VERKLIGA antalet räknat direkt
+ * från ordrarna (order-line-totals.ts), oavsett om den ackumulerade
+ * inventory.reserved_quantity-kolumnen råkat hamna fel - den kolumnen
+ * används bara internt för butikens egen snabba lagerkoll i kassan
+ * (se lib/queries/cart.ts), inte för vad som visas här.
  */
 export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
   const rows = await db
@@ -46,7 +56,6 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
       productId: schema.inventory.productId,
       variantId: schema.inventory.variantId,
       quantity: schema.inventory.quantity,
-      reservedQuantity: schema.inventory.reservedQuantity,
       alarmLevel: schema.inventory.alarmLevel,
       productName: schema.products.nameSv,
       productSku: schema.products.sku,
@@ -61,17 +70,10 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
     )
     .orderBy(asc(schema.products.nameSv));
 
-  const shippedRows = await db
-    .select({
-      inventoryId: schema.inventoryMovements.inventoryId,
-      shippedQuantity: sql<string>`sum(-${schema.inventoryMovements.changeAmount})`,
-    })
-    .from(schema.inventoryMovements)
-    .where(eq(schema.inventoryMovements.reason, "order_shipped"))
-    .groupBy(schema.inventoryMovements.inventoryId);
-  const shippedByInventoryId = new Map(
-    shippedRows.map((row) => [row.inventoryId, Number(row.shippedQuantity)]),
-  );
+  const [trueReserved, trueShipped] = await Promise.all([
+    computeTrueReservedQuantities(),
+    computeTrueShippedQuantities(),
+  ]);
 
   const bundleItems = await getAllBundleItems(db);
   const bundlesByProduct = new Map<string, typeof bundleItems>();
@@ -84,6 +86,9 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
   const rowByKey = new Map(rows.map((row) => [`${row.productId}|${row.variantId ?? ""}`, row]));
 
   return rows.map((row) => {
+    const key = `${row.productId}|${row.variantId ?? ""}`;
+    const reservedQuantity = trueReserved.get(key) ?? 0;
+    const shippedQuantity = trueShipped.get(key) ?? 0;
     const components = row.variantId ? undefined : bundlesByProduct.get(row.productId);
 
     if (!components || components.length === 0) {
@@ -95,11 +100,11 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
         variantName: row.variantName,
         sku: row.variantSku ?? row.productSku,
         quantity: row.quantity,
-        reservedQuantity: row.reservedQuantity,
+        reservedQuantity,
         alarmLevel: row.alarmLevel,
         isBundle: false,
         available: row.quantity,
-        shippedQuantity: shippedByInventoryId.get(row.inventoryId) ?? 0,
+        shippedQuantity,
         bundleBreakdown: null,
       };
     }
@@ -108,8 +113,9 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
       const componentRow = rowByKey.get(
         `${item.componentProductId}|${item.componentVariantId ?? ""}`,
       );
+      const componentKey = `${item.componentProductId}|${item.componentVariantId ?? ""}`;
       const available = componentRow
-        ? Math.max(0, componentRow.quantity - componentRow.reservedQuantity)
+        ? Math.max(0, componentRow.quantity - (trueReserved.get(componentKey) ?? 0))
         : 0;
       const name = componentRow
         ? componentRow.variantName
@@ -132,11 +138,11 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
       variantName: row.variantName,
       sku: row.variantSku ?? row.productSku,
       quantity: row.quantity,
-      reservedQuantity: row.reservedQuantity,
+      reservedQuantity,
       alarmLevel: row.alarmLevel,
       isBundle: true,
       available,
-      shippedQuantity: shippedByInventoryId.get(row.inventoryId) ?? 0,
+      shippedQuantity,
       bundleBreakdown: breakdown,
     };
   });
