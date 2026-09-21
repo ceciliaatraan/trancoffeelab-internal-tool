@@ -30,11 +30,12 @@ export default async function InventoryPage({
           </Link>
           <form action={reconcileReservedQuantitiesAction}>
             <SubmitButton className="tran-label border border-tran-black px-4 py-2.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
-              Synka reserverat
+              Synka lager
             </SubmitButton>
             <p className="mt-1.5 max-w-xs text-xs text-tran-muted">
               Siffrorna nedan är alltid rätträknade. Den här knappen rättar bara vad hemsidans
-              kassa internt tror är ledigt att sälja - klicka om något nyligen kändes fel där.
+              kassa internt tror är ledigt att sälja (reserverat + skickat) - klicka om något
+              nyligen kändes fel där.
             </p>
           </form>
         </div>
@@ -46,8 +47,8 @@ export default async function InventoryPage({
       {reconciled !== null ? (
         <p className="border border-tran-hairline px-4 py-3 text-sm text-tran-muted">
           {reconciled === 0
-            ? "Reserverat stämde redan - inga rader behövde rättas."
-            : `Reserverat synkat - ${reconciled} ${reconciled === 1 ? "rad" : "rader"} rättades.`}
+            ? "Lagret stämde redan - inga rader behövde rättas."
+            : `Lager synkat - ${reconciled} ${reconciled === 1 ? "rad" : "rader"} rättades.`}
         </p>
       ) : null}
       {batchReceived !== null ? (

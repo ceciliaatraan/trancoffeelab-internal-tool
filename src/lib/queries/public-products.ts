@@ -40,8 +40,8 @@ export type PublicProduct = {
   comingSoon: boolean;
 };
 
-function availableQuantity(quantity: number, reserved: number): number {
-  return Math.max(0, quantity - reserved);
+function availableQuantity(quantity: number, reserved: number, shipped: number): number {
+  return Math.max(0, quantity - reserved - shipped);
 }
 
 async function attachVariants(
@@ -61,6 +61,7 @@ async function attachVariants(
       images: schema.productVariants.images,
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
+      shippedQuantity: schema.inventory.shippedQuantity,
     })
     .from(schema.productVariants)
     .leftJoin(
@@ -78,7 +79,9 @@ async function attachVariants(
       name: { sv: row.nameSv, en: row.nameEn },
       price: { amountOre: row.priceOre, currency: "SEK" },
       weightGrams: row.weightGrams,
-      inStock: availableQuantity(row.quantity ?? 0, row.reservedQuantity ?? 0) > 0,
+      inStock:
+        availableQuantity(row.quantity ?? 0, row.reservedQuantity ?? 0, row.shippedQuantity ?? 0) >
+        0,
       images: row.images,
     });
     byProduct.set(row.productId, list);
@@ -105,6 +108,7 @@ function baseProductQuery() {
       status: schema.products.status,
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
+      shippedQuantity: schema.inventory.shippedQuantity,
     })
     .from(schema.products)
     .leftJoin(
@@ -142,7 +146,8 @@ function toPublicProduct(
         ? bundleAvailable > 0
         : variants.length > 0
           ? variants.some((variant) => variant.inStock)
-          : availableQuantity(row.quantity ?? 0, row.reservedQuantity ?? 0) > 0,
+          : availableQuantity(row.quantity ?? 0, row.reservedQuantity ?? 0, row.shippedQuantity ?? 0) >
+            0,
     variants: variantsWithImages,
     isPreorder: row.isPreorder,
     expectedShipDate: row.expectedShipDate,

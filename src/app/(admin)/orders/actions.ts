@@ -272,18 +272,23 @@ export async function markShippedAction(orderId: string, formData: FormData) {
 
         if (!inventoryRow) continue;
 
+        // "I lager" (quantity) rörs INTE vid leverans - den är
+        // ursprungslager, satt bara av admin (se schema/catalog.ts).
+        // Reservationen släpps och skickat-räknaren ökar i stället, så
+        // "Tillgängligt"/kassans lagerkoll (quantity - reserverat -
+        // skickat) blir rätt automatiskt.
         await tx
           .update(schema.inventory)
           .set({
-            quantity: sql`${schema.inventory.quantity} - ${target.quantity}`,
             reservedQuantity: sql`${schema.inventory.reservedQuantity} - ${target.quantity}`,
+            shippedQuantity: sql`${schema.inventory.shippedQuantity} + ${target.quantity}`,
             updatedAt: new Date(),
           })
           .where(eq(schema.inventory.id, inventoryRow.id));
 
         await tx.insert(schema.inventoryMovements).values({
           inventoryId: inventoryRow.id,
-          changeAmount: -target.quantity,
+          changeAmount: target.quantity,
           reason: "order_shipped",
           orderId,
           note:
@@ -340,11 +345,14 @@ export async function deleteTestOrderAction(orderId: string) {
           })
           .where(eq(schema.inventory.id, movement.inventoryId));
       } else if (movement.reason === "order_shipped") {
+        // "I lager" (quantity) rörs aldrig av leverans (se markShippedAction)
+        // - reversera i stället skickat-ökningen och återställ
+        // reservationen som släpptes när ordern skickades.
         await tx
           .update(schema.inventory)
           .set({
-            quantity: sql`${schema.inventory.quantity} - ${movement.changeAmount}`,
-            reservedQuantity: sql`${schema.inventory.reservedQuantity} - ${movement.changeAmount}`,
+            shippedQuantity: sql`${schema.inventory.shippedQuantity} - ${movement.changeAmount}`,
+            reservedQuantity: sql`${schema.inventory.reservedQuantity} + ${movement.changeAmount}`,
             updatedAt: new Date(),
           })
           .where(eq(schema.inventory.id, movement.inventoryId));

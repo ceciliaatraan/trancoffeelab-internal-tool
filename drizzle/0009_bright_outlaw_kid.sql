@@ -1,0 +1,1 @@
+ALTER TABLE "inventory" ADD COLUMN "shipped_quantity" integer DEFAULT 0 NOT NULL;

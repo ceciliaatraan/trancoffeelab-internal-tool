@@ -39,7 +39,13 @@ export async function getBundleItemsForProduct(
     .where(eq(schema.productBundleItems.bundleProductId, bundleProductId));
 }
 
-/** Fysiskt saldo minus reserverat, per (produkt, variant), för en uppsättning lagerförda enheter. */
+/**
+ * Ursprungslager minus reserverat minus skickat, per (produkt, variant),
+ * för en uppsättning lagerförda enheter - vad som faktiskt går att sälja
+ * just nu. `quantity` ("I lager") ändras ALDRIG automatiskt av
+ * ordersystemet (bara admin sätter den, se schema/catalog.ts), så
+ * skickat måste dras ifrån här precis som reserverat.
+ */
 export async function getAvailabilityByKey(
   dbOrTx: DbOrTx,
   keys: { productId: string; variantId: string | null }[],
@@ -54,6 +60,7 @@ export async function getAvailabilityByKey(
       variantId: schema.inventory.variantId,
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
+      shippedQuantity: schema.inventory.shippedQuantity,
     })
     .from(schema.inventory)
     .where(inArray(schema.inventory.productId, productIds));
@@ -61,7 +68,7 @@ export async function getAvailabilityByKey(
   for (const row of rows) {
     map.set(
       `${row.productId}|${row.variantId ?? ""}`,
-      Math.max(0, row.quantity - row.reservedQuantity),
+      Math.max(0, row.quantity - row.reservedQuantity - row.shippedQuantity),
     );
   }
   return map;

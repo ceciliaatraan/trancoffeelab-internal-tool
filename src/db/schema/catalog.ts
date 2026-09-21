@@ -92,6 +92,19 @@ productVariants.enableRLS();
 /**
  * En rad per lagerförd enhet: antingen en produkt utan varianter
  * (variantId null) eller en specifik variant (variantId satt).
+ *
+ * `quantity` ("I lager" i adminet) är "ursprungslager" - totalt mottaget,
+ * satt ENDAST av admin (Justera/Ny leverans) och ALDRIG ändrat
+ * automatiskt av ordersystemet. `shippedQuantity` ("Skickat") ökar
+ * automatiskt när en order markeras skickad/levererad (se
+ * markShippedAction) - vad som går att sälja/checka ut är alltid
+ * `quantity - reservedQuantity - shippedQuantity` (se lib/queries/cart.ts,
+ * lib/inventory/bundles.ts, lib/queries/public-products.ts). Ägaren
+ * försökte upprepade gånger skriva in "ursprungslager" direkt i
+ * quantity (fullt logiskt - det är det enda talet man känner till) och
+ * det krockade med att quantity tidigare AUTO-minskade vid leverans -
+ * löst 2026-09-21 genom att separera de två med en egen kolumn i
+ * stället för att fortsätta be ägaren komma ihåg skillnaden.
  */
 export const inventory = pgTable(
   "inventory",
@@ -105,6 +118,7 @@ export const inventory = pgTable(
     }),
     quantity: integer("quantity").notNull().default(0),
     reservedQuantity: integer("reserved_quantity").notNull().default(0),
+    shippedQuantity: integer("shipped_quantity").notNull().default(0),
     alarmLevel: integer("alarm_level").notNull().default(0),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()

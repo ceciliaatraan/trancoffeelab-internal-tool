@@ -41,6 +41,7 @@ async function resolveBaseProduct(
       images: schema.products.images,
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
+      shippedQuantity: schema.inventory.shippedQuantity,
     })
     .from(schema.products)
     .leftJoin(
@@ -74,7 +75,8 @@ async function resolveBaseProduct(
     taxRate: row.taxRate,
     weightGrams: row.weightGrams,
     available:
-      bundleAvailable ?? Math.max(0, (row.quantity ?? 0) - (row.reservedQuantity ?? 0)),
+      bundleAvailable ??
+      Math.max(0, (row.quantity ?? 0) - (row.reservedQuantity ?? 0) - (row.shippedQuantity ?? 0)),
     productId: row.productId,
     variantId: null,
     isPreorder: row.isPreorder,
@@ -105,6 +107,7 @@ async function resolveVariant(
       productImages: schema.products.images,
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
+      shippedQuantity: schema.inventory.shippedQuantity,
     })
     .from(schema.productVariants)
     .innerJoin(schema.products, eq(schema.products.id, schema.productVariants.productId))
@@ -125,7 +128,10 @@ async function resolveVariant(
     priceOre: row.priceOre,
     taxRate: row.taxRate,
     weightGrams: row.weightGrams,
-    available: Math.max(0, (row.quantity ?? 0) - (row.reservedQuantity ?? 0)),
+    available: Math.max(
+      0,
+      (row.quantity ?? 0) - (row.reservedQuantity ?? 0) - (row.shippedQuantity ?? 0),
+    ),
     productId: row.productId,
     variantId: row.variantId,
     isPreorder: row.isPreorder,

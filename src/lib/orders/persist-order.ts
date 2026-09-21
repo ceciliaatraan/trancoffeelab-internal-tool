@@ -41,10 +41,12 @@ function sumTaxAmount(order: KustomOrderManagementOrder): number {
  *
  * `changeAmount` i inventory_movements tolkas olika beroende på `reason`
  * (eget designbeslut, inte hämtat från Kustom): för order_reserved/
- * order_released ändras `reservedQuantity`, för manual_adjustment/return/
- * order_shipped ändras `quantity`. En order_shipped-rad (fas 4)
- * representerar BÅDA (fysiskt lager minskar och reservationen släpps
- * med samma belopp).
+ * order_released ändras `reservedQuantity`, för manual_adjustment/return
+ * ändras `quantity` ("I lager"/ursprungslager, bara admin sätter den).
+ * En order_shipped-rad (fas 4) representerar BÅDA - reservationen
+ * släpps OCH `shippedQuantity` ökar med samma belopp (se
+ * markShippedAction/schema/catalog.ts) - `quantity` självt rörs aldrig
+ * av ordersystemet.
  */
 export async function persistOrderFromKustom(
   order: KustomOrderManagementOrder,

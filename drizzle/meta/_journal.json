@@ -64,6 +64,13 @@
       "when": 1788958064368,
       "tag": "0008_brave_rocket_raccoon",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790014087833,
+      "tag": "0009_bright_outlaw_kid",
+      "breakpoints": true
     }
   ]
 }

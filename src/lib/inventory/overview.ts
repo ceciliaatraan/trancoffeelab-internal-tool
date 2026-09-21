@@ -17,28 +17,28 @@ export type InventoryOverviewRow = {
   productName: string;
   variantName: string | null;
   sku: string;
+  /** "I lager": ursprungslager, satt ENDAST av admin (Justera/Ny leverans) - ändras aldrig automatiskt av ordersystemet, se schema/catalog.ts. */
   quantity: number;
   /** Alltid det VERKLIGA antalet öppna ordrar just nu (se order-line-totals.ts) - inte den ackumulerade inventory.reserved_quantity-kolumnen, som bara används internt för butikens snabba lagerkoll i kassan. */
   reservedQuantity: number;
   alarmLevel: number;
   isBundle: boolean;
-  /** "I lager": rå kvantitet för vanliga rader, komponent-beräknat antal kit för bundlar. */
+  /** Samma som `quantity` för vanliga rader, komponent-beräknat antal kit för bundlar (som redan drar ifrån komponenternas reserverat OCH skickat, se bundles.ts). */
   available: number;
   /**
    * Totalt skickat/levererat genom tiderna - alltid det VERKLIGA antalet
    * räknat direkt från ordrar med fulfillment_status = shipped (se
-   * order-line-totals.ts), inte en rörelselogg-summa. "Reserverat" ingår
-   * redan i "I lager" (den dras bara ifrån vid faktisk leverans), så det
-   * som en gång togs emot i lager = I lager + Skickat (INTE + Reserverat,
-   * det vore dubbelräkning).
+   * order-line-totals.ts), inte den ackumulerade inventory.shipped_
+   * quantity-kolumnen (som bara används internt för kassan, av samma
+   * skäl som reserved_quantity ovan).
    */
   shippedQuantity: number;
   /**
    * "Tillgängligt": hur många som är fria att sälja RIGHT NOW - I lager
-   * minus Reserverat (öppna ordrar). Beräknas automatiskt, aldrig satt
+   * minus Reserverat minus Skickat. Beräknas automatiskt, aldrig satt
    * manuellt. Bundlar visar "-" här (samma som Reserverat/Skickat), för
    * "I lager" på en kit-rad är redan det komponent-beräknade antalet,
-   * som redan tar hänsyn till komponenternas reserverat.
+   * som redan tar hänsyn till komponenternas reserverat/skickat.
    */
   sellableQuantity: number | null;
   bundleBreakdown: BundleComponentStatus[] | null;
@@ -130,7 +130,7 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
           isBundle: false,
           available: row.quantity,
           shippedQuantity,
-          sellableQuantity: Math.max(0, row.quantity - reservedQuantity),
+          sellableQuantity: Math.max(0, row.quantity - reservedQuantity - shippedQuantity),
           bundleBreakdown: null,
         },
       ];
@@ -142,7 +142,12 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
       );
       const componentKey = `${item.componentProductId}|${item.componentVariantId ?? ""}`;
       const available = componentRow
-        ? Math.max(0, componentRow.quantity - (trueReserved.get(componentKey) ?? 0))
+        ? Math.max(
+            0,
+            componentRow.quantity -
+              (trueReserved.get(componentKey) ?? 0) -
+              (trueShipped.get(componentKey) ?? 0),
+          )
         : 0;
       const name = componentRow
         ? componentRow.variantName

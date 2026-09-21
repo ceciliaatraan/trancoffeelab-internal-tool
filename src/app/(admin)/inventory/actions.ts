@@ -6,7 +6,10 @@ import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCurrentAdmin } from "@/lib/current-admin";
 import { getBundleItemsForProduct } from "@/lib/inventory/bundles";
-import { computeTrueReservedQuantities } from "@/lib/inventory/order-line-totals";
+import {
+  computeTrueReservedQuantities,
+  computeTrueShippedQuantities,
+} from "@/lib/inventory/order-line-totals";
 import { inventoryAdjustSchema } from "@/lib/validation/product";
 
 export async function adjustInventory(formData: FormData) {
@@ -89,16 +92,23 @@ export async function adjustInventory(formData: FormData) {
 }
 
 /**
- * Räknar om reserverat lager från grunden utifrån öppna ordrar (se
- * computeTrueReservedQuantities) och rättar reserved_quantity där den
- * inte stämmer - en knapp admin kan klicka på för att självläka drift
- * som uppstått av buggar i enskilda kod-vägar (t.ex. avbokningar som
- * tidigare inte släppte sin reservation).
+ * Räknar om reserverat OCH skickat lager från grunden utifrån de
+ * faktiska ordrarna (se order-line-totals.ts) och rättar reserved_
+ * quantity/shipped_quantity där de inte stämmer - en knapp admin kan
+ * klicka på för att självläka drift som uppstått av buggar i enskilda
+ * kod-vägar (t.ex. avbokningar som tidigare inte släppte sin
+ * reservation). De här två kolumnerna är de enda inventory-fälten
+ * hemsidans kassa faktiskt läser (lib/queries/cart.ts,
+ * lib/inventory/bundles.ts) - /inventory-sidan själv visar redan alltid
+ * det rätträknade värdet oavsett, den här knappen är till för kassan.
  */
 export async function reconcileReservedQuantitiesAction() {
   const adminUser = await requireCurrentAdmin();
 
-  const trueReserved = await computeTrueReservedQuantities();
+  const [trueReserved, trueShipped] = await Promise.all([
+    computeTrueReservedQuantities(),
+    computeTrueShippedQuantities(),
+  ]);
 
   const rows = await db
     .select({
@@ -106,6 +116,7 @@ export async function reconcileReservedQuantitiesAction() {
       productId: schema.inventory.productId,
       variantId: schema.inventory.variantId,
       reservedQuantity: schema.inventory.reservedQuantity,
+      shippedQuantity: schema.inventory.shippedQuantity,
     })
     .from(schema.inventory);
 
@@ -114,24 +125,41 @@ export async function reconcileReservedQuantitiesAction() {
   await db.transaction(async (tx) => {
     for (const row of rows) {
       const key = `${row.productId}|${row.variantId ?? ""}`;
-      const trueValue = trueReserved.get(key) ?? 0;
-      const delta = trueValue - row.reservedQuantity;
-      if (delta === 0) continue;
+      const trueReservedValue = trueReserved.get(key) ?? 0;
+      const trueShippedValue = trueShipped.get(key) ?? 0;
+      const reservedDelta = trueReservedValue - row.reservedQuantity;
+      const shippedDelta = trueShippedValue - row.shippedQuantity;
+      if (reservedDelta === 0 && shippedDelta === 0) continue;
 
       correctedCount += 1;
 
       await tx
         .update(schema.inventory)
-        .set({ reservedQuantity: trueValue, updatedAt: new Date() })
+        .set({
+          reservedQuantity: trueReservedValue,
+          shippedQuantity: trueShippedValue,
+          updatedAt: new Date(),
+        })
         .where(eq(schema.inventory.id, row.id));
 
-      await tx.insert(schema.inventoryMovements).values({
-        inventoryId: row.id,
-        changeAmount: delta,
-        reason: delta < 0 ? "order_released" : "order_reserved",
-        note: `Avstämning: reserverat rättat från ${row.reservedQuantity} till ${trueValue} (baserat på öppna ordrar).`,
-        causedByAdminId: adminUser.id,
-      });
+      if (reservedDelta !== 0) {
+        await tx.insert(schema.inventoryMovements).values({
+          inventoryId: row.id,
+          changeAmount: reservedDelta,
+          reason: reservedDelta < 0 ? "order_released" : "order_reserved",
+          note: `Avstämning: reserverat rättat från ${row.reservedQuantity} till ${trueReservedValue} (baserat på öppna ordrar).`,
+          causedByAdminId: adminUser.id,
+        });
+      }
+      if (shippedDelta !== 0) {
+        await tx.insert(schema.inventoryMovements).values({
+          inventoryId: row.id,
+          changeAmount: shippedDelta,
+          reason: "order_shipped",
+          note: `Avstämning: skickat rättat från ${row.shippedQuantity} till ${trueShippedValue} (baserat på skickade ordrar).`,
+          causedByAdminId: adminUser.id,
+        });
+      }
     }
   });
 
