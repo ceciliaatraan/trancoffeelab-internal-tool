@@ -22,7 +22,10 @@ export type ResolvedCartLine = {
   slug: string;
 };
 
-async function resolveBaseProduct(sku: string): Promise<ResolvedCartLine | null> {
+async function resolveBaseProduct(
+  sku: string,
+  requirePublished: boolean,
+): Promise<ResolvedCartLine | null> {
   const [row] = await db
     .select({
       productId: schema.products.id,
@@ -47,7 +50,12 @@ async function resolveBaseProduct(sku: string): Promise<ResolvedCartLine | null>
         isNull(schema.inventory.variantId),
       ),
     )
-    .where(and(eq(schema.products.sku, sku), eq(schema.products.status, "published")));
+    .where(
+      and(
+        eq(schema.products.sku, sku),
+        requirePublished ? eq(schema.products.status, "published") : undefined,
+      ),
+    );
 
   if (!row) return null;
 
@@ -76,7 +84,10 @@ async function resolveBaseProduct(sku: string): Promise<ResolvedCartLine | null>
   };
 }
 
-async function resolveVariant(sku: string): Promise<ResolvedCartLine | null> {
+async function resolveVariant(
+  sku: string,
+  requirePublished: boolean,
+): Promise<ResolvedCartLine | null> {
   const [row] = await db
     .select({
       productId: schema.productVariants.productId,
@@ -98,7 +109,12 @@ async function resolveVariant(sku: string): Promise<ResolvedCartLine | null> {
     .from(schema.productVariants)
     .innerJoin(schema.products, eq(schema.products.id, schema.productVariants.productId))
     .leftJoin(schema.inventory, eq(schema.inventory.variantId, schema.productVariants.id))
-    .where(and(eq(schema.productVariants.sku, sku), eq(schema.products.status, "published")));
+    .where(
+      and(
+        eq(schema.productVariants.sku, sku),
+        requirePublished ? eq(schema.products.status, "published") : undefined,
+      ),
+    );
 
   if (!row) return null;
 
@@ -119,7 +135,24 @@ async function resolveVariant(sku: string): Promise<ResolvedCartLine | null> {
   };
 }
 
+export type ResolveCartLineOptions = {
+  /**
+   * Standard true (varukorg/checkout ska bara sälja publicerade produkter).
+   * Sätt till false vid orderhantering efter köpet (t.ex. markera skickad/
+   * levererad) - en produkt kan ha avpublicerats eller arkiverats sedan
+   * ordern lades, men lagret för den ska ändå kunna justeras.
+   */
+  requirePublished?: boolean;
+};
+
 /** Slår upp en varukorgsrad på SKU - provar produkt, sedan variant. Priser/moms/lager kommer alltid härifrån, aldrig från klienten. */
-export async function resolveCartLine(sku: string): Promise<ResolvedCartLine | null> {
-  return (await resolveBaseProduct(sku)) ?? (await resolveVariant(sku));
+export async function resolveCartLine(
+  sku: string,
+  options: ResolveCartLineOptions = {},
+): Promise<ResolvedCartLine | null> {
+  const requirePublished = options.requirePublished ?? true;
+  return (
+    (await resolveBaseProduct(sku, requirePublished)) ??
+    (await resolveVariant(sku, requirePublished))
+  );
 }

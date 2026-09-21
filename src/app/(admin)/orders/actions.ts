@@ -181,7 +181,7 @@ export async function markShippedAction(orderId: string, formData: FormData) {
 
     for (const line of lines) {
       if (line.type !== "physical" || !line.reference) continue;
-      const resolved = await resolveCartLine(line.reference);
+      const resolved = await resolveCartLine(line.reference, { requirePublished: false });
       if (!resolved) continue;
 
       const targets = await expandLineToInventoryTargets(
