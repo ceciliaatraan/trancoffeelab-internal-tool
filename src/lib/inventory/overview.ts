@@ -33,6 +33,14 @@ export type InventoryOverviewRow = {
    * det vore dubbelräkning).
    */
   shippedQuantity: number;
+  /**
+   * "Tillgängligt": hur många som är fria att sälja RIGHT NOW - I lager
+   * minus Reserverat (öppna ordrar). Beräknas automatiskt, aldrig satt
+   * manuellt. Bundlar visar "-" här (samma som Reserverat/Skickat), för
+   * "I lager" på en kit-rad är redan det komponent-beräknade antalet,
+   * som redan tar hänsyn till komponenternas reserverat.
+   */
+  sellableQuantity: number | null;
   bundleBreakdown: BundleComponentStatus[] | null;
 };
 
@@ -105,6 +113,7 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
         isBundle: false,
         available: row.quantity,
         shippedQuantity,
+        sellableQuantity: Math.max(0, row.quantity - reservedQuantity),
         bundleBreakdown: null,
       };
     }
@@ -143,6 +152,7 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
       isBundle: true,
       available,
       shippedQuantity,
+      sellableQuantity: null,
       bundleBreakdown: breakdown,
     };
   });
