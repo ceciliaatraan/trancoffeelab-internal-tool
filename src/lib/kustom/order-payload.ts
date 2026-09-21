@@ -23,10 +23,18 @@ export type ShippingInput = {
 };
 
 export type DiscountInput = {
+  /** Rabattkodens namn - alltid raden `reference` (används av persist-order.ts för att räkna upp discountCodes.usedCount), oavsett `label`. */
   code: string;
   /** Rabattens storlek som ett positivt belopp i öre - läggs på ordern som en negativ rad. */
   amountOre: number;
   taxRateHundredthsPercent: number;
+  /**
+   * Anpassat radnamn - används i stället för standardnamnet "Rabatt
+   * (${code})"/"Discount (${code})" när raden representerar mer än
+   * bara koden (t.ex. fri frakt vid tröskelbelopp, eller en kombination
+   * av kod + fri frakt - se checkout/session/route.ts).
+   */
+  label?: { sv: string; en: string };
 };
 
 export type KustomOrderLine = {
@@ -127,7 +135,11 @@ export function buildOrderLines({
     lines.push({
       type: "discount",
       reference: discount.code,
-      name: locale === "en-SE" ? `Discount (${discount.code})` : `Rabatt (${discount.code})`,
+      name: discount.label
+        ? localizedName(discount.label.sv, discount.label.en, locale)
+        : locale === "en-SE"
+          ? `Discount (${discount.code})`
+          : `Rabatt (${discount.code})`,
       quantity: 1,
       quantity_unit: "st",
       unit_price: negativeAmount,

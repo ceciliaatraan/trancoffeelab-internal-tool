@@ -276,6 +276,22 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
   fungerar, inte något vår payload kan runda - skulle kräva svar från
   Kustom support (se tidigare utkast till supportmejl) om det blir
   aktuellt.
+- **Samma live-frakt-blindhet gällde "Fri frakt över X kr"
+  (tröskelbeloppet), upptäckt samma dag när ägaren frågade om
+  PostNord-priset kunde nollas för en fraktrabatt.** `cart.freeShipping`
+  nollade bara `shippingOption.price` (fallbacken), inte Kustoms
+  live-pris - exakt samma gap som rabattkoder hade. Löst med samma
+  mönster: `cart.shippingFlatRateOre` (den ORÖRDA flatraten - `cart.
+  shippingOre` är redan nollad av `freeShipping`) läggs som en
+  kompensation på rabattraden, tillsammans med en eventuell aktiv
+  rabattkod (EN kombinerad rad - `DiscountInput.label` styr radens
+  namn: "Fri frakt", "Rabatt (KOD)" eller "Rabatt (KOD) + Fri frakt").
+  Samma tak (kan inte göra `order_amount` negativt) gäller här också.
+  I Kustoms checkout-widget syns fortfarande "Frakt: 49 kr" som sin
+  egen rad (det är PostNords live-pris, kan inte nollas av oss) - det
+  är en separat rabattrad som gör att TOTALEN blir rätt, inte att
+  fraktraden själv visar 0 kr. Bekräftat med en skärmdump av en riktig
+  checkout: delsumma 349 kr, frakt 49 kr, rabatt −49 kr, totalt 349 kr.
 
 ## Status i koden
 

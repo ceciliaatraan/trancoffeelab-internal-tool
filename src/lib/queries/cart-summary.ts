@@ -41,6 +41,8 @@ export type ValidatedCart = {
   subtotalOre: number;
   /** 0 om fri frakt gäller (se freeShipping) - annars shop_settings flatrate. */
   shippingOre: number;
+  /** shop_settings flatrate, ALDRIG nollad av fri frakt - vad frakten skulle kosta annars (checkout/session/route.ts behöver den för att kompensera för fri frakt i order_amount). */
+  shippingFlatRateOre: number;
   freeShipping: boolean;
   discount: ValidatedCartDiscount | null;
 };
@@ -117,5 +119,13 @@ export async function buildValidatedCart(request: CartRequest): Promise<Validate
       : { code: request.discountCode, valid: false, reason: evaluation.reason };
   }
 
-  return { items, valid, subtotalOre, shippingOre, freeShipping, discount };
+  return {
+    items,
+    valid,
+    subtotalOre,
+    shippingOre,
+    shippingFlatRateOre: shopSettings.shippingFlatRateOre,
+    freeShipping,
+    discount,
+  };
 }

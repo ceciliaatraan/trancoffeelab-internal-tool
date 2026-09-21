@@ -86,6 +86,45 @@ describe("buildOrderLines", () => {
     expect(lines[0].total_tax_amount).toBeLessThan(0);
   });
 
+  it("namnger rabattraden efter koden som standard, men reference är alltid koden", () => {
+    const lines = buildOrderLines({
+      items: [],
+      discount: { code: "SOMMAR10", amountOre: 1000, taxRateHundredthsPercent: 1200 },
+      locale: "sv-SE",
+    });
+    expect(lines[0].reference).toBe("SOMMAR10");
+    expect(lines[0].name).toBe("Rabatt (SOMMAR10)");
+  });
+
+  it("använder discount.label i stället för standardnamnet när det är satt (t.ex. fri frakt kombinerat med en kod)", () => {
+    const svLines = buildOrderLines({
+      items: [],
+      discount: {
+        code: "SOMMAR10",
+        amountOre: 1000,
+        taxRateHundredthsPercent: 1200,
+        label: { sv: "Rabatt (SOMMAR10) + Fri frakt", en: "Discount (SOMMAR10) + Free shipping" },
+      },
+      locale: "sv-SE",
+    });
+    expect(svLines[0].name).toBe("Rabatt (SOMMAR10) + Fri frakt");
+    // reference (används för att räkna upp discountCodes.usedCount) är
+    // fortfarande den riktiga koden, oavsett visningsnamnet.
+    expect(svLines[0].reference).toBe("SOMMAR10");
+
+    const enLines = buildOrderLines({
+      items: [],
+      discount: {
+        code: "SOMMAR10",
+        amountOre: 1000,
+        taxRateHundredthsPercent: 1200,
+        label: { sv: "Rabatt (SOMMAR10) + Fri frakt", en: "Discount (SOMMAR10) + Free shipping" },
+      },
+      locale: "en-SE",
+    });
+    expect(enLines[0].name).toBe("Discount (SOMMAR10) + Free shipping");
+  });
+
   it("sätter attributes.weight per styck (inte multiplicerat med quantity) på varje physical-rad, så vikten följer med till Kustom Shipping Assistant/PostNord", () => {
     const lines = buildOrderLines({
       items: [

@@ -5,6 +5,7 @@ import { buildValidatedCart } from "@/lib/queries/cart-summary";
 import {
   buildCreateOrderPayload,
   type CartItemInput,
+  type DiscountInput,
   type KustomShippingOption,
 } from "@/lib/kustom/order-payload";
 import { calculateTaxFromGross } from "@/lib/kustom/tax";
@@ -106,29 +107,49 @@ export async function POST(request: Request) {
     tax_rate: shippingTaxRate,
   };
 
+  // Samma problem som rabattkoder (se ovan) gäller fri frakt vid
+  // tröskelbelopp: shippingAmountOre=0 ovan nollar bara vår egen
+  // fallback, inte Kustoms live PostNord-pris. Kompenserar därför här
+  // med cart.shippingFlatRateOre (den ORÖRDA flatraten, INTE
+  // cart.shippingOre som redan är nollad av fri frakt) på samma sätt -
+  // lägg det till på rabattraden i stället.
+  const freeShippingCompensationOre = cart.freeShipping ? cart.shippingFlatRateOre : 0;
+  const codeDiscountOre = cart.discount?.valid ? cart.discount.amountOre : 0;
+
   // Rabattraden kan aldrig göra order_amount negativt - frakten är inte
   // längre med i order_amount alls (se ovan), så taket är produkternas
-  // egen delsumma. En rabattkod värd mer än det (t.ex. en "100 % på allt,
-  // inklusive frakt"-kod) kan alltså inte tvinga fram gratis frakt när
-  // Kustom hämtar ett live PostNord-pris - det är en gräns i hur Kustom
-  // Shipping Assistant fungerar (fraktpriset läggs på UTANFÖR
-  // order_amount), inte något vi kan runda via payloaden. Vanliga
-  // rabatter (mindre än ordersumman) blir alltid rätt.
-  const discountAmountOre = cart.discount?.valid
-    ? Math.min(cart.discount.amountOre, cart.subtotalOre)
-    : 0;
+  // egen delsumma. En kombination värd mer än det (t.ex. en "100 % på
+  // allt, inklusive frakt"-kod, eller en redan stor rabatt PLUS fri
+  // frakt) kan alltså inte tvinga fram gratis frakt när Kustom hämtar
+  // ett live PostNord-pris - det är en gräns i hur Kustom Shipping
+  // Assistant fungerar (fraktpriset läggs på UTANFÖR order_amount),
+  // inte något vi kan runda via payloaden. Vanliga fall (rabatt +
+  // ev. fri frakt tillsammans mindre än ordersumman) blir alltid rätt.
+  const discountAmountOre = Math.min(codeDiscountOre + freeShippingCompensationOre, cart.subtotalOre);
+
+  const discountLabel: DiscountInput["label"] =
+    codeDiscountOre > 0 && freeShippingCompensationOre > 0
+      ? {
+          sv: `Rabatt (${cart.discount?.valid ? cart.discount.code : ""}) + Fri frakt`,
+          en: `Discount (${cart.discount?.valid ? cart.discount.code : ""}) + Free shipping`,
+        }
+      : freeShippingCompensationOre > 0
+        ? { sv: "Fri frakt", en: "Free shipping" }
+        : undefined;
 
   const payload = buildCreateOrderPayload({
     items,
     shippingOption,
-    // Hela rabatten (produkter + frakt, inom taket ovan) hamnar på den
-    // här raden - se kommentaren vid shippingAmountOre ovan för varför.
+    // Rabattkod och/eller fri frakt (inom taket ovan) hamnar tillsammans
+    // på den här EN raden - se kommentaren vid shippingAmountOre ovan
+    // för varför.
     discount:
-      discountAmountOre > 0 && cart.discount?.valid
+      discountAmountOre > 0
         ? {
-            code: cart.discount.code,
+            code: cart.discount?.valid ? cart.discount.code : "FRI_FRAKT",
             amountOre: discountAmountOre,
             taxRateHundredthsPercent: shippingTaxRate,
+            label: discountLabel,
           }
         : undefined,
     locale: parsed.data.locale,
@@ -141,14 +162,14 @@ export async function POST(request: Request) {
       {
         html_snippet: extractHtmlSnippet(order),
         order_id: extractOrderId(order),
-        // The discount was already resolved into the Kustom payload above -
-        // echoed back here so the storefront's own order summary (which has
-        // no other way to know the amount) can actually show it. Uses the
-        // capped discountAmountOre so the summary never shows a bigger
-        // discount than what was actually applied to order_amount.
+        // The discount code's OWN amount, echoed back so the storefront's
+        // "Rabatt (CODE)" line can show it - deliberately excludes any
+        // free-shipping compensation folded into the Kustom payload above,
+        // since the storefront already shows "Fri frakt" as its own thing
+        // (the progress bar/threshold UI), independent of a discount code.
         discount:
-          discountAmountOre > 0 && cart.discount?.valid
-            ? { code: cart.discount.code, amountOre: discountAmountOre }
+          cart.discount?.valid && codeDiscountOre > 0
+            ? { code: cart.discount.code, amountOre: Math.min(codeDiscountOre, cart.subtotalOre) }
             : null,
       },
       { headers: corsHeaders(origin) },
