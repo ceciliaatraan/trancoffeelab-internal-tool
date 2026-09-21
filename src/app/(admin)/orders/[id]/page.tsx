@@ -278,34 +278,50 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         )}
 
         {canShip ? (
-          <form
-            action={markShippedAction.bind(null, order.id)}
-            className="flex flex-wrap items-end gap-3 border border-tran-hairline p-4"
-          >
-            <div>
-              <label className="tran-label mb-1 block text-[11px] text-tran-muted">
-                Fraktbolag
-              </label>
-              <input
-                name="carrier"
-                required
-                className="w-40 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="tran-label mb-1 block text-[11px] text-tran-muted">
-                Spårningsnummer
-              </label>
-              <input
-                name="trackingNumber"
-                required
-                className="w-52 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
-              />
-            </div>
-            <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
-              Markera som skickad
-            </SubmitButton>
-          </form>
+          <div className="flex flex-wrap gap-3">
+            <form
+              action={markShippedAction.bind(null, order.id)}
+              className="flex flex-wrap items-end gap-3 border border-tran-hairline p-4"
+            >
+              <div>
+                <label className="tran-label mb-1 block text-[11px] text-tran-muted">
+                  Fraktbolag
+                </label>
+                <input
+                  name="carrier"
+                  required
+                  className="w-40 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
+                />
+              </div>
+              <div>
+                <label className="tran-label mb-1 block text-[11px] text-tran-muted">
+                  Spårningsnummer
+                </label>
+                <input
+                  name="trackingNumber"
+                  required
+                  className="w-52 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
+                />
+              </div>
+              <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
+                Markera som skickad
+              </SubmitButton>
+            </form>
+
+            <form
+              action={markShippedAction.bind(null, order.id)}
+              className="flex flex-col items-start justify-end gap-1 border border-tran-hairline p-4"
+            >
+              <input type="hidden" name="carrier" value="Levererad för hand" />
+              <input type="hidden" name="trackingNumber" value="(ingen spårning)" />
+              <p className="text-xs text-tran-muted">
+                För ordrar som lämnas över personligen, utan fraktbolag.
+              </p>
+              <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
+                Markera som levererad för hand
+              </SubmitButton>
+            </form>
+          </div>
         ) : null}
       </section>
 
