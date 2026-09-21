@@ -22,17 +22,7 @@ export type InventoryOverviewRow = {
   reservedQuantity: number;
   alarmLevel: number;
   isBundle: boolean;
-  /**
-   * True bara för en produkts EGEN (variant-lösa) lagerrad, när den
-   * produkten har konfigurerade varianter (t.ex. "No Regrets Horse" med
-   * varianterna "Malet kaffe"/"Kaffebönor"). Ingen kund kan köpa
-   * produkten utan att välja en variant, så den egna raden har aldrig
-   * riktig försäljning - "I lager" blir då bara en summering av
-   * varianternas lager (inte en egen redigerbar siffra), på samma sätt
-   * som en kit-rad räknas ut från sina komponenter.
-   */
-  hasVariants: boolean;
-  /** "I lager": rå kvantitet för vanliga rader, komponent-beräknat antal kit för bundlar, summan av varianterna för en variant-förälder. */
+  /** "I lager": rå kvantitet för vanliga rader, komponent-beräknat antal kit för bundlar. */
   available: number;
   /**
    * Totalt skickat/levererat genom tiderna - alltid det VERKLIGA antalet
@@ -66,6 +56,15 @@ export type InventoryOverviewRow = {
  * inventory.reserved_quantity-kolumnen råkat hamna fel - den kolumnen
  * används bara internt för butikens egen snabba lagerkoll i kassan
  * (se lib/queries/cart.ts), inte för vad som visas här.
+ *
+ * En produkts EGEN (variant-lösa) lagerrad visas ALDRIG här om
+ * produkten har konfigurerade varianter (t.ex. "No Regrets Horse" med
+ * "Malet kaffe"/"Kaffebönor") - ingen kund kan köpa produkten utan att
+ * välja en variant (se toPublicProduct i public-products.ts, som redan
+ * ignorerar den raden helt), så den är bara förvirrande dubbeldata på
+ * lagersidan. Den underliggande inventory-raden finns kvar i databasen
+ * (variant-tabellen är beroende av produktraden), den filtreras bara
+ * bort härifrån.
  */
 export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
   const rows = await db
@@ -107,55 +106,34 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
     rows.filter((row) => row.variantId !== null).map((row) => row.productId),
   );
 
-  return rows.map((row) => {
+  return rows.flatMap((row): InventoryOverviewRow[] => {
+    const hasVariants = !row.variantId && variantProductIds.has(row.productId);
+    if (hasVariants) return [];
+
     const key = `${row.productId}|${row.variantId ?? ""}`;
     const reservedQuantity = trueReserved.get(key) ?? 0;
     const shippedQuantity = trueShipped.get(key) ?? 0;
     const components = row.variantId ? undefined : bundlesByProduct.get(row.productId);
-    const hasVariants = !row.variantId && variantProductIds.has(row.productId);
-
-    if (hasVariants) {
-      const variantQuantitySum = rows
-        .filter((r) => r.productId === row.productId && r.variantId !== null)
-        .reduce((sum, r) => sum + r.quantity, 0);
-
-      return {
-        inventoryId: row.inventoryId,
-        productId: row.productId,
-        variantId: row.variantId,
-        productName: row.productName,
-        variantName: row.variantName,
-        sku: row.variantSku ?? row.productSku,
-        quantity: row.quantity,
-        reservedQuantity,
-        alarmLevel: row.alarmLevel,
-        isBundle: false,
-        hasVariants: true,
-        available: variantQuantitySum,
-        shippedQuantity,
-        sellableQuantity: null,
-        bundleBreakdown: null,
-      };
-    }
 
     if (!components || components.length === 0) {
-      return {
-        inventoryId: row.inventoryId,
-        productId: row.productId,
-        variantId: row.variantId,
-        productName: row.productName,
-        variantName: row.variantName,
-        sku: row.variantSku ?? row.productSku,
-        quantity: row.quantity,
-        reservedQuantity,
-        alarmLevel: row.alarmLevel,
-        isBundle: false,
-        hasVariants: false,
-        available: row.quantity,
-        shippedQuantity,
-        sellableQuantity: Math.max(0, row.quantity - reservedQuantity),
-        bundleBreakdown: null,
-      };
+      return [
+        {
+          inventoryId: row.inventoryId,
+          productId: row.productId,
+          variantId: row.variantId,
+          productName: row.productName,
+          variantName: row.variantName,
+          sku: row.variantSku ?? row.productSku,
+          quantity: row.quantity,
+          reservedQuantity,
+          alarmLevel: row.alarmLevel,
+          isBundle: false,
+          available: row.quantity,
+          shippedQuantity,
+          sellableQuantity: Math.max(0, row.quantity - reservedQuantity),
+          bundleBreakdown: null,
+        },
+      ];
     }
 
     const breakdown: BundleComponentStatus[] = components.map((item) => {
@@ -179,22 +157,23 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
       Math.min(...breakdown.map((c) => Math.floor(c.available / c.quantityPerBundle))),
     );
 
-    return {
-      inventoryId: row.inventoryId,
-      productId: row.productId,
-      variantId: row.variantId,
-      productName: row.productName,
-      variantName: row.variantName,
-      sku: row.variantSku ?? row.productSku,
-      quantity: row.quantity,
-      reservedQuantity,
-      alarmLevel: row.alarmLevel,
-      isBundle: true,
-      hasVariants: false,
-      available,
-      shippedQuantity,
-      sellableQuantity: null,
-      bundleBreakdown: breakdown,
-    };
+    return [
+      {
+        inventoryId: row.inventoryId,
+        productId: row.productId,
+        variantId: row.variantId,
+        productName: row.productName,
+        variantName: row.variantName,
+        sku: row.variantSku ?? row.productSku,
+        quantity: row.quantity,
+        reservedQuantity,
+        alarmLevel: row.alarmLevel,
+        isBundle: true,
+        available,
+        shippedQuantity,
+        sellableQuantity: null,
+        bundleBreakdown: breakdown,
+      },
+    ];
   });
 }

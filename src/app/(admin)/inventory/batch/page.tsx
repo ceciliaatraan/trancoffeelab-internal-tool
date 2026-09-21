@@ -15,7 +15,7 @@ export default async function NewBatchPage({
     getInventoryOverview(),
     getRecentStockBatches(),
   ]);
-  const sellableRows = rows.filter((row) => !row.isBundle && !row.hasVariants);
+  const sellableRows = rows.filter((row) => !row.isBundle);
   const rowByInventoryId = new Map(rows.map((row) => [row.inventoryId, row]));
 
   return (
