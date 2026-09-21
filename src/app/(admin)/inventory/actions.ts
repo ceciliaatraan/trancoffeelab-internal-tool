@@ -122,3 +122,60 @@ export async function reconcileReservedQuantitiesAction() {
   revalidatePath("/");
   redirect(`/inventory?reconciled=${correctedCount}`);
 }
+
+/**
+ * Registrerar en leverans/batch: lägger TILL angivna antal på befintligt
+ * lagersaldo för flera produkter samtidigt (i stället för att behöva
+ * räkna ut och skriva in den nya totalsumman per produkt via Justera).
+ * Formulärfält namnges `qty_<inventoryId>` - se /inventory/batch.
+ */
+export async function receiveBatchAction(formData: FormData) {
+  const adminUser = await requireCurrentAdmin();
+
+  const label = formData.get("label")?.toString().trim() || null;
+  const note = label ? `Ny leverans: ${label}` : "Ny leverans";
+
+  const linesToApply: { inventoryId: string; amount: number }[] = [];
+  for (const [key, value] of formData.entries()) {
+    if (!key.startsWith("qty_")) continue;
+    const amount = Number(value);
+    if (!Number.isFinite(amount) || !Number.isInteger(amount) || amount <= 0) continue;
+    linesToApply.push({ inventoryId: key.slice("qty_".length), amount });
+  }
+
+  if (linesToApply.length === 0) {
+    redirect(
+      `/inventory/batch?error=${encodeURIComponent("Fyll i minst ett antal (större än 0).")}`,
+    );
+  }
+
+  await db.transaction(async (tx) => {
+    for (const line of linesToApply) {
+      const [row] = await tx
+        .select({ quantity: schema.inventory.quantity })
+        .from(schema.inventory)
+        .where(eq(schema.inventory.id, line.inventoryId))
+        .for("update");
+
+      if (!row) continue;
+
+      await tx
+        .update(schema.inventory)
+        .set({ quantity: row.quantity + line.amount, updatedAt: new Date() })
+        .where(eq(schema.inventory.id, line.inventoryId));
+
+      await tx.insert(schema.inventoryMovements).values({
+        inventoryId: line.inventoryId,
+        changeAmount: line.amount,
+        reason: "manual_adjustment",
+        note,
+        causedByAdminId: adminUser.id,
+      });
+    }
+  });
+
+  revalidatePath("/inventory");
+  revalidatePath("/inventory/batch");
+  revalidatePath("/");
+  redirect(`/inventory?batchReceived=${linesToApply.length}`);
+}

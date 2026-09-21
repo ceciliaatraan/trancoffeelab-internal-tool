@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { getInventoryOverview } from "@/lib/inventory/overview";
 import { adjustInventory, reconcileReservedQuantitiesAction } from "./actions";
 import { SubmitButton } from "@/components/submit-button";
@@ -11,6 +12,8 @@ export default async function InventoryPage({
   const search = await searchParams;
   const error = typeof search.error === "string" ? search.error : null;
   const reconciled = typeof search.reconciled === "string" ? Number(search.reconciled) : null;
+  const batchReceived =
+    typeof search.batchReceived === "string" ? Number(search.batchReceived) : null;
 
   const rows = await getInventoryOverview();
 
@@ -18,15 +21,23 @@ export default async function InventoryPage({
     <div className="flex flex-col gap-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <h1 className="text-4xl font-bold uppercase tracking-tight">Lager</h1>
-        <form action={reconcileReservedQuantitiesAction}>
-          <SubmitButton className="tran-label border border-tran-black px-4 py-2.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
-            Synka reserverat
-          </SubmitButton>
-          <p className="mt-1.5 max-w-xs text-xs text-tran-muted">
-            Siffrorna nedan är alltid rätträknade. Den här knappen rättar bara vad hemsidans kassa
-            internt tror är ledigt att sälja - klicka om något nyligen kändes fel där.
-          </p>
-        </form>
+        <div className="flex flex-wrap items-start gap-4">
+          <Link
+            href="/inventory/batch"
+            className="tran-label border border-tran-black px-4 py-2.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
+          >
+            Ny leverans
+          </Link>
+          <form action={reconcileReservedQuantitiesAction}>
+            <SubmitButton className="tran-label border border-tran-black px-4 py-2.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
+              Synka reserverat
+            </SubmitButton>
+            <p className="mt-1.5 max-w-xs text-xs text-tran-muted">
+              Siffrorna nedan är alltid rätträknade. Den här knappen rättar bara vad hemsidans
+              kassa internt tror är ledigt att sälja - klicka om något nyligen kändes fel där.
+            </p>
+          </form>
+        </div>
       </div>
 
       {error ? (
@@ -37,6 +48,12 @@ export default async function InventoryPage({
           {reconciled === 0
             ? "Reserverat stämde redan - inga rader behövde rättas."
             : `Reserverat synkat - ${reconciled} ${reconciled === 1 ? "rad" : "rader"} rättades.`}
+        </p>
+      ) : null}
+      {batchReceived !== null ? (
+        <p className="border border-tran-hairline px-4 py-3 text-sm text-tran-muted">
+          Leverans registrerad - {batchReceived} {batchReceived === 1 ? "produkt" : "produkter"}{" "}
+          uppdaterades.
         </p>
       ) : null}
 
