@@ -85,6 +85,12 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
         <SubmitButton className="border border-tran-black px-4 py-2 text-sm font-medium transition-colors hover:border-tran-red hover:text-tran-red">
           Filtrera
         </SubmitButton>
+        <a
+          href="/api/orders/export-postnord"
+          className="tran-label border border-tran-black px-4 py-2.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
+        >
+          Exportera till PostNord (CSV)
+        </a>
       </form>
 
       {orders.length === 0 ? (
