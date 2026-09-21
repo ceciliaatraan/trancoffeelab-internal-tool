@@ -33,6 +33,7 @@ export default async function InventoryPage({
               <th className="py-3 pr-4 font-medium">SKU</th>
               <th className="py-3 pr-4 font-medium">I lager</th>
               <th className="py-3 pr-4 font-medium">Reserverat</th>
+              <th className="py-3 pr-4 font-medium">Skickat</th>
               <th className="py-3 pr-4 font-medium">Larmnivå</th>
               <th className="py-3 pr-4 font-medium">Justera</th>
             </tr>
@@ -69,6 +70,9 @@ export default async function InventoryPage({
                   </td>
                   <td className="tran-tabular py-4 pr-4 align-top text-tran-muted">
                     {row.isBundle ? "-" : row.reservedQuantity}
+                  </td>
+                  <td className="tran-tabular py-4 pr-4 align-top text-tran-muted">
+                    {row.isBundle ? "-" : row.shippedQuantity}
                   </td>
                   <td className="tran-tabular py-4 pr-4 align-top text-tran-muted">
                     {row.alarmLevel}

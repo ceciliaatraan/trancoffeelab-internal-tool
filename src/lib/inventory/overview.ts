@@ -1,5 +1,5 @@
 import "server-only";
-import { asc, eq } from "drizzle-orm";
+import { asc, eq, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { getAllBundleItems } from "./bundles";
 
@@ -22,6 +22,13 @@ export type InventoryOverviewRow = {
   isBundle: boolean;
   /** "I lager": rå kvantitet för vanliga rader, komponent-beräknat antal kit för bundlar. */
   available: number;
+  /**
+   * Totalt skickat/levererat genom tidens - summan av alla order_shipped-
+   * rörelser för lagerraden. "Reserverat" ingår redan i "I lager" (den dras
+   * bara ifrån vid faktisk leverans), så det som en gång togs emot i lager
+   * = I lager + Skickat (INTE + Reserverat, det vore dubbelräkning).
+   */
+  shippedQuantity: number;
   bundleBreakdown: BundleComponentStatus[] | null;
 };
 
@@ -54,6 +61,18 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
     )
     .orderBy(asc(schema.products.nameSv));
 
+  const shippedRows = await db
+    .select({
+      inventoryId: schema.inventoryMovements.inventoryId,
+      shippedQuantity: sql<string>`sum(-${schema.inventoryMovements.changeAmount})`,
+    })
+    .from(schema.inventoryMovements)
+    .where(eq(schema.inventoryMovements.reason, "order_shipped"))
+    .groupBy(schema.inventoryMovements.inventoryId);
+  const shippedByInventoryId = new Map(
+    shippedRows.map((row) => [row.inventoryId, Number(row.shippedQuantity)]),
+  );
+
   const bundleItems = await getAllBundleItems(db);
   const bundlesByProduct = new Map<string, typeof bundleItems>();
   for (const item of bundleItems) {
@@ -80,6 +99,7 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
         alarmLevel: row.alarmLevel,
         isBundle: false,
         available: row.quantity,
+        shippedQuantity: shippedByInventoryId.get(row.inventoryId) ?? 0,
         bundleBreakdown: null,
       };
     }
@@ -116,6 +136,7 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
       alarmLevel: row.alarmLevel,
       isBundle: true,
       available,
+      shippedQuantity: shippedByInventoryId.get(row.inventoryId) ?? 0,
       bundleBreakdown: breakdown,
     };
   });
