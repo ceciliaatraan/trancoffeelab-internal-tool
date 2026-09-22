@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { asc, desc, eq } from "drizzle-orm";
+import { getSwapCandidates } from "@/lib/orders/swap-candidates";
 import { db, schema } from "@/db";
 import { formatDateTime, formatOre } from "@/lib/format";
 import { oreToKronorInput } from "@/lib/money-input";
@@ -13,6 +14,7 @@ import {
   cancelOrderAction,
   captureOrderAction,
   deleteOrderAction,
+  editOrderLineAction,
   markLabelCreatedAction,
   markShippedAction,
   refundFullAction,
@@ -86,7 +88,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
   if (!order) notFound();
 
-  const [lines, events, shipmentRows] = await Promise.all([
+  const [lines, events, shipmentRows, swapCandidates] = await Promise.all([
     db
       .select()
       .from(schema.orderLines)
@@ -102,6 +104,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       .from(schema.shipments)
       .where(eq(schema.shipments.orderId, id))
       .orderBy(asc(schema.shipments.shippedAt)),
+    getSwapCandidates(),
   ]);
 
   // Fraktstatus hämtas live från PostNords Track & Trace-API för
@@ -152,6 +155,8 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const canMarkLabelCreated = order.fulfillmentStatus === "unfulfilled";
   const canShip =
     order.fulfillmentStatus === "unfulfilled" || order.fulfillmentStatus === "label_created";
+  /** Samma villkor som canShip - en orderrad går att byta så länge paketet inte fysiskt lämnat/avbrutits. */
+  const canEditLines = canShip;
   // Sökresultatens "Använd"-länk hoppar till nästa relevanta steg: om
   // fraktsedeln inte redan är markerad som skapad är det naturliga
   // nästa steget att markera det, annars är ordern redo att skickas.
@@ -231,6 +236,15 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
 
       <section className="flex flex-col gap-4">
         <h2 className="tran-label text-xs text-tran-muted">Orderrader</h2>
+        {canEditLines ? (
+          <p className="text-xs text-tran-muted">
+            Om en kund ändrat sig (t.ex. vill ha helböna i stället för malet) - byt raden mot en
+            annan SKU av EXAKT samma pris nedan. Lagret uppdateras automatiskt: reservationen på
+            den gamla SKU:n släpps och den nya reserveras i stället. Går bara mellan SKU:er med
+            samma pris, för att ordersumman aldrig ska ändras utan att ni själva hanterar
+            debitering/återbetalning.
+          </p>
+        ) : null}
         <table className="w-full border-collapse text-sm">
           <thead>
             <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
@@ -239,20 +253,66 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
               <th className="py-2 pr-4 font-medium">Antal</th>
               <th className="py-2 pr-4 font-medium">À-pris</th>
               <th className="py-2 pr-4 font-medium">Summa</th>
+              {canEditLines ? <th className="py-2 pr-4 font-medium">Byt</th> : null}
             </tr>
           </thead>
           <tbody>
-            {lines.map((line) => (
-              <tr key={line.id} className="border-b border-tran-hairline">
-                <td className="py-3 pr-4">{line.name}</td>
-                <td className="tran-tabular py-3 pr-4 text-tran-muted">{line.reference}</td>
-                <td className="tran-tabular py-3 pr-4">{line.quantity}</td>
-                <td className="tran-tabular py-3 pr-4 text-tran-muted">
-                  {formatOre(line.unitPriceOre)}
-                </td>
-                <td className="tran-tabular py-3 pr-4">{formatOre(line.totalAmountOre)}</td>
-              </tr>
-            ))}
+            {lines.map((line) => {
+              const options =
+                canEditLines && line.type === "physical"
+                  ? swapCandidates.filter(
+                      (candidate) =>
+                        candidate.sku !== line.reference &&
+                        candidate.priceOre === line.unitPriceOre &&
+                        candidate.taxRate === line.taxRate,
+                    )
+                  : [];
+
+              return (
+                <tr key={line.id} className="border-b border-tran-hairline">
+                  <td className="py-3 pr-4">{line.name}</td>
+                  <td className="tran-tabular py-3 pr-4 text-tran-muted">{line.reference}</td>
+                  <td className="tran-tabular py-3 pr-4">{line.quantity}</td>
+                  <td className="tran-tabular py-3 pr-4 text-tran-muted">
+                    {formatOre(line.unitPriceOre)}
+                  </td>
+                  <td className="tran-tabular py-3 pr-4">{formatOre(line.totalAmountOre)}</td>
+                  {canEditLines ? (
+                    <td className="py-3 pr-4">
+                      {line.type !== "physical" ? null : options.length === 0 ? (
+                        <span className="text-xs text-tran-muted">
+                          Ingen annan SKU till samma pris
+                        </span>
+                      ) : (
+                        <form
+                          action={editOrderLineAction.bind(null, order.id, line.id)}
+                          className="flex items-center gap-2"
+                        >
+                          <select
+                            name="newSku"
+                            required
+                            defaultValue=""
+                            className="border border-tran-hairline bg-tran-white px-2 py-1 text-xs focus:border-tran-black focus:outline-none"
+                          >
+                            <option value="" disabled>
+                              Välj ny SKU…
+                            </option>
+                            {options.map((option) => (
+                              <option key={option.sku} value={option.sku}>
+                                {option.label} ({option.sku})
+                              </option>
+                            ))}
+                          </select>
+                          <SubmitButton className="tran-label border border-tran-black px-2 py-1 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red">
+                            Byt
+                          </SubmitButton>
+                        </form>
+                      )}
+                    </td>
+                  ) : null}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </section>

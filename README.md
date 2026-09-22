@@ -160,6 +160,19 @@ skickas ingen notis alls (ingen krasch) - funktionen är helt valfri. Ett fel
 från Slack (nätverksfel, ogiltig webhook m.m.) stoppar aldrig själva ordern -
 den sparas, captureas och mejlar kunden precis som vanligt, felet loggas bara.
 
+## Byta SKU på en orderrad
+
+Om en kund ändrar sig efter köp (t.ex. vill ha helböna i stället för malet) -
+orderdetaljen har en "Byt"-kolumn på orderrader, med en dropdown av alla
+andra publicerade SKU:er som kostar EXAKT lika mycket (inklusive samma
+momssats). Ordersumman kan alltså aldrig ändras av ett byte - det som redan
+debiterats hos Kustom förblir korrekt utan att ni behöver göra något med
+betalningen. Lagret uppdateras automatiskt (reservationen på den gamla SKU:n
+släpps, den nya reserveras), och kräver att det finns tillräckligt i lager av
+den nya SKU:n. Bara tillgängligt innan ordern fysiskt skickats eller
+avbrutits. Ingen annan SKU till samma pris i katalogen? Byt går då inte att
+göra härifrån (inga byten som skulle ändra summan) - hantera det manuellt.
+
 ## Fraktstatus "Fraktsedel skapad"
 
 Fraktstatusen har nu fyra lägen: Ej skickad → **Fraktsedel skapad** → Skickad

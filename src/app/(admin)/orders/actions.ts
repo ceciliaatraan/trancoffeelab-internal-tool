@@ -6,6 +6,7 @@ import { and, eq, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCurrentAdmin, requireOwner } from "@/lib/current-admin";
 import { kronorToOre } from "@/lib/money-input";
+import { formatOre } from "@/lib/format";
 import { expandLineToInventoryTargets } from "@/lib/inventory/bundles";
 import { resolveCartLine } from "@/lib/queries/cart";
 import {
@@ -212,6 +213,172 @@ export async function cancelOrderAction(orderId: string) {
   } catch (err) {
     redirect(`/orders/${orderId}?error=${encodeURIComponent(kustomErrorMessage(err))}`);
   }
+
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/orders");
+  revalidatePath("/inventory");
+  redirect(`/orders/${orderId}?saved=1`);
+}
+
+/**
+ * Byter en orderrad mot en annan SKU - t.ex. en kund som ändrat sig och
+ * vill ha helböna i stället för malet. Bara mellan SKU:er med EXAKT
+ * samma pris och momssats: ordersumman (och därmed det som redan
+ * debiterats hos Kustom) ska aldrig ändras av ett byte, så priskänsliga
+ * byten blockeras helt i stället för att kräva manuell efterdebitering/
+ * återbetalning. Släpper reservationen på den gamla SKU:n och reserverar
+ * den nya, med samma expandLineToInventoryTargets-mekanik (kit-
+ * expansion m.m.) som resten av lagersystemet - orderraden i sig
+ * (kvantitet, pris, moms, totalsumma) ändras aldrig, bara namn/SKU.
+ * Bara tillåtet innan ordern fysiskt skickats/avbrutits.
+ */
+export async function editOrderLineAction(orderId: string, lineId: string, formData: FormData) {
+  await requireCurrentAdmin();
+  const order = await getOrderOrRedirect(orderId);
+
+  if (order.fulfillmentStatus !== "unfulfilled" && order.fulfillmentStatus !== "label_created") {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent("Ordern är redan skickad eller avbruten - går inte att ändra.")}`,
+    );
+  }
+
+  const [line] = await db
+    .select()
+    .from(schema.orderLines)
+    .where(and(eq(schema.orderLines.id, lineId), eq(schema.orderLines.orderId, orderId)));
+  if (!line || line.type !== "physical") {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Orderraden hittades inte.")}`);
+  }
+
+  const newSku = formData.get("newSku")?.toString().trim();
+  if (!newSku || newSku === line.reference) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Ange en annan SKU att byta till.")}`);
+  }
+
+  const [oldResolved, newResolved] = await Promise.all([
+    resolveCartLine(line.reference, { requirePublished: false }),
+    resolveCartLine(newSku, { requirePublished: true }),
+  ]);
+
+  if (!oldResolved) {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent("Den nuvarande SKU:n hittades inte - kan inte byta säkert.")}`,
+    );
+  }
+  if (!newResolved) {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent(`"${newSku}" hittades inte eller är inte publicerad.`)}`,
+    );
+  }
+  if (newResolved.priceOre !== line.unitPriceOre || newResolved.taxRate !== line.taxRate) {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent(
+        `Kan bara byta till en SKU med exakt samma pris - "${newSku}" kostar ${formatOre(newResolved.priceOre)}, orderraden kostar ${formatOre(line.unitPriceOre)}.`,
+      )}`,
+    );
+  }
+  if (newResolved.available < line.quantity) {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent(
+        `Inte tillräckligt i lager av "${newSku}" (${newResolved.available} tillgängligt, behöver ${line.quantity}).`,
+      )}`,
+    );
+  }
+
+  const newName = order.locale === "en-SE" ? newResolved.nameEn : newResolved.nameSv;
+
+  await db.transaction(async (tx) => {
+    const releaseTargets = await expandLineToInventoryTargets(
+      tx,
+      oldResolved.productId,
+      oldResolved.variantId,
+      line.quantity,
+    );
+    for (const target of releaseTargets) {
+      const condition = target.variantId
+        ? and(
+            eq(schema.inventory.productId, target.productId),
+            eq(schema.inventory.variantId, target.variantId),
+          )
+        : and(
+            eq(schema.inventory.productId, target.productId),
+            isNull(schema.inventory.variantId),
+          );
+
+      const [inventoryRow] = await tx
+        .select({ id: schema.inventory.id })
+        .from(schema.inventory)
+        .where(condition);
+      if (!inventoryRow) continue;
+
+      await tx
+        .update(schema.inventory)
+        .set({
+          reservedQuantity: sql`${schema.inventory.reservedQuantity} - ${target.quantity}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.inventory.id, inventoryRow.id));
+
+      await tx.insert(schema.inventoryMovements).values({
+        inventoryId: inventoryRow.id,
+        changeAmount: -target.quantity,
+        reason: "order_released",
+        orderId,
+        note:
+          target.productId === oldResolved.productId
+            ? `Reservation släppt: bytt till "${newSku}"`
+            : `Reservation släppt: bytt till "${newSku}" (komponent i "${oldResolved.nameSv}")`,
+      });
+    }
+
+    const reserveTargets = await expandLineToInventoryTargets(
+      tx,
+      newResolved.productId,
+      newResolved.variantId,
+      line.quantity,
+    );
+    for (const target of reserveTargets) {
+      const condition = target.variantId
+        ? and(
+            eq(schema.inventory.productId, target.productId),
+            eq(schema.inventory.variantId, target.variantId),
+          )
+        : and(
+            eq(schema.inventory.productId, target.productId),
+            isNull(schema.inventory.variantId),
+          );
+
+      const [inventoryRow] = await tx
+        .select({ id: schema.inventory.id })
+        .from(schema.inventory)
+        .where(condition);
+      if (!inventoryRow) continue;
+
+      await tx
+        .update(schema.inventory)
+        .set({
+          reservedQuantity: sql`${schema.inventory.reservedQuantity} + ${target.quantity}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.inventory.id, inventoryRow.id));
+
+      await tx.insert(schema.inventoryMovements).values({
+        inventoryId: inventoryRow.id,
+        changeAmount: target.quantity,
+        reason: "order_reserved",
+        orderId,
+        note:
+          target.productId === newResolved.productId
+            ? `Reserverat: bytt från "${line.reference}"`
+            : `Reserverat: bytt från "${line.reference}" (komponent i "${newResolved.nameSv}")`,
+      });
+    }
+
+    await tx
+      .update(schema.orderLines)
+      .set({ productId: newResolved.productId, reference: newSku, name: newName })
+      .where(eq(schema.orderLines.id, lineId));
+  });
 
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders");
