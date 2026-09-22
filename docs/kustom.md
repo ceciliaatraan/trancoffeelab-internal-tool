@@ -292,6 +292,20 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
   är en separat rabattrad som gör att TOTALEN blir rätt, inte att
   fraktraden själv visar 0 kr. Bekräftat med en skärmdump av en riktig
   checkout: delsumma 349 kr, frakt 49 kr, rabatt −49 kr, totalt 349 kr.
+- **PostNords eget Track & Trace-API (separat från Kustom) visar live
+  fraktstatus på orderdetaljen, 2026-09-22.** Ägaren har ett eget
+  PostNord-utvecklarkonto (developer.postnord.com) - bara läsning
+  (`GET .../trackandtrace/findByIdentifier.json`), inget bokas/ändras.
+  Försändelsen bokas fortfarande av Kustom Shipping Assistant (se
+  KSA-sektionen ovan) - PROVADE MEDVETET INTE att boka en egen separat
+  PostNord-försändelse via PostNords "Booking"-API
+  (`POST .../shipment/v3/edi`), eftersom det hade riskerat att skapa
+  DUBBLA försändelser för samma order (en från Kustom, en från oss) -
+  ägaren bekräftade explicit att Kustom ska förbli den enda som bokar.
+  Se `src/lib/postnord/client.ts` (`trackPostnordShipment`) och
+  README "PostNord-fraktstatus på orderdetaljen" för miljövariabler.
+  Auth: `apikey` som query-parameter (inte header) - bekräftat från
+  PostNords egen dokumentation, inte ett antagande.
 
 ## Status i koden
 

@@ -160,6 +160,31 @@ skickas ingen notis alls (ingen krasch) - funktionen är helt valfri. Ett fel
 från Slack (nätverksfel, ogiltig webhook m.m.) stoppar aldrig själva ordern -
 den sparas, captureas och mejlar kunden precis som vanligt, felet loggas bara.
 
+## PostNord-fraktstatus på orderdetaljen
+
+Orderdetaljen (`/orders/[id]`) visar automatiskt live-status från PostNord
+(t.ex. "Under transport"/"Levererad") för riktiga PostNord-spårningsnummer -
+via PostNords Track & Trace-API (`GET .../trackandtrace/findByIdentifier.json`,
+läsning bara, bokar/ändrar aldrig något). Skickningar bokas fortfarande av
+Kustom Shipping Assistant, inte av den här koden.
+
+1. Skapa ett konto på https://developer.postnord.com (Customer- eller
+   Partner-plan beroende på ert upplägg) och hämta er produktions-API-nyckel.
+2. Sätt den i Vercels miljövariabler (produktionsmiljön):
+   ```
+   POSTNORD_API_KEY=<er API-nyckel>
+   ```
+   `POSTNORD_API_HOST` behöver bara sättas om ni vill peka mot PostNords
+   sandbox (`https://atapi2.postnord.com`, kräver en separat testnyckel från
+   https://atdeveloper.postnord.com) - tom/ej satt = produktion
+   (`https://api2.postnord.com`).
+
+Saknas `POSTNORD_API_KEY`, eller svarar PostNord inte (fel spårningsnummer,
+nere, rate limit m.m.), visas bara det ni själva skrivit in
+(fraktbolag/spårningsnummer) precis som innan - orderdetaljen kraschar aldrig
+på grund av PostNord. Slås bara på för skickningar där fraktbolaget innehåller
+"PostNord" och spårningsnumret inte är "(ingen spårning)" (handleveranser).
+
 ## Byggordning
 
 Projektet byggs i faser, med avstämning efter varje fas:

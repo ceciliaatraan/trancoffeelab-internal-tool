@@ -15,6 +15,11 @@ import {
   refundFullAction,
   refundPartialAction,
 } from "../actions";
+import {
+  PostnordApiError,
+  trackPostnordShipment,
+  type PostnordShipmentTracking,
+} from "@/lib/postnord/client";
 
 type Address = {
   given_name?: string;
@@ -86,6 +91,38 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       .orderBy(desc(schema.orderEvents.createdAt)),
     db.select().from(schema.shipments).where(eq(schema.shipments.orderId, id)),
   ]);
+
+  // Fraktstatus hämtas live från PostNords Track & Trace-API för
+  // riktiga PostNord-spårningsnummer (inte "(ingen spårning)" för
+  // handleveranser) - läsning bara, bokar/ändrar aldrig något. Ett fel
+  // för EN skickning (fel spårningsnummer, PostNord nere) ska aldrig
+  // hindra resten av sidan från att visas.
+  const postnordTracking = new Map<
+    string,
+    { data: PostnordShipmentTracking | null; error: string | null }
+  >();
+  await Promise.all(
+    shipmentRows
+      .filter(
+        (shipment) =>
+          shipment.carrier.toLowerCase().includes("postnord") &&
+          shipment.trackingNumber !== "(ingen spårning)",
+      )
+      .map(async (shipment) => {
+        try {
+          const data = await trackPostnordShipment(shipment.trackingNumber, "sv");
+          postnordTracking.set(shipment.id, { data, error: null });
+        } catch (err) {
+          postnordTracking.set(shipment.id, {
+            data: null,
+            error:
+              err instanceof PostnordApiError
+                ? err.message
+                : "Kunde inte hämta fraktstatus från PostNord just nu.",
+          });
+        }
+      }),
+  );
 
   const remainingToCapture = order.orderAmountOre - order.capturedAmountOre;
   const remainingToRefund = order.capturedAmountOre - order.refundedAmountOre;
@@ -266,12 +303,30 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       <section className="flex flex-col gap-4">
         <h2 className="tran-label text-xs text-tran-muted">Frakt</h2>
         {shipmentRows.length > 0 ? (
-          <ul className="text-sm">
-            {shipmentRows.map((shipment) => (
-              <li key={shipment.id}>
-                {shipment.carrier} - {shipment.trackingNumber} ({formatDateTime(shipment.shippedAt)})
-              </li>
-            ))}
+          <ul className="flex flex-col gap-3 text-sm">
+            {shipmentRows.map((shipment) => {
+              const tracking = postnordTracking.get(shipment.id);
+              return (
+                <li key={shipment.id}>
+                  <p>
+                    {shipment.carrier} - {shipment.trackingNumber} (
+                    {formatDateTime(shipment.shippedAt)})
+                  </p>
+                  {tracking?.data ? (
+                    <p className="mt-1 text-xs text-tran-muted">
+                      PostNord: {tracking.data.statusText.header}
+                      {tracking.data.deliveryDate
+                        ? ` (${formatDateTime(new Date(tracking.data.deliveryDate))})`
+                        : ""}
+                    </p>
+                  ) : tracking?.error ? (
+                    <p className="mt-1 text-xs text-tran-muted">
+                      PostNord-status kunde inte hämtas: {tracking.error}
+                    </p>
+                  ) : null}
+                </li>
+              );
+            })}
           </ul>
         ) : (
           <p className="text-sm text-tran-muted">Inte skickad än.</p>
