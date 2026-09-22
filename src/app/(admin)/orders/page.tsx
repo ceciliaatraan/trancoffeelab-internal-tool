@@ -9,15 +9,7 @@ import { SubmitButton } from "@/components/submit-button";
 import { FraktStatusBadge } from "@/components/frakt-status-badge";
 import { TableRowLink } from "@/components/table-row-link";
 import { getFraktStatusByOrderId } from "@/lib/orders/frakt-status-for-orders";
-
-type ShippingAddress = { given_name?: string; family_name?: string };
-
-/** Namn från leveransadressen om det finns, annars e-post. */
-function customerDisplayName(order: { customerEmail: string; shippingAddress: unknown }): string {
-  const address = order.shippingAddress as ShippingAddress | null;
-  const name = [address?.given_name, address?.family_name].filter(Boolean).join(" ").trim();
-  return name || order.customerEmail;
-}
+import { customerDisplayName } from "@/lib/orders/customer-display-name";
 
 export default async function OrdersPage({ searchParams }: PageProps<"/orders">) {
   const params = await searchParams;

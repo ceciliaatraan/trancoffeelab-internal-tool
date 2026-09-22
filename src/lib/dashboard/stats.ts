@@ -59,10 +59,9 @@ export type RecentOrder = {
   id: string;
   orderNumber: number;
   customerEmail: string;
+  shippingAddress: unknown;
   orderAmountOre: number;
-  status: string;
   fulfillmentStatus: string;
-  containsPreorder: boolean;
   createdAt: Date;
 };
 
@@ -73,10 +72,9 @@ export async function getRecentOrders(limit: number): Promise<RecentOrder[]> {
       id: schema.orders.id,
       orderNumber: schema.orders.orderNumber,
       customerEmail: schema.orders.customerEmail,
+      shippingAddress: schema.orders.shippingAddress,
       orderAmountOre: schema.orders.orderAmountOre,
-      status: schema.orders.status,
       fulfillmentStatus: schema.orders.fulfillmentStatus,
-      containsPreorder: schema.orders.containsPreorder,
       createdAt: schema.orders.createdAt,
     })
     .from(schema.orders)

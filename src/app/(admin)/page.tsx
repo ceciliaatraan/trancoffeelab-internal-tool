@@ -7,9 +7,8 @@ import { getDailySales, getRecentOrders, getTopProducts, summarizeDailySales } f
 import { getFraktStatusByOrderId } from "@/lib/orders/frakt-status-for-orders";
 import { SalesBarChart } from "@/components/sales-bar-chart";
 import { TopProductsList } from "@/components/top-products-list";
-import { OrderStatusChip } from "@/components/order-status-chip";
-import { PreorderChip } from "@/components/preorder-chip";
 import { FraktStatusBadge } from "@/components/frakt-status-badge";
+import { customerDisplayName } from "@/lib/orders/customer-display-name";
 
 export default async function DashboardPage() {
   const [daily, recentOrders, topProducts, unprocessedOrders, inventoryOverview, webhookErrors] =
@@ -49,29 +48,29 @@ export default async function DashboardPage() {
       <h1 className="text-4xl font-bold uppercase tracking-tight">Dashboard</h1>
 
       <section className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
-        <div className="border border-tran-hairline p-6">
+        <div className="min-w-0 border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Försäljning idag</p>
-          <p className="tran-tabular text-2xl">{formatOre(summary.todayOre)}</p>
+          <p className="tran-tabular break-words text-2xl">{formatOre(summary.todayOre)}</p>
         </div>
-        <div className="border border-tran-hairline p-6">
+        <div className="min-w-0 border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Denna vecka</p>
-          <p className="tran-tabular text-2xl">{formatOre(summary.weekOre)}</p>
+          <p className="tran-tabular break-words text-2xl">{formatOre(summary.weekOre)}</p>
         </div>
-        <div className="border border-tran-hairline p-6">
+        <div className="min-w-0 border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Denna månad</p>
-          <p className="tran-tabular text-2xl">{formatOre(summary.monthOre)}</p>
+          <p className="tran-tabular break-words text-2xl">{formatOre(summary.monthOre)}</p>
         </div>
-        <div className="border border-tran-hairline p-6">
+        <div className="min-w-0 border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Snittorder (månad)</p>
-          <p className="tran-tabular text-2xl">{formatOre(summary.monthAvgOrderOre)}</p>
+          <p className="tran-tabular break-words text-2xl">{formatOre(summary.monthAvgOrderOre)}</p>
         </div>
-        <div className="border border-tran-hairline p-6">
+        <div className="min-w-0 border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Obehandlade ordrar</p>
-          <p className="tran-tabular text-2xl">{unprocessedCount}</p>
+          <p className="tran-tabular break-words text-2xl">{unprocessedCount}</p>
         </div>
-        <div className="border border-tran-hairline p-6">
+        <div className="min-w-0 border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Under larmnivå</p>
-          <p className="tran-tabular text-2xl">{lowStock.length}</p>
+          <p className="tran-tabular break-words text-2xl">{lowStock.length}</p>
         </div>
       </section>
 
@@ -97,7 +96,6 @@ export default async function DashboardPage() {
                   <th className="py-2 pr-4 font-medium">Order</th>
                   <th className="py-2 pr-4 font-medium">Kund</th>
                   <th className="py-2 pr-4 font-medium">Belopp</th>
-                  <th className="py-2 pr-4 font-medium">Status</th>
                   <th className="py-2 pr-4 font-medium">Frakt</th>
                   <th className="py-2 pr-4 font-medium">Datum</th>
                 </tr>
@@ -116,15 +114,9 @@ export default async function DashboardPage() {
                         </Link>
                       </td>
                       <td className="max-w-[160px] truncate py-3 pr-4 text-tran-muted">
-                        {order.customerEmail}
+                        {customerDisplayName(order)}
                       </td>
                       <td className="tran-tabular py-3 pr-4">{formatOre(order.orderAmountOre)}</td>
-                      <td className="py-3 pr-4">
-                        <div className="flex flex-wrap items-center gap-1.5">
-                          <OrderStatusChip status={order.status} />
-                          {order.containsPreorder && <PreorderChip />}
-                        </div>
-                      </td>
                       <td className="py-3 pr-4">
                         <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
                       </td>
