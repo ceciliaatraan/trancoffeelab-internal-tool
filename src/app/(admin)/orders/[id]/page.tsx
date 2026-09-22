@@ -290,6 +290,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                 <input
                   name="carrier"
                   required
+                  defaultValue="PostNord"
                   className="w-40 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
                 />
               </div>
