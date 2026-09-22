@@ -219,8 +219,8 @@ describe("renderEmail", () => {
       locale: "sv-SE",
       shipping: { name: "Standardfrakt", amountOre: 4900 },
     });
-    expect(text).toContain("Frakt: 49,00 kr");
-    expect(html).toContain("Frakt");
+    expect(text).toContain("Frakt - Standardfrakt: 49,00 kr");
+    expect(html).toContain("Frakt - Standardfrakt");
     expect(html).toContain("49,00 kr");
   });
 
@@ -230,7 +230,7 @@ describe("renderEmail", () => {
       locale: "en-US",
       shipping: { name: "Standard shipping", amountOre: 4900 },
     });
-    expect(text).toContain("Shipping: 49.00 kr");
+    expect(text).toContain("Shipping - Standard shipping: 49.00 kr");
   });
 
   it("visar ingen fraktrad om anroparen inte skickat med fraktinfo alls (shipping: undefined)", () => {
@@ -257,6 +257,35 @@ describe("renderEmail", () => {
   it("visar 'Free shipping' på engelska när frakten är gratis", () => {
     const { text } = renderEmail({ ...baseInput, locale: "en-US", shipping: null });
     expect(text).toContain("Shipping: Free shipping");
+  });
+
+  it("visar leveranstidsuppskattningen (2-4 arbetsdagar) när ordern har fraktinfo", () => {
+    const { html, text } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      shipping: { name: "Standardfrakt", amountOre: 4900 },
+    });
+    expect(text).toContain("2-4 arbetsdagar");
+    expect(html).toContain("2-4 arbetsdagar");
+  });
+
+  it("visar leveranstidsuppskattningen även vid fri frakt (shipping: null)", () => {
+    const { text } = renderEmail({ ...baseInput, locale: "sv-SE", shipping: null });
+    expect(text).toContain("2-4 arbetsdagar");
+  });
+
+  it("visar ingen leveranstidsuppskattning om anroparen inte skickat med fraktinfo alls (shipping: undefined)", () => {
+    const { text } = renderEmail({ ...baseInput, locale: "sv-SE" });
+    expect(text).not.toContain("arbetsdagar");
+  });
+
+  it("visar leveranstidsuppskattningen på engelska", () => {
+    const { text } = renderEmail({
+      ...baseInput,
+      locale: "en-US",
+      shipping: { name: "Standard shipping", amountOre: 4900 },
+    });
+    expect(text).toContain("2-4 business days");
   });
 
   it("länkar produktbild och namn till produktsidan när raden har en slug", () => {

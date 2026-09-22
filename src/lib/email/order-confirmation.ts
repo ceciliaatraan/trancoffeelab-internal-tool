@@ -117,6 +117,9 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
   const shipLabel = isEnglish ? "Estimated ship" : "Beräknad leverans";
   const shippingLabel = isEnglish ? "Shipping" : "Frakt";
   const freeShippingLabel = isEnglish ? "Free shipping" : "Fri frakt";
+  const deliveryEstimateText = isEnglish
+    ? "Delivery takes 2-4 business days once your package has been handed over to PostNord."
+    : "Leveransen tar 2-4 arbetsdagar från att paketet har lämnats över till PostNord.";
   const businessLabel = isEnglish ? "Business" : "Företag";
   const vatLabel = isEnglish ? "VAT no." : "Momsregnr";
   const businessLine = input.business
@@ -169,12 +172,23 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
     })
     .join("");
 
+  const shippingLabelWithOption = input.shipping
+    ? `${shippingLabel} - ${input.shipping.name}`
+    : shippingLabel;
   const shippingRow =
     input.shipping === undefined
       ? ""
       : `<tr>
-        <td style="font-size:13px;color:rgba(0,0,0,0.55);padding-bottom:6px;">${escapeHtml(shippingLabel)}</td>
+        <td style="font-size:13px;color:rgba(0,0,0,0.55);padding-bottom:6px;">${escapeHtml(shippingLabelWithOption)}</td>
         <td style="font-size:13px;color:rgba(0,0,0,0.55);text-align:right;padding-bottom:6px;">${escapeHtml(shippingValueText(input.shipping))}</td>
+      </tr>`;
+  const deliveryEstimateRow =
+    input.shipping === undefined
+      ? ""
+      : `<tr>
+        <td colspan="2" style="padding-top:10px;font-size:12px;color:rgba(0,0,0,0.55);">
+          ${escapeHtml(deliveryEstimateText)}
+        </td>
       </tr>`;
 
   const html = `<!doctype html>
@@ -228,6 +242,7 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
                 <td style="font-size:14px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em;">${escapeHtml(totalLabel)}</td>
                 <td style="font-size:14px;font-weight:700;text-align:right;">${total} kr</td>
               </tr>
+              ${deliveryEstimateRow}
             </table>
           </td>
         </tr>
@@ -246,21 +261,25 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
 
   const footer = `${closingLine}\n\n${signature}\nTRAN Coffee Lab`;
   const shippingText =
-    input.shipping === undefined ? "" : `${shippingLabel}: ${shippingValueText(input.shipping)}\n`;
+    input.shipping === undefined
+      ? ""
+      : `${shippingLabelWithOption}: ${shippingValueText(input.shipping)}\n`;
+  const deliveryEstimateTextLine =
+    input.shipping === undefined ? "" : `${deliveryEstimateText}\n`;
 
   const businessText = businessLine ? `${businessLine}\n` : "";
 
   if (isEnglish) {
     return {
       subject: `Order confirmation #${input.orderNumber} - TRAN Coffee Lab`,
-      text: `${intro}\n\nOrder #${input.orderNumber}\n${businessText}\n${lines}\n\n${shippingText}Total: ${total} kr\n\n${footer}`,
+      text: `${intro}\n\nOrder #${input.orderNumber}\n${businessText}\n${lines}\n\n${shippingText}Total: ${total} kr\n${deliveryEstimateTextLine}\n${footer}`,
       html,
     };
   }
 
   return {
     subject: `Orderbekräftelse #${input.orderNumber} - TRAN Coffee Lab`,
-    text: `${intro}\n\nOrder #${input.orderNumber}\n${businessText}\n${lines}\n\n${shippingText}Totalt: ${total} kr\n\n${footer}`,
+    text: `${intro}\n\nOrder #${input.orderNumber}\n${businessText}\n${lines}\n\n${shippingText}Totalt: ${total} kr\n${deliveryEstimateTextLine}\n${footer}`,
     html,
   };
 }
