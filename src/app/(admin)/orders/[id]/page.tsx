@@ -313,6 +313,10 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           <p className="tran-label text-xs text-tran-muted">Datum</p>
           <p className="text-sm">{formatDateTime(order.createdAt)}</p>
         </div>
+        <div className="col-span-2 sm:col-span-4">
+          <p className="tran-label text-xs text-tran-muted">E-post</p>
+          <p className="text-sm break-all">{order.customerEmail}</p>
+        </div>
       </section>
 
       <section className="grid grid-cols-1 gap-6 sm:grid-cols-2">
