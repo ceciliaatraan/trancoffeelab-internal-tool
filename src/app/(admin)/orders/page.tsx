@@ -8,8 +8,7 @@ import { TestOrderChip } from "@/components/test-order-chip";
 import { SubmitButton } from "@/components/submit-button";
 import { FraktStatusBadge } from "@/components/frakt-status-badge";
 import { TableRowLink } from "@/components/table-row-link";
-import { resolveFraktStatus } from "@/lib/orders/fulfillment-status";
-import { PostnordApiError, trackPostnordShipment } from "@/lib/postnord/client";
+import { getFraktStatusByOrderId } from "@/lib/orders/frakt-status-for-orders";
 
 type ShippingAddress = { given_name?: string; family_name?: string };
 
@@ -76,50 +75,12 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
     }
   }
 
-  // Live PostNord-status i "Frakt"-kolumnen för skickade ordrar med ett
-  // riktigt PostNord-spårningsnummer - läsning bara (se lib/postnord/
-  // client.ts). Ett fel för EN order (fel nummer, PostNord nere) visar
-  // bara den ordens rad med den vanliga texten, hindrar aldrig resten
-  // av listan från att laddas.
-  const shippedOrderIds = orders
-    .filter((order) => order.fulfillmentStatus === "shipped")
-    .map((order) => order.id);
-
-  const latestShipmentCarrierByOrderId = new Map<string, string>();
-  const postnordStatusByOrderId = new Map<string, string>();
-  if (shippedOrderIds.length > 0) {
-    const shipmentsForShippedOrders = await db
-      .select()
-      .from(schema.shipments)
-      .where(inArray(schema.shipments.orderId, shippedOrderIds))
-      .orderBy(asc(schema.shipments.shippedAt));
-
-    // Senaste skickningen per order "vinner" (sista i den asc-sorterade
-    // listan skriver över) - normalfallet är en enda skickning per order.
-    for (const shipment of shipmentsForShippedOrders) {
-      latestShipmentCarrierByOrderId.set(shipment.orderId, shipment.carrier);
-    }
-
-    await Promise.all(
-      shipmentsForShippedOrders
-        .filter(
-          (shipment) =>
-            shipment.carrier.toLowerCase().includes("postnord") &&
-            shipment.trackingNumber !== "(ingen spårning)",
-        )
-        .map(async (shipment) => {
-          try {
-            const tracking = await trackPostnordShipment(shipment.trackingNumber, "sv");
-            if (tracking) {
-              postnordStatusByOrderId.set(shipment.orderId, tracking.status);
-            }
-          } catch (err) {
-            if (!(err instanceof PostnordApiError)) throw err;
-            // Tyst - raden faller tillbaka på "Skickad" nedan.
-          }
-        }),
-    );
-  }
+  // Live PostNord-status i "Frakt"-kolumnen - läsning bara (se
+  // lib/postnord/client.ts). Ett fel för EN order (fel nummer, PostNord
+  // nere) visar bara den ordens rad med den vanliga texten, hindrar
+  // aldrig resten av listan från att laddas. Delad med Dashboard-
+  // startsidans "Senaste ordrar" - se frakt-status-for-orders.ts.
+  const fraktStatusByOrderId = await getFraktStatusByOrderId(orders);
 
   return (
     <div className="flex flex-col gap-8">
@@ -193,11 +154,10 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
           <tbody>
             {orders.map((order) => {
               const items = itemsByOrderId.get(order.id);
-              const fraktStatus = resolveFraktStatus(
-                order.fulfillmentStatus,
-                latestShipmentCarrierByOrderId.get(order.id) ?? null,
-                postnordStatusByOrderId.get(order.id) ?? null,
-              );
+              const fraktStatus = fraktStatusByOrderId.get(order.id) ?? {
+                kind: "ej_skickad" as const,
+                label: order.fulfillmentStatus,
+              };
 
               return (
                 <TableRowLink

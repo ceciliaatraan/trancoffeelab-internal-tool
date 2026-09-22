@@ -47,7 +47,12 @@ export default async function LogsPage() {
                         <span className="text-tran-red">Nej</span>
                       )}
                     </td>
-                    <td className="py-2 pr-4 text-tran-red">{event.errorMessage ?? ""}</td>
+                    <td
+                      className="max-w-xs truncate py-2 pr-4 text-tran-red"
+                      title={event.errorMessage ?? undefined}
+                    >
+                      {event.errorMessage ?? ""}
+                    </td>
                     <td className="tran-tabular py-2 pr-4 text-tran-muted">
                       {formatDateTime(event.receivedAt)}
                     </td>

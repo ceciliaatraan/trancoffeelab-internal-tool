@@ -4,17 +4,12 @@ import { db, schema } from "@/db";
 import { formatDateTime, formatOre } from "@/lib/format";
 import { getInventoryOverview } from "@/lib/inventory/overview";
 import { getDailySales, getRecentOrders, getTopProducts, summarizeDailySales } from "@/lib/dashboard/stats";
+import { getFraktStatusByOrderId } from "@/lib/orders/frakt-status-for-orders";
 import { SalesBarChart } from "@/components/sales-bar-chart";
 import { TopProductsList } from "@/components/top-products-list";
 import { OrderStatusChip } from "@/components/order-status-chip";
 import { PreorderChip } from "@/components/preorder-chip";
-
-const FULFILLMENT_LABELS: Record<string, string> = {
-  unfulfilled: "Ej skickad",
-  label_created: "Fraktsedel skapad",
-  shipped: "Skickad",
-  cancelled: "Avbruten",
-};
+import { FraktStatusBadge } from "@/components/frakt-status-badge";
 
 export default async function DashboardPage() {
   const [daily, recentOrders, topProducts, unprocessedOrders, inventoryOverview, webhookErrors] =
@@ -45,6 +40,9 @@ export default async function DashboardPage() {
   const lowStock = inventoryOverview
     .filter((row) => row.available <= row.alarmLevel)
     .sort((a, b) => a.available - b.available);
+  // Samma färgade badge/live PostNord-status som /orders-listan - se
+  // frakt-status-for-orders.ts.
+  const fraktStatusByOrderId = await getFraktStatusByOrderId(recentOrders);
 
   return (
     <div className="flex flex-col gap-10">
@@ -105,31 +103,37 @@ export default async function DashboardPage() {
                 </tr>
               </thead>
               <tbody>
-                {recentOrders.map((order) => (
-                  <tr key={order.id} className="border-b border-tran-hairline">
-                    <td className="py-3 pr-4">
-                      <Link href={`/orders/${order.id}`} className="tran-tabular hover:text-tran-red">
-                        #{order.orderNumber}
-                      </Link>
-                    </td>
-                    <td className="max-w-[160px] truncate py-3 pr-4 text-tran-muted">
-                      {order.customerEmail}
-                    </td>
-                    <td className="tran-tabular py-3 pr-4">{formatOre(order.orderAmountOre)}</td>
-                    <td className="py-3 pr-4">
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        <OrderStatusChip status={order.status} />
-                        {order.containsPreorder && <PreorderChip />}
-                      </div>
-                    </td>
-                    <td className="py-3 pr-4 text-tran-muted">
-                      {FULFILLMENT_LABELS[order.fulfillmentStatus] ?? order.fulfillmentStatus}
-                    </td>
-                    <td className="tran-tabular py-3 pr-4 text-tran-muted">
-                      {formatDateTime(order.createdAt)}
-                    </td>
-                  </tr>
-                ))}
+                {recentOrders.map((order) => {
+                  const fraktStatus = fraktStatusByOrderId.get(order.id) ?? {
+                    kind: "ej_skickad" as const,
+                    label: order.fulfillmentStatus,
+                  };
+                  return (
+                    <tr key={order.id} className="border-b border-tran-hairline">
+                      <td className="py-3 pr-4">
+                        <Link href={`/orders/${order.id}`} className="tran-tabular hover:text-tran-red">
+                          #{order.orderNumber}
+                        </Link>
+                      </td>
+                      <td className="max-w-[160px] truncate py-3 pr-4 text-tran-muted">
+                        {order.customerEmail}
+                      </td>
+                      <td className="tran-tabular py-3 pr-4">{formatOre(order.orderAmountOre)}</td>
+                      <td className="py-3 pr-4">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                          <OrderStatusChip status={order.status} />
+                          {order.containsPreorder && <PreorderChip />}
+                        </div>
+                      </td>
+                      <td className="py-3 pr-4">
+                        <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
+                      </td>
+                      <td className="tran-tabular py-3 pr-4 text-tran-muted">
+                        {formatDateTime(order.createdAt)}
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           )}
@@ -168,9 +172,17 @@ export default async function DashboardPage() {
         ) : (
           <ul className="text-sm">
             {webhookErrors.map((event) => (
-              <li key={event.id} className="border-b border-tran-hairline py-2">
-                <span className="text-tran-red">{event.errorMessage}</span> -{" "}
-                {formatDateTime(event.receivedAt)}
+              <li
+                key={event.id}
+                className="flex items-center gap-2 border-b border-tran-hairline py-2"
+              >
+                <span
+                  className="min-w-0 flex-1 truncate text-tran-red"
+                  title={event.errorMessage ?? undefined}
+                >
+                  {event.errorMessage}
+                </span>
+                <span className="shrink-0 text-tran-muted">{formatDateTime(event.receivedAt)}</span>
               </li>
             ))}
           </ul>
