@@ -317,6 +317,28 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
   vad ordern innehåller, och hela raden är klickbar in till
   orderdetaljen (`<TableRowLink>`, en klient-komponent eftersom
   `router.push` inte går i en server-komponent).
+- **Sök spårningsnummer hos PostNord via referens (findByReference),
+  2026-09-22.** För fraktsedlar som skapats manuellt i PostNords portal
+  (inte via vår CSV-export) och där spårningsnumret inte redan finns
+  inskrivet hos oss - en sökruta på orderdetaljen, före "Markera som
+  skickad", som letar upp skickningar via en egen referens i stället för
+  spårningsnumret (`GET .../trackandtrace/findByReference.json?
+  customerNumber=...&referenceValue=...`, se
+  `findPostnordShipmentsByReference` i `src/lib/postnord/client.ts`).
+  Kräver en ny miljövariabel, `POSTNORD_CUSTOMER_NUMBER` (PostNords
+  kundnummer, ett separat fält utöver apikey - bekräftat från PostNords
+  egen dokumentation). **Viktigt antagande, INTE bekräftat av PostNord:**
+  ägarens dokumentationsexempel för findByReference visade bara ett
+  403-felsvar (fel auth i PostNords egen exempeldokumentation), aldrig
+  ett lyckat svar - koden antar att svarsformen (`TrackingInformation
+  Response.shipments[]`) är identisk med `findByIdentifier` eftersom det
+  är samma API-familj/version (v5, samma bas-path). Om antagandet är
+  fel visas bara "inga träffar" (koden kraschar aldrig på en avvikande
+  form, se `getTrackAndTrace` i client.ts) - testa mot en riktig
+  manuellt skapad sedel för att bekräfta. Fungerar bara om en referens
+  faktiskt skrevs in i PostNords portal vid bokningstillfället (t.ex.
+  ordernummer eller kundnamn) - annars ingen träff, och spårningsnumret
+  får slås upp och skrivas in manuellt som innan.
 
 ## Status i koden
 

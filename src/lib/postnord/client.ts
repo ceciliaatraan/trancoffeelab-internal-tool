@@ -34,26 +34,66 @@ export type PostnordShipmentTracking = {
   items: PostnordTrackingItem[];
 };
 
-type FindByIdentifierResponse = {
-  TrackingInformationResponse: {
+type RawShipment = {
+  shipmentId: string;
+  status: string;
+  statusText: { header: string; body: string };
+  deliveryDate?: string;
+  items: {
+    itemId: string;
+    status: string;
+    statusText: { header: string; body: string };
+    deliveryDate?: string;
+    events: PostnordTrackingEvent[];
+  }[];
+};
+
+type TrackAndTraceResponse = {
+  TrackingInformationResponse?: {
     compositeFault?: {
       faults: { faultCode: string; explanationText: string }[];
     };
-    shipments: {
-      shipmentId: string;
-      status: string;
-      statusText: { header: string; body: string };
-      deliveryDate?: string;
-      items: {
-        itemId: string;
-        status: string;
-        statusText: { header: string; body: string };
-        deliveryDate?: string;
-        events: PostnordTrackingEvent[];
-      }[];
-    }[];
+    shipments?: RawShipment[];
   };
 };
+
+function toShipmentTracking(shipment: RawShipment): PostnordShipmentTracking {
+  return {
+    shipmentId: shipment.shipmentId,
+    status: shipment.status,
+    statusText: shipment.statusText,
+    deliveryDate: shipment.deliveryDate ?? null,
+    items: shipment.items.map((item) => ({
+      itemId: item.itemId,
+      status: item.status,
+      statusText: item.statusText,
+      deliveryDate: item.deliveryDate ?? null,
+      events: item.events,
+    })),
+  };
+}
+
+async function getTrackAndTrace(url: string): Promise<RawShipment[]> {
+  let response: Response;
+  try {
+    response = await fetch(url, { next: { revalidate: 300 } });
+  } catch (err) {
+    throw new PostnordApiError(
+      err instanceof Error ? err.message : "Kunde inte nå PostNords API.",
+    );
+  }
+
+  if (!response.ok) {
+    throw new PostnordApiError(`PostNord svarade med fel (${response.status}).`, response.status);
+  }
+
+  const data = (await response.json()) as TrackAndTraceResponse;
+  // `?? []` snarare än att anta att fältet alltid finns - findByReference
+  // bekräftades bara med ett 403-exempel (fel auth i PostNords egen
+  // dokumentation), aldrig ett lyckat svar, så vi litar inte blint på att
+  // svarsformen är identisk med findByIdentifier.
+  return data.TrackingInformationResponse?.shipments ?? [];
+}
 
 /**
  * Slår upp fraktstatus för ett spårningsnummer via PostNords Track &
@@ -76,37 +116,40 @@ export async function trackPostnordShipment(
   }
 
   const url = `${POSTNORD_HOST}/rest/shipment/v5/trackandtrace/findByIdentifier.json?apikey=${encodeURIComponent(apiKey)}&id=${encodeURIComponent(trackingId)}&locale=${locale}`;
+  const shipments = await getTrackAndTrace(url);
+  const shipment = shipments[0];
+  return shipment ? toShipmentTracking(shipment) : null;
+}
 
-  let response: Response;
-  try {
-    response = await fetch(url, { next: { revalidate: 300 } });
-  } catch (err) {
-    throw new PostnordApiError(
-      err instanceof Error ? err.message : "Kunde inte nå PostNords API.",
-    );
+/**
+ * Söker upp skickningar via ER EGEN referens (t.ex. det ni skrev i
+ * PostNords portal när en fraktsedel skapades) i stället för
+ * spårningsnumret - för skickningar där vi inte redan har fått
+ * spårningsnumret inmatat hos oss. Samma läsning-bara-princip som
+ * `trackPostnordShipment`. Returnerar en tom lista (INTE ett fel) om
+ * referensen inte matchar något, t.ex. om referensen aldrig skrevs in
+ * vid bokningstillfället.
+ *
+ * `customerNumber` är ert PostNord-kundnummer (POSTNORD_CUSTOMER_NUMBER)
+ * - ett separat fält som API:et kräver utöver apikey, se
+ * README "PostNord-fraktstatus".
+ */
+export async function findPostnordShipmentsByReference(
+  referenceValue: string,
+  locale: "sv" | "en" = "sv",
+): Promise<PostnordShipmentTracking[]> {
+  const apiKey = process.env.POSTNORD_API_KEY;
+  const customerNumber = process.env.POSTNORD_CUSTOMER_NUMBER;
+  if (!apiKey) {
+    throw new PostnordApiError("POSTNORD_API_KEY saknas.");
+  }
+  if (!customerNumber) {
+    throw new PostnordApiError("POSTNORD_CUSTOMER_NUMBER saknas.");
   }
 
-  if (!response.ok) {
-    throw new PostnordApiError(`PostNord svarade med fel (${response.status}).`, response.status);
-  }
-
-  const data = (await response.json()) as FindByIdentifierResponse;
-  const shipment = data.TrackingInformationResponse.shipments[0];
-  if (!shipment) return null;
-
-  return {
-    shipmentId: shipment.shipmentId,
-    status: shipment.status,
-    statusText: shipment.statusText,
-    deliveryDate: shipment.deliveryDate ?? null,
-    items: shipment.items.map((item) => ({
-      itemId: item.itemId,
-      status: item.status,
-      statusText: item.statusText,
-      deliveryDate: item.deliveryDate ?? null,
-      events: item.events,
-    })),
-  };
+  const url = `${POSTNORD_HOST}/rest/shipment/v5/trackandtrace/findByReference.json?apikey=${encodeURIComponent(apiKey)}&customerNumber=${encodeURIComponent(customerNumber)}&referenceValue=${encodeURIComponent(referenceValue)}&locale=${locale}`;
+  const shipments = await getTrackAndTrace(url);
+  return shipments.map(toShipmentTracking);
 }
 
 /**

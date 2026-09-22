@@ -1,11 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PostnordApiError, shortPostnordStatusLabel, trackPostnordShipment } from "./client";
+import {
+  PostnordApiError,
+  findPostnordShipmentsByReference,
+  shortPostnordStatusLabel,
+  trackPostnordShipment,
+} from "./client";
 
 const ORIGINAL_ENV = { ...process.env };
 
 beforeEach(() => {
   process.env.POSTNORD_API_KEY = "test-api-key";
   process.env.POSTNORD_API_HOST = "https://api2.postnord.com";
+  process.env.POSTNORD_CUSTOMER_NUMBER = "80068059";
 });
 
 afterEach(() => {
@@ -106,6 +112,59 @@ describe("trackPostnordShipment", () => {
     delete process.env.POSTNORD_API_KEY;
 
     await expect(trackPostnordShipment("96932007555SE")).rejects.toThrow(PostnordApiError);
+  });
+});
+
+describe("findPostnordShipmentsByReference", () => {
+  it("GETar findByReference med apikey, customerNumber och referenceValue som query-parametrar", async () => {
+    const fetchMock = mockFetchOnce(true, 200, DELIVERED_RESPONSE);
+
+    await findPostnordShipmentsByReference("TRAN #1057");
+
+    const calledUrl = fetchMock.mock.calls[0][0] as string;
+    expect(calledUrl).toContain("/rest/shipment/v5/trackandtrace/findByReference.json");
+    expect(calledUrl).toContain("apikey=test-api-key");
+    expect(calledUrl).toContain("customerNumber=80068059");
+    expect(calledUrl).toContain("referenceValue=TRAN");
+  });
+
+  it("returnerar matchande skickningar", async () => {
+    mockFetchOnce(true, 200, DELIVERED_RESPONSE);
+
+    const result = await findPostnordShipmentsByReference("TRAN #1057");
+
+    expect(result).toHaveLength(1);
+    expect(result[0].shipmentId).toBe("96932007555SE");
+    expect(result[0].status).toBe("DELIVERED");
+  });
+
+  it("returnerar en tom lista om referensen inte matchar något (t.ex. aldrig inskriven vid bokning)", async () => {
+    mockFetchOnce(true, 200, {
+      TrackingInformationResponse: {
+        compositeFault: { faults: [{ faultCode: "notFound", explanationText: "Not found" }] },
+        shipments: [],
+      },
+    });
+
+    const result = await findPostnordShipmentsByReference("okänd referens");
+
+    expect(result).toEqual([]);
+  });
+
+  it("returnerar en tom lista i stället för att krascha om svarsformen avviker (t.ex. saknar shipments helt)", async () => {
+    mockFetchOnce(true, 200, { TrackingInformationResponse: {} });
+
+    const result = await findPostnordShipmentsByReference("TRAN #1057");
+
+    expect(result).toEqual([]);
+  });
+
+  it("kastar PostnordApiError om POSTNORD_CUSTOMER_NUMBER saknas", async () => {
+    delete process.env.POSTNORD_CUSTOMER_NUMBER;
+
+    await expect(findPostnordShipmentsByReference("TRAN #1057")).rejects.toThrow(
+      PostnordApiError,
+    );
   });
 });
 

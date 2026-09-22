@@ -191,6 +191,31 @@ nere, rate limit m.m.), visas bara det ni själva skrivit in
 på grund av PostNord. Slås bara på för skickningar där fraktbolaget innehåller
 "PostNord" och spårningsnumret inte är "(ingen spårning)" (handleveranser).
 
+### Hitta spårningsnummer hos PostNord via referens
+
+På orderdetaljen, innan en order markerats som skickad, finns en sökruta
+"Hitta spårningsnummer hos PostNord" - för fraktsedlar som skapats direkt i
+PostNords portal (t.ex. manuellt, utan att gå via "Exportera till PostNord
+(CSV)"-knappen i orderlistan) och där spårningsnumret därför inte redan finns
+inskrivet hos oss. Sök på samma referens ni skrev in i PostNords portal när
+sedeln skapades (t.ex. ordernummer eller kundens namn) - PostNords
+`findByReference`-API (`GET .../trackandtrace/findByReference.json`) letar
+upp matchande skickningar, och "Använd"-knappen fyller i spårningsnumret i
+formuläret nedanför.
+
+Kräver, utöver `POSTNORD_API_KEY`, även:
+```
+POSTNORD_CUSTOMER_NUMBER=<ert PostNord-kundnummer>
+```
+
+Ger inga träffar om referensen aldrig skrevs in vid bokningstillfället - då
+får spårningsnumret slås upp manuellt hos PostNord och skrivas in som
+tidigare. **Observera:** PostNords egen dokumentation visade bara ett
+exempel med ett 403-felsvar för det här API:et, aldrig ett lyckat svar - vi
+antar att svarsformen är densamma som för `findByIdentifier` (samma
+API-familj/version). Ett fel eller en avvikande svarsform visas som "inga
+träffar" i stället för att krascha sidan.
+
 ## Byggordning
 
 Projektet byggs i faser, med avstämning efter varje fas:

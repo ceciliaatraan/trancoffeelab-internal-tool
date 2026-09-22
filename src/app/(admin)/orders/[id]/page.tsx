@@ -19,6 +19,7 @@ import {
 } from "../actions";
 import {
   PostnordApiError,
+  findPostnordShipmentsByReference,
   trackPostnordShipment,
   type PostnordShipmentTracking,
 } from "@/lib/postnord/client";
@@ -76,6 +77,10 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const search = await searchParams;
   const error = typeof search.error === "string" ? search.error : null;
   const saved = "saved" in search;
+  const postnordSearch =
+    typeof search.postnordSearch === "string" ? search.postnordSearch.trim() : "";
+  const prefillTrackingNumber =
+    typeof search.trackingNumber === "string" ? search.trackingNumber : "";
 
   const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
   if (!order) notFound();
@@ -144,6 +149,24 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const remainingToRefund = order.capturedAmountOre - order.refundedAmountOre;
   const canCancel = order.fulfillmentStatus !== "cancelled" && order.capturedAmountOre === 0;
   const canShip = order.fulfillmentStatus === "unfulfilled";
+
+  // Sök upp spårningsnummer hos PostNord via en egen referens (t.ex. det
+  // som skrevs i PostNords portal när en fraktsedel skapades manuellt,
+  // utan att gå via vår CSV-export) - för ordrar där vi inte redan har
+  // fått spårningsnumret inmatat. Läsning bara, bokar/ändrar aldrig
+  // något. Körs bara när det faktiskt går att markera som skickad.
+  let postnordSearchResults: PostnordShipmentTracking[] | null = null;
+  let postnordSearchError: string | null = null;
+  if (canShip && postnordSearch) {
+    try {
+      postnordSearchResults = await findPostnordShipmentsByReference(postnordSearch, "sv");
+    } catch (err) {
+      postnordSearchError =
+        err instanceof PostnordApiError
+          ? err.message
+          : "Kunde inte söka hos PostNord just nu.";
+    }
+  }
 
   return (
     <div className="flex max-w-3xl flex-col gap-10">
@@ -352,7 +375,62 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         )}
 
         {canShip ? (
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-col gap-3 border border-tran-hairline p-4">
+            <p className="tran-label text-[11px] text-tran-muted">
+              Hitta spårningsnummer hos PostNord
+            </p>
+            <p className="text-xs text-tran-muted">
+              Om fraktsedeln skapades i PostNords portal utan att spårningsnumret matats in här
+              - sök på referensen ni skrev in där (t.ex. ordernummer eller kundens namn).
+            </p>
+            <form method="get" className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="tran-label mb-1 block text-[11px] text-tran-muted">
+                  Referens
+                </label>
+                <input
+                  name="postnordSearch"
+                  defaultValue={postnordSearch || `TRAN #${order.orderNumber}`}
+                  className="w-52 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
+                />
+              </div>
+              <button
+                type="submit"
+                className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
+              >
+                Sök hos PostNord
+              </button>
+            </form>
+
+            {postnordSearchError ? (
+              <p className="text-xs text-tran-muted">
+                Sökningen kunde inte genomföras: {postnordSearchError}
+              </p>
+            ) : postnordSearchResults ? postnordSearchResults.length === 0 ? (
+              <p className="text-xs text-tran-muted">
+                Inga skickningar hittades hos PostNord för &quot;{postnordSearch}&quot;.
+              </p>
+            ) : (
+              <ul className="flex flex-col gap-1.5 text-xs">
+                {postnordSearchResults.map((result) => (
+                  <li key={result.shipmentId} className="flex items-center gap-2">
+                    <span className="tran-tabular">{result.shipmentId}</span>
+                    <span className="text-tran-muted">{result.statusText.header}</span>
+                    <Link
+                      href={`/orders/${order.id}?trackingNumber=${encodeURIComponent(result.shipmentId)}#markera-skickad`}
+                      className="tran-label border border-tran-black px-2 py-1 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red"
+                    >
+                      Använd
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            ) : null}
+          </div>
+        ) : null}
+
+        {canShip ? (
+          <div id="markera-skickad" className="flex flex-wrap gap-3">
             <form
               action={markShippedAction.bind(null, order.id)}
               className="flex flex-wrap items-end gap-3 border border-tran-hairline p-4"
@@ -375,6 +453,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                 <input
                   name="trackingNumber"
                   required
+                  defaultValue={prefillTrackingNumber}
                   className="w-52 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
                 />
               </div>
