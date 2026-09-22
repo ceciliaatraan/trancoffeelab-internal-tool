@@ -172,17 +172,20 @@ export default async function DashboardPage() {
         ) : (
           <ul className="text-sm">
             {webhookErrors.map((event) => (
-              <li
-                key={event.id}
-                className="flex items-center gap-2 border-b border-tran-hairline py-2"
-              >
-                <span
-                  className="min-w-0 flex-1 truncate text-tran-red"
-                  title={event.errorMessage ?? undefined}
-                >
-                  {event.errorMessage}
-                </span>
-                <span className="shrink-0 text-tran-muted">{formatDateTime(event.receivedAt)}</span>
+              <li key={event.id} className="border-b border-tran-hairline py-2">
+                <details>
+                  <summary className="flex cursor-pointer list-none items-center gap-2 marker:hidden [&::-webkit-details-marker]:hidden">
+                    <span className="min-w-0 flex-1 truncate text-tran-red">
+                      {event.errorMessage}
+                    </span>
+                    <span className="shrink-0 text-tran-muted">
+                      {formatDateTime(event.receivedAt)}
+                    </span>
+                  </summary>
+                  <p className="mt-2 break-all whitespace-pre-wrap text-xs text-tran-red">
+                    {event.errorMessage}
+                  </p>
+                </details>
               </li>
             ))}
           </ul>

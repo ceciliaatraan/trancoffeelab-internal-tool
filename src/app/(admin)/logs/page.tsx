@@ -47,11 +47,17 @@ export default async function LogsPage() {
                         <span className="text-tran-red">Nej</span>
                       )}
                     </td>
-                    <td
-                      className="max-w-xs truncate py-2 pr-4 text-tran-red"
-                      title={event.errorMessage ?? undefined}
-                    >
-                      {event.errorMessage ?? ""}
+                    <td className="max-w-xs py-2 pr-4 text-tran-red">
+                      {event.errorMessage ? (
+                        <details>
+                          <summary className="block cursor-pointer truncate list-none marker:hidden [&::-webkit-details-marker]:hidden">
+                            {event.errorMessage}
+                          </summary>
+                          <p className="mt-2 break-all whitespace-pre-wrap text-xs">
+                            {event.errorMessage}
+                          </p>
+                        </details>
+                      ) : null}
                     </td>
                     <td className="tran-tabular py-2 pr-4 text-tran-muted">
                       {formatDateTime(event.receivedAt)}
