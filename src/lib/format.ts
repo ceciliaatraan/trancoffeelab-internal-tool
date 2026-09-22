@@ -3,6 +3,13 @@ const currencyFormatter = new Intl.NumberFormat("sv-SE", {
   currency: "SEK",
 });
 
+/** Utan decimaler - för Dashboardens summeringsrutor, där exakta ören inte behövs och bara gör talen bredare än rutan. */
+const currencyFormatterWhole = new Intl.NumberFormat("sv-SE", {
+  style: "currency",
+  currency: "SEK",
+  maximumFractionDigits: 0,
+});
+
 /**
  * Utan explicit timeZone används körtidens egen (UTC på Vercels
  * serverless-funktioner) - inte besökarens, eftersom det här renderas
@@ -17,6 +24,10 @@ const dateFormatter = new Intl.DateTimeFormat("sv-SE", {
 
 export function formatOre(ore: number): string {
   return currencyFormatter.format(ore / 100);
+}
+
+export function formatOreWhole(ore: number): string {
+  return currencyFormatterWhole.format(ore / 100);
 }
 
 export function formatTaxRate(taxRateHundredthsPercent: number): string {

@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { formatDateTime, formatOre } from "@/lib/format";
+import { formatDateTime, formatOre, formatOreWhole } from "@/lib/format";
 import { getInventoryOverview } from "@/lib/inventory/overview";
 import { getDailySales, getRecentOrders, getTopProducts, summarizeDailySales } from "@/lib/dashboard/stats";
 import { getFraktStatusByOrderId } from "@/lib/orders/frakt-status-for-orders";
@@ -50,27 +50,27 @@ export default async function DashboardPage() {
       <section className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
         <div className="min-w-0 border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Försäljning idag</p>
-          <p className="tran-tabular break-words text-2xl">{formatOre(summary.todayOre)}</p>
+          <p className="tran-tabular break-words text-xl">{formatOreWhole(summary.todayOre)}</p>
         </div>
         <div className="min-w-0 border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Denna vecka</p>
-          <p className="tran-tabular break-words text-2xl">{formatOre(summary.weekOre)}</p>
+          <p className="tran-tabular break-words text-xl">{formatOreWhole(summary.weekOre)}</p>
         </div>
         <div className="min-w-0 border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Denna månad</p>
-          <p className="tran-tabular break-words text-2xl">{formatOre(summary.monthOre)}</p>
+          <p className="tran-tabular break-words text-xl">{formatOreWhole(summary.monthOre)}</p>
         </div>
         <div className="min-w-0 border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Snittorder (månad)</p>
-          <p className="tran-tabular break-words text-2xl">{formatOre(summary.monthAvgOrderOre)}</p>
+          <p className="tran-tabular break-words text-xl">{formatOreWhole(summary.monthAvgOrderOre)}</p>
         </div>
         <div className="min-w-0 border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Obehandlade ordrar</p>
-          <p className="tran-tabular break-words text-2xl">{unprocessedCount}</p>
+          <p className="tran-tabular break-words text-xl">{unprocessedCount}</p>
         </div>
         <div className="min-w-0 border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Under larmnivå</p>
-          <p className="tran-tabular break-words text-2xl">{lowStock.length}</p>
+          <p className="tran-tabular break-words text-xl">{lowStock.length}</p>
         </div>
       </section>
 

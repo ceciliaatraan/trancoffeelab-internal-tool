@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatDateTime, formatOre, formatTaxRate } from "./format";
+import { formatDateTime, formatOre, formatOreWhole, formatTaxRate } from "./format";
 
 /** sv-SE:s valutaformat separerar belopp och "kr" med en hårt mellanslag (U+00A0). */
 function normalizeSpaces(value: string): string {
@@ -17,6 +17,21 @@ describe("formatOre", () => {
 
   it("rundar aldrig - öre är redan heltal", () => {
     expect(normalizeSpaces(formatOre(100))).toBe("1,00 kr");
+  });
+});
+
+describe("formatOreWhole", () => {
+  it("formaterar öre som svenska kronor utan decimaler", () => {
+    expect(normalizeSpaces(formatOreWhole(14900))).toBe("149 kr");
+  });
+
+  it("avrundar till närmaste krona", () => {
+    expect(normalizeSpaces(formatOreWhole(14950))).toBe("150 kr");
+    expect(normalizeSpaces(formatOreWhole(14949))).toBe("149 kr");
+  });
+
+  it("hanterar noll", () => {
+    expect(normalizeSpaces(formatOreWhole(0))).toBe("0 kr");
   });
 });
 
