@@ -29,7 +29,12 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
 
   const conditions = [];
   if (statusFilter) {
-    conditions.push(eq(schema.orders.fulfillmentStatus, statusFilter as "unfulfilled" | "shipped" | "cancelled"));
+    conditions.push(
+      eq(
+        schema.orders.fulfillmentStatus,
+        statusFilter as "unfulfilled" | "label_created" | "shipped" | "cancelled",
+      ),
+    );
   }
   if (query) {
     const orderNumber = Number(query);
@@ -153,6 +158,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
           >
             <option value="">Alla</option>
             <option value="unfulfilled">Ej skickad</option>
+            <option value="label_created">Fraktsedel skapad</option>
             <option value="shipped">Skickad</option>
             <option value="cancelled">Avbruten</option>
           </select>

@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, desc, eq, isNotNull, sql } from "drizzle-orm";
+import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatDateTime, formatOre } from "@/lib/format";
 import { getInventoryOverview } from "@/lib/inventory/overview";
@@ -11,6 +11,7 @@ import { PreorderChip } from "@/components/preorder-chip";
 
 const FULFILLMENT_LABELS: Record<string, string> = {
   unfulfilled: "Ej skickad",
+  label_created: "Fraktsedel skapad",
   shipped: "Skickad",
   cancelled: "Avbruten",
 };
@@ -24,7 +25,12 @@ export default async function DashboardPage() {
       db
         .select({ count: sql<number>`count(*)` })
         .from(schema.orders)
-        .where(and(eq(schema.orders.fulfillmentStatus, "unfulfilled"), eq(schema.orders.isTest, false))),
+        .where(
+          and(
+            inArray(schema.orders.fulfillmentStatus, ["unfulfilled", "label_created"]),
+            eq(schema.orders.isTest, false),
+          ),
+        ),
       getInventoryOverview(),
       db
         .select()

@@ -13,6 +13,7 @@ import {
   cancelOrderAction,
   captureOrderAction,
   deleteOrderAction,
+  markLabelCreatedAction,
   markShippedAction,
   refundFullAction,
   refundPartialAction,
@@ -148,7 +149,13 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const remainingToCapture = order.orderAmountOre - order.capturedAmountOre;
   const remainingToRefund = order.capturedAmountOre - order.refundedAmountOre;
   const canCancel = order.fulfillmentStatus !== "cancelled" && order.capturedAmountOre === 0;
-  const canShip = order.fulfillmentStatus === "unfulfilled";
+  const canMarkLabelCreated = order.fulfillmentStatus === "unfulfilled";
+  const canShip =
+    order.fulfillmentStatus === "unfulfilled" || order.fulfillmentStatus === "label_created";
+  // Sökresultatens "Använd"-länk hoppar till nästa relevanta steg: om
+  // fraktsedeln inte redan är markerad som skapad är det naturliga
+  // nästa steget att markera det, annars är ordern redo att skickas.
+  const nextStepAnchor = canMarkLabelCreated ? "fraktsedel-skapad" : "markera-skickad";
 
   // Sök upp spårningsnummer hos PostNord via en egen referens (t.ex. det
   // som skrevs i PostNords portal när en fraktsedel skapades manuellt,
@@ -370,6 +377,12 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
               );
             })}
           </ul>
+        ) : order.fulfillmentStatus === "label_created" ? (
+          <p className="text-sm text-tran-muted">
+            Fraktsedel skapad
+            {order.labelTrackingNumber ? ` - ${order.labelTrackingNumber}` : ""}, paketet inte
+            lämnat/hämtat än.
+          </p>
         ) : (
           <p className="text-sm text-tran-muted">Inte skickad än.</p>
         )}
@@ -417,7 +430,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                     <span className="tran-tabular">{result.shipmentId}</span>
                     <span className="text-tran-muted">{result.statusText.header}</span>
                     <Link
-                      href={`/orders/${order.id}?trackingNumber=${encodeURIComponent(result.shipmentId)}#markera-skickad`}
+                      href={`/orders/${order.id}?trackingNumber=${encodeURIComponent(result.shipmentId)}#${nextStepAnchor}`}
                       className="tran-label border border-tran-black px-2 py-1 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red"
                     >
                       Använd
@@ -426,6 +439,32 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                 ))}
               </ul>
             ) : null}
+          </div>
+        ) : null}
+
+        {canMarkLabelCreated ? (
+          <div
+            id="fraktsedel-skapad"
+            className="flex flex-wrap items-end gap-3 border border-tran-hairline p-4"
+          >
+            <form
+              action={markLabelCreatedAction.bind(null, order.id)}
+              className="flex flex-wrap items-end gap-3"
+            >
+              <div>
+                <label className="tran-label mb-1 block text-[11px] text-tran-muted">
+                  Spårningsnummer (valfritt, kan fyllas i senare)
+                </label>
+                <input
+                  name="trackingNumber"
+                  defaultValue={prefillTrackingNumber}
+                  className="w-52 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
+                />
+              </div>
+              <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
+                Markera: fraktsedel skapad
+              </SubmitButton>
+            </form>
           </div>
         ) : null}
 
@@ -453,7 +492,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                 <input
                   name="trackingNumber"
                   required
-                  defaultValue={prefillTrackingNumber}
+                  defaultValue={prefillTrackingNumber || order.labelTrackingNumber || ""}
                   className="w-52 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
                 />
               </div>

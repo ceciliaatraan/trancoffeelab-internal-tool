@@ -47,7 +47,7 @@ export type OrderLineTotals = {
  * produkt som avpublicerats i efterhand. Nyckel: `${productId}|${variantId ?? ""}`.
  */
 async function sumOrderLineQuantitiesByFulfillmentStatus(
-  fulfillmentStatus: FulfillmentStatus,
+  fulfillmentStatuses: FulfillmentStatus[],
 ): Promise<OrderLineTotals> {
   const lines = await db
     .select({
@@ -57,7 +57,7 @@ async function sumOrderLineQuantitiesByFulfillmentStatus(
     })
     .from(schema.orderLines)
     .innerJoin(schema.orders, eq(schema.orders.id, schema.orderLines.orderId))
-    .where(eq(schema.orders.fulfillmentStatus, fulfillmentStatus));
+    .where(inArray(schema.orders.fulfillmentStatus, fulfillmentStatuses));
 
   const physicalLines = lines.filter(
     (line): line is typeof line & { reference: string } =>
@@ -129,12 +129,17 @@ async function sumOrderLineQuantitiesByFulfillmentStatus(
   return { expanded, direct };
 }
 
-/** Verkligt reserverat lager per (produkt, variant) - ordrar som varken skickats eller avbokats. */
+/**
+ * Verkligt reserverat lager per (produkt, variant) - ordrar som varken
+ * skickats eller avbokats. Inkluderar "label_created" (fraktsedel skapad
+ * hos PostNord, men paketet inte lämnat/hämtat än) - fortfarande
+ * reserverat, inte skickat.
+ */
 export function computeTrueReservedQuantities(): Promise<OrderLineTotals> {
-  return sumOrderLineQuantitiesByFulfillmentStatus("unfulfilled");
+  return sumOrderLineQuantitiesByFulfillmentStatus(["unfulfilled", "label_created"]);
 }
 
 /** Verkligt skickat/levererat lager per (produkt, variant), totalt genom tiderna. */
 export function computeTrueShippedQuantities(): Promise<OrderLineTotals> {
-  return sumOrderLineQuantitiesByFulfillmentStatus("shipped");
+  return sumOrderLineQuantitiesByFulfillmentStatus(["shipped"]);
 }

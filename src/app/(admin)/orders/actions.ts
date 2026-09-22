@@ -219,6 +219,41 @@ export async function cancelOrderAction(orderId: string) {
   redirect(`/orders/${orderId}?saved=1`);
 }
 
+/**
+ * Markerar att en fraktsedel skapats hos PostNord (t.ex. manuellt i
+ * deras portal) men paketet inte lämnats/hämtats än - en mellanstatus
+ * mellan "Ej skickad" och "Skickad". Rör INTE lagret (ingen rad i
+ * `shipments`, ingen inventoryMovement) - reservationen som gjordes när
+ * ordern kom in ligger kvar orörd tills markShippedAction faktiskt kör
+ * (se computeTrueReservedQuantities i order-line-totals.ts, som räknar
+ * "label_created" som fortsatt reserverat).
+ */
+export async function markLabelCreatedAction(orderId: string, formData: FormData) {
+  await requireCurrentAdmin();
+  const order = await getOrderOrRedirect(orderId);
+
+  if (order.fulfillmentStatus !== "unfulfilled") {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent('Ordern är inte längre "Ej skickad".')}`,
+    );
+  }
+
+  const trackingNumber = formData.get("trackingNumber")?.toString().trim() || null;
+
+  await db
+    .update(schema.orders)
+    .set({
+      fulfillmentStatus: "label_created",
+      labelTrackingNumber: trackingNumber,
+      updatedAt: new Date(),
+    })
+    .where(eq(schema.orders.id, orderId));
+
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/orders");
+  redirect(`/orders/${orderId}?saved=1`);
+}
+
 export async function markShippedAction(orderId: string, formData: FormData) {
   await requireCurrentAdmin();
   const carrier = formData.get("carrier")?.toString().trim();

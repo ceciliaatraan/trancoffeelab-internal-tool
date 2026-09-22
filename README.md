@@ -160,6 +160,20 @@ skickas ingen notis alls (ingen krasch) - funktionen är helt valfri. Ett fel
 från Slack (nätverksfel, ogiltig webhook m.m.) stoppar aldrig själva ordern -
 den sparas, captureas och mejlar kunden precis som vanligt, felet loggas bara.
 
+## Fraktstatus "Fraktsedel skapad"
+
+Fraktstatusen har nu fyra lägen: Ej skickad → **Fraktsedel skapad** → Skickad
+→ (eller Avbruten). "Fraktsedel skapad" är till för perioden mellan att en
+fraktsedel gjorts hos PostNord och att paketet faktiskt lämnats/hämtats -
+sätts manuellt med en egen knapp på orderdetaljen (`markLabelCreatedAction`,
+`orders.fulfillment_status = 'label_created'`), med ett valfritt
+spårningsnummer som sparas på ordern (`orders.label_tracking_number`) och
+sedan är förifyllt när ni senare markerar ordern som faktiskt skickad.
+
+Påverkar INTE lagret - reservationen som gjordes när ordern kom in ligger
+kvar orörd (`computeTrueReservedQuantities` räknar `label_created` som
+fortsatt reserverat, inte skickat) tills "Markera som skickad" körs.
+
 ## PostNord-fraktstatus på orderdetaljen och i orderlistan
 
 Orderdetaljen (`/orders/[id]`) OCH orderlistan (`/orders`, kolumnen "Frakt")

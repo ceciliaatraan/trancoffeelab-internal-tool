@@ -2,6 +2,7 @@ import type { FraktStatusKind } from "@/lib/orders/fulfillment-status";
 
 const STYLES: Record<FraktStatusKind, string> = {
   ej_skickad: "border border-tran-red text-tran-red",
+  fraktsedel_skapad: "border border-tran-blue text-tran-blue",
   under_transport: "border border-tran-amber text-tran-amber",
   levererad: "bg-tran-green text-tran-white",
   avbruten: "border border-tran-hairline-strong text-tran-muted",

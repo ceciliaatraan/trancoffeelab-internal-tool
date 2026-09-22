@@ -1,6 +1,11 @@
 import { shortPostnordStatusLabel } from "@/lib/postnord/client";
 
-export type FraktStatusKind = "ej_skickad" | "under_transport" | "levererad" | "avbruten";
+export type FraktStatusKind =
+  | "ej_skickad"
+  | "fraktsedel_skapad"
+  | "under_transport"
+  | "levererad"
+  | "avbruten";
 
 export type FraktStatus = { kind: FraktStatusKind; label: string };
 
@@ -18,6 +23,9 @@ export function resolveFraktStatus(
 ): FraktStatus {
   if (fulfillmentStatus === "cancelled") {
     return { kind: "avbruten", label: "Avbruten" };
+  }
+  if (fulfillmentStatus === "label_created") {
+    return { kind: "fraktsedel_skapad", label: "Fraktsedel skapad" };
   }
   if (fulfillmentStatus !== "shipped") {
     return { kind: "ej_skickad", label: "Ej skickad" };

@@ -22,6 +22,14 @@ import { adminUsers } from "./admin";
  */
 export const orderFulfillmentStatusEnum = pgEnum("order_fulfillment_status", [
   "unfulfilled",
+  /**
+   * En fraktsedel har skapats hos PostNord men paketet har inte
+   * lämnats/hämtats än - räknas fortfarande som RESERVERAT lager, inte
+   * skickat (se computeTrueReservedQuantities i order-line-totals.ts -
+   * måste inkludera denna statusen, annars "läker" Synka lager bort
+   * reservationen för ordrar i det här läget).
+   */
+  "label_created",
   "shipped",
   "cancelled",
 ]);
@@ -70,6 +78,9 @@ export const orders = pgTable("orders", {
    * ordrar. Se deleteTestOrderAction i orders/actions.ts.
    */
   isTest: boolean("is_test").notNull().default(false),
+
+  /** Sparat när fulfillment_status sätts till "label_created" - se markLabelCreatedAction. */
+  labelTrackingNumber: text("label_tracking_number"),
 
   shippingAddress: jsonb("shipping_address"),
   billingAddress: jsonb("billing_address"),
