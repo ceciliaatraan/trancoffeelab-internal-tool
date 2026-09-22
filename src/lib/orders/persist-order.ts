@@ -115,6 +115,14 @@ export async function persistOrderFromKustom(
         ? { code: discountKustomLine.reference, amountOre: Math.abs(discountKustomLine.total_amount) }
         : null;
 
+    // Vårt eget TS-typ (KustomOrderManagementOrder) säger att purchase_
+    // country/purchase_currency/locale alltid finns, men det garanterar
+    // ingenting vid körning - Kustoms API har levererat ordrar där
+    // locale saknades, vilket kraschade hela insertet (orders.locale är
+    // NOT NULL utan default) och tystade HELA bearbetningen (ingen
+    // bekräftelse, inget lager, inget mejl) - se webhook_events för
+    // 2026-09-22. Faller tillbaka på svenska (majoriteten av kunderna)
+    // i stället för att krascha på en enda saknad fält.
     const [inserted] = await tx
       .insert(schema.orders)
       .values({
@@ -123,9 +131,9 @@ export async function persistOrderFromKustom(
         customerEmail: customerEmail ?? "okand@example.com",
         status: order.status,
         paymentStatus: order.status,
-        purchaseCountry: order.purchase_country.toUpperCase(),
-        currency: order.purchase_currency.toUpperCase(),
-        locale: order.locale,
+        purchaseCountry: (order.purchase_country || "SE").toUpperCase(),
+        currency: (order.purchase_currency || "SEK").toUpperCase(),
+        locale: order.locale || "sv-SE",
         orderAmountOre: order.order_amount,
         orderTaxAmountOre,
         containsPreorder,

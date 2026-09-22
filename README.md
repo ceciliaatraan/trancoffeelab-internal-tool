@@ -160,6 +160,23 @@ skickas ingen notis alls (ingen krasch) - funktionen är helt valfri. Ett fel
 från Slack (nätverksfel, ogiltig webhook m.m.) stoppar aldrig själva ordern -
 den sparas, captureas och mejlar kunden precis som vanligt, felet loggas bara.
 
+## Bearbeta om en misslyckad order-webhook
+
+`/logs` visar alla push-/bekräftelseanrop från Kustom. Ett misslyckat anrop
+("Nej" i kolumnen Bearbetad) betyder att ordern INTE sparades hos er - ingen
+bekräftelse mejlades, inget lager reserverades - även om Kustom redan
+debiterat kunden (kollas via `raw_kustom_order`/status i det bakomliggande
+webhook-eventet). Felmeddelandet går nu att klicka upp till en fullständig,
+radbrytande text (i stället för att bara synas vid hover) och visar den
+faktiska databasfelet, inte bara SQL-frågan som misslyckades.
+
+Knappen "Bearbeta om" på en misslyckad rad kör ordern igen - säkert att
+klicka flera gånger (ordern skapas bara en gång även om ni klickar om och
+om igen). Skriver en ny rad i loggen i stället för att skriva över den
+gamla, så historiken bevaras. Använd den här när en order fastnat på grund
+av ett tillfälligt fel (t.ex. Kustom var nere) eller en bugg som sedan
+fixats.
+
 ## Kit-komponenter: byta en enskild vara i kitet, och partiell retur
 
 För en kit-rad (t.ex. Komplett Kit) visar orderdetaljen numera "Innehåll i

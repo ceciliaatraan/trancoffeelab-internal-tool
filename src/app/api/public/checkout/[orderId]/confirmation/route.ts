@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import { checkRateLimit, corsHeaders, getClientIp, resolveAllowedOrigin } from "@/lib/public-api";
 import { KustomApiError, extractHtmlSnippet, readOrder } from "@/lib/kustom/client";
 import { processKustomOrder } from "@/lib/orders/process-kustom-order";
+import { describeError } from "@/lib/describe-error";
 
 /**
  * ÖPPET/eget antagande: readOrder (checkout v3) antas returnera samma
@@ -59,7 +60,7 @@ export async function GET(
         .set({ processed: true, processedAt: new Date(), errorMessage: null })
         .where(eq(schema.webhookEvents.id, webhookEvent.id));
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Okänt fel";
+      const message = describeError(err);
       console.error("Kunde inte eager-bearbeta order från bekräftelsesidan", orderId, err);
       await db
         .update(schema.webhookEvents)

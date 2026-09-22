@@ -369,6 +369,40 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
   återbetalning hanteras manuellt som idag via befintliga knappar) efter
   att ha fått frågan, för att undvika att gissa en rimlig
   pris-per-komponent-fördelning av kitets pris.
+- **BUGG: en order med tomt `locale`-fält från Kustom kraschade HELA
+  orderbearbetningen tyst, 2026-09-22.** Upptäckt via ett webhook-fel på
+  Dashboard ("Failed query: insert into orders..."). Root cause:
+  `orders.locale` är NOT NULL utan default (schema/orders.ts), och
+  `persistOrderFromKustom` (persist-order.ts) satte `locale: order.locale`
+  rakt av - vårt TS-typ (`KustomOrderManagementOrder.locale: string`)
+  garanterar INGET vid körning, och för den här ordern var fältet tomt
+  från Kustom. INSERT:et kastade, hela transaktionen rullades tillbaka -
+  ingen order sparades, ingen bekräftelse mejlades, inget lager
+  reserverades, TROTS att Kustom redan debiterat kunden (status:
+  CAPTURED i den loggade raw_kustom_order). Så här ser det ut för
+  ägaren: en riktig, betald order som bara aldrig dök upp i verktyget -
+  vad kunden upplever som "misslyckad betalning" trots att pengarna togs.
+  Fixat med `locale: order.locale || "sv-SE"` (samma fallback för
+  purchase_country/purchase_currency) - defensivt snarare än att lita på
+  ett TS-typ för extern data.
+
+  Samtidigt upptäcktes att `err.message` för ett Drizzle-fel BARA är
+  "Failed query: <sql>\nparams: <params>" - den faktiska Postgres-
+  orsaken (t.ex. "null value in column ... violates not-null
+  constraint") ligger i `err.cause`, som webhook-felhanteringen aldrig
+  läste. Alla tidigare loggade webhook-fel har alltså bara visat SQL-
+  frågan, aldrig VARFÖR den misslyckades - i praktiken odiagnostiserbara
+  i efterhand. Fixat med `src/lib/describe-error.ts` (`describeError`),
+  som packar upp `.cause` - används av både push- och
+  confirmation-webhooken.
+
+  Ny återhämtningsväg: `/logs` har nu en "Bearbeta om"-knapp per
+  misslyckat anrop med ett order-id (`reprocessWebhookEventAction`,
+  `logs/actions.ts`) - kör `processKustomOrder` igen (idempotent på
+  kustom_order_id, ofarligt att klicka flera gånger), skriver en NY
+  webhook_events-rad i stället för att skriva över den gamla. Låter
+  ägaren själv rädda en order som fastnat efter en engångsmiss, utan att
+  behöva vänta på en kodändring.
 
 ## Status i koden
 

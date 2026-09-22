@@ -1,8 +1,14 @@
 import { desc } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatDateTime } from "@/lib/format";
+import { SubmitButton } from "@/components/submit-button";
+import { reprocessWebhookEventAction } from "./actions";
 
-export default async function LogsPage() {
+export default async function LogsPage({ searchParams }: PageProps<"/logs">) {
+  const search = await searchParams;
+  const error = typeof search.error === "string" ? search.error : null;
+  const saved = "saved" in search;
+
   const [webhookEvents, auditLogEntries] = await Promise.all([
     db.select().from(schema.webhookEvents).orderBy(desc(schema.webhookEvents.receivedAt)).limit(50),
     db.select().from(schema.auditLog).orderBy(desc(schema.auditLog.createdAt)).limit(50),
@@ -12,8 +18,22 @@ export default async function LogsPage() {
     <div className="flex flex-col gap-10">
       <h1 className="text-4xl font-bold uppercase tracking-tight">Loggar</h1>
 
+      {error ? (
+        <p className="border border-tran-red px-4 py-3 text-sm text-tran-red">{error}</p>
+      ) : null}
+      {saved ? (
+        <p className="border border-tran-hairline px-4 py-3 text-sm text-tran-muted">
+          Ordern bearbetades om. Se raden längst upp för resultatet.
+        </p>
+      ) : null}
+
       <section className="flex flex-col gap-4">
         <h2 className="tran-label text-xs text-tran-muted">Webhook-anrop från Kustom</h2>
+        <p className="text-xs text-tran-muted">
+          Ett misslyckat anrop (Nej i Bearbetad) betyder att ordern INTE sparades hos oss - ingen
+          bekräftelse, inget lager reserverat - även om Kustom redan debiterat kunden. &quot;Bearbeta
+          om&quot; försöker igen, ofarligt att klicka flera gånger.
+        </p>
         {webhookEvents.length === 0 ? (
           <p className="text-sm text-tran-muted">Inga anrop än.</p>
         ) : (
@@ -27,6 +47,7 @@ export default async function LogsPage() {
                 <th className="py-2 pr-4 font-medium">Mottaget</th>
                 <th className="py-2 pr-4 font-medium">Klar</th>
                 <th className="py-2 pr-4 font-medium">Tid</th>
+                <th className="py-2 pr-4 font-medium">Åtgärd</th>
               </tr>
             </thead>
             <tbody>
@@ -71,6 +92,15 @@ export default async function LogsPage() {
                         : processingMs < 1000
                           ? `${processingMs} ms`
                           : `${(processingMs / 1000).toFixed(1)} s`}
+                    </td>
+                    <td className="py-2 pr-4">
+                      {!event.processed && event.kustomOrderId ? (
+                        <form action={reprocessWebhookEventAction.bind(null, event.id)}>
+                          <SubmitButton className="tran-label border border-tran-black px-2 py-1 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red">
+                            Bearbeta om
+                          </SubmitButton>
+                        </form>
+                      ) : null}
                     </td>
                   </tr>
                 );

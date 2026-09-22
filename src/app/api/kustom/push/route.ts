@@ -2,6 +2,7 @@ import { NextResponse, after } from "next/server";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { processKustomOrder } from "@/lib/orders/process-kustom-order";
+import { describeError } from "@/lib/describe-error";
 
 /**
  * order_id kommer som query-parameter (bekräftat i AGENTS.md:s
@@ -48,7 +49,7 @@ export async function POST(request: Request) {
         .set({ processed: true, processedAt: new Date(), errorMessage: null })
         .where(eq(schema.webhookEvents.id, webhookEvent.id));
     } catch (err) {
-      const message = err instanceof Error ? err.message : "Okänt fel";
+      const message = describeError(err);
       console.error("Kunde inte bearbeta push för order", orderId, err);
       await db
         .update(schema.webhookEvents)
