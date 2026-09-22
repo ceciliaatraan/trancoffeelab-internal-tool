@@ -339,6 +339,36 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
   faktiskt skrevs in i PostNords portal vid bokningstillfället (t.ex.
   ordernummer eller kundnamn) - annars ingen träff, och spårningsnumret
   får slås upp och skrivas in manuellt som innan.
+- **Sticky vänstermeny, 2026-09-22.** `<aside>` i `(admin)/layout.tsx`
+  saknade egen positionering (bara ett normalt flex-item) - på en lång
+  sida scrollade hela menyn bort med resten av innehållet. Fixat med
+  `lg:sticky lg:top-0 lg:h-screen lg:overflow-y-auto`.
+- **Kit-komponenter: byta en enskild vara + partiell retur, 2026-09-22.**
+  Ny tabell `order_line_component_swaps` (per-order substitution av EN
+  komponent i en kit-orderrad, t.ex. helböna i stället för malet - se
+  utförlig kommentar i `schema/orders.ts`). Orderdetaljen bryter nu ner
+  varje kit-rad till sina komponenter (`getOrderLineComponentsByLine`,
+  `src/lib/orders/line-components.ts`) och visar dem som egna rader,
+  med "Byt" (`swapLineComponentAction`, inget priskrav - kunden betalade
+  för hela kitet) och "Retur" (`returnLineComponentAction`).
+  KRITISKT för korrekthet: både `expandLineToInventoryTargets`
+  (`lib/inventory/bundles.ts`, tar nu en valfri `orderLineId`) och den
+  "sanna" reserverat-beräkningen (`computeTrueReservedQuantities`,
+  `order-line-totals.ts`) måste slå upp och tillämpa den här tabellen
+  vid kit-expansion - annars hade "Synka lager" läkt bort bytet, och
+  skickad/annullerad-hanteringen hade träffat fel lagervara. Delad
+  batchad uppslagning: `src/lib/orders/component-swaps.ts`.
+
+  Retur (`inventory_movement_reason = 'return'`, fanns redan i enumen
+  men användes aldrig förrän nu) lägger BARA tillbaka i `inventory.
+  quantity` ("I lager") - rör aldrig `reservedQuantity`/`shippedQuantity`
+  (de är kumulativa "totalt genom tiderna"-räknare, en retur är en NY
+  leverans-händelse, inte en ångring av leveransen - matchar hur
+  `receiveBatchAction` redan fungerar). Kopplat medvetet INTE ihop med
+  återbetalning - ägaren valde separata steg (retur = bara lager,
+  återbetalning hanteras manuellt som idag via befintliga knappar) efter
+  att ha fått frågan, för att undvika att gissa en rimlig
+  pris-per-komponent-fördelning av kitets pris.
 
 ## Status i koden
 

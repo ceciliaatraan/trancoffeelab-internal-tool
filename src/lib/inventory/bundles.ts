@@ -1,6 +1,7 @@
 import "server-only";
 import { eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
+import { getComponentSwapsForLine } from "@/lib/orders/component-swaps";
 
 type DbOrTx = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -121,12 +122,21 @@ export type InventoryTarget = {
  * En kit-rad sprids ut på sina komponenter (kvantitet per kit gånger
  * antal beställda kit) - kitets egen lagerrad rörs aldrig. En vanlig
  * rad pekar direkt på sin egen lagerrad, precis som tidigare.
+ *
+ * `orderLineId` (valfri): om satt, tillämpas eventuella per-order
+ * komponent-substitutioner (swapLineComponentAction, se schema/orders.ts
+ * order_line_component_swaps) INNAN targets returneras - annars skulle
+ * t.ex. markShippedAction/cancelOrderAction träffa fel lagervara för en
+ * kit-rad där en komponent bytts ut för just den här ordern. Utelämna
+ * vid ordererläggning (persist-order.ts) - inga substitutioner kan
+ * finnas innan orderraden ens skapats.
  */
 export async function expandLineToInventoryTargets(
   dbOrTx: DbOrTx,
   productId: string,
   variantId: string | null,
   quantity: number,
+  orderLineId?: string,
 ): Promise<InventoryTarget[]> {
   if (variantId) {
     return [{ productId, variantId, quantity }];
@@ -137,9 +147,16 @@ export async function expandLineToInventoryTargets(
     return [{ productId, variantId: null, quantity }];
   }
 
-  return items.map((item) => ({
-    productId: item.componentProductId,
-    variantId: item.componentVariantId,
-    quantity: quantity * item.quantity,
-  }));
+  const overrides = orderLineId
+    ? await getComponentSwapsForLine(dbOrTx, orderLineId)
+    : new Map<string, { productId: string; variantId: string | null }>();
+
+  return items.map((item) => {
+    const override = overrides.get(item.componentProductId);
+    return {
+      productId: override?.productId ?? item.componentProductId,
+      variantId: override ? override.variantId : item.componentVariantId,
+      quantity: quantity * item.quantity,
+    };
+  });
 }

@@ -2,6 +2,7 @@ import "server-only";
 import { eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { getAllBundleItems } from "@/lib/inventory/bundles";
+import { getComponentSwapsForLines } from "@/lib/orders/component-swaps";
 import type { orderFulfillmentStatusEnum } from "@/db/schema/orders";
 
 type FulfillmentStatus = (typeof orderFulfillmentStatusEnum.enumValues)[number];
@@ -45,12 +46,18 @@ export type OrderLineTotals = {
  * tom). Motsvarar resolveCartLine({ requirePublished: false }) - hittar
  * produkten/varianten oavsett status, eftersom en order kan peka på en
  * produkt som avpublicerats i efterhand. Nyckel: `${productId}|${variantId ?? ""}`.
+ *
+ * Tillämpar även order_line_component_swaps (swapLineComponentAction) -
+ * en kit-komponent som bytts ut för en specifik order (t.ex. helböna i
+ * stället för malet) ska räknas mot den NYA varan, inte kitets
+ * ursprungliga recept, annars läker "Synka lager" bort bytet.
  */
 async function sumOrderLineQuantitiesByFulfillmentStatus(
   fulfillmentStatuses: FulfillmentStatus[],
 ): Promise<OrderLineTotals> {
   const lines = await db
     .select({
+      id: schema.orderLines.id,
       reference: schema.orderLines.reference,
       quantity: schema.orderLines.quantity,
       type: schema.orderLines.type,
@@ -70,7 +77,7 @@ async function sumOrderLineQuantitiesByFulfillmentStatus(
 
   const skus = [...new Set(physicalLines.map((line) => line.reference))];
 
-  const [productRows, variantRows, bundleItems] = await Promise.all([
+  const [productRows, variantRows, bundleItems, componentSwapsByLine] = await Promise.all([
     db
       .select({ sku: schema.products.sku, productId: schema.products.id })
       .from(schema.products)
@@ -84,6 +91,10 @@ async function sumOrderLineQuantitiesByFulfillmentStatus(
       .from(schema.productVariants)
       .where(inArray(schema.productVariants.sku, skus)),
     getAllBundleItems(db),
+    getComponentSwapsForLines(
+      db,
+      physicalLines.map((line) => line.id),
+    ),
   ]);
 
   // Samma prioritet som resolveCartLine: produkt-SKU före variant-SKU.
@@ -120,8 +131,12 @@ async function sumOrderLineQuantitiesByFulfillmentStatus(
       continue;
     }
 
+    const overridesForLine = componentSwapsByLine.get(line.id);
     for (const component of components) {
-      const key = `${component.componentProductId}|${component.componentVariantId ?? ""}`;
+      const override = overridesForLine?.get(component.componentProductId);
+      const key = override
+        ? `${override.productId}|${override.variantId ?? ""}`
+        : `${component.componentProductId}|${component.componentVariantId ?? ""}`;
       expanded.set(key, (expanded.get(key) ?? 0) + line.quantity * component.quantity);
     }
   }

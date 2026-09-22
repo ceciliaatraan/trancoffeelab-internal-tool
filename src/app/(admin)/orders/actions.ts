@@ -7,7 +7,8 @@ import { db, schema } from "@/db";
 import { requireCurrentAdmin, requireOwner } from "@/lib/current-admin";
 import { kronorToOre } from "@/lib/money-input";
 import { formatOre } from "@/lib/format";
-import { expandLineToInventoryTargets } from "@/lib/inventory/bundles";
+import { computeBundleAvailability, expandLineToInventoryTargets } from "@/lib/inventory/bundles";
+import { getOrderLineComponentsByLine } from "@/lib/orders/line-components";
 import { resolveCartLine } from "@/lib/queries/cart";
 import {
   KustomApiError,
@@ -169,6 +170,7 @@ export async function cancelOrderAction(orderId: string) {
           resolved.productId,
           resolved.variantId,
           line.quantity,
+          line.id,
         );
 
         for (const target of targets) {
@@ -293,6 +295,7 @@ export async function editOrderLineAction(orderId: string, lineId: string, formD
       oldResolved.productId,
       oldResolved.variantId,
       line.quantity,
+      line.id,
     );
     for (const target of releaseTargets) {
       const condition = target.variantId
@@ -378,6 +381,281 @@ export async function editOrderLineAction(orderId: string, lineId: string, formD
       .update(schema.orderLines)
       .set({ productId: newResolved.productId, reference: newSku, name: newName })
       .where(eq(schema.orderLines.id, lineId));
+
+    // Ev. tidigare komponent-substitutioner (swapLineComponentAction)
+    // pekade på "platser" i DEN GAMLA SKU:ns kit-recept - meningslösa nu
+    // när hela raden pekar på en annan SKU.
+    await tx
+      .delete(schema.orderLineComponentSwaps)
+      .where(eq(schema.orderLineComponentSwaps.orderLineId, lineId));
+  });
+
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/orders");
+  revalidatePath("/inventory");
+  redirect(`/orders/${orderId}?saved=1`);
+}
+
+/**
+ * Byter EN komponent inuti en kit-orderrad - t.ex. helböna i stället
+ * för malet i ett redan köpt Komplett Kit. Till skillnad från
+ * editOrderLineAction (som byter hela raden, bara vid samma pris)
+ * ändras INGENTING på orderraden själv (kitets SKU/pris/summa) - bara
+ * vilken lagervara som reserveras för just den komponent-"platsen", för
+ * den här ordern (sparas i order_line_component_swaps). Inget priskrav:
+ * kunden betalade för HELA kitet, inte för den enskilda komponenten.
+ * Bara tillåtet innan ordern fysiskt skickats/avbrutits, precis som
+ * editOrderLineAction.
+ */
+export async function swapLineComponentAction(
+  orderId: string,
+  lineId: string,
+  formData: FormData,
+) {
+  await requireCurrentAdmin();
+  const order = await getOrderOrRedirect(orderId);
+
+  if (order.fulfillmentStatus !== "unfulfilled" && order.fulfillmentStatus !== "label_created") {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent("Ordern är redan skickad eller avbruten - går inte att ändra.")}`,
+    );
+  }
+
+  const [line] = await db
+    .select()
+    .from(schema.orderLines)
+    .where(and(eq(schema.orderLines.id, lineId), eq(schema.orderLines.orderId, orderId)));
+  if (!line || line.type !== "physical") {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Orderraden hittades inte.")}`);
+  }
+
+  const originalComponentProductId = formData.get("originalComponentProductId")?.toString();
+  const newSku = formData.get("newSku")?.toString().trim();
+  if (!originalComponentProductId || !newSku) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Ange en vara att byta till.")}`);
+  }
+
+  const componentsByLine = await getOrderLineComponentsByLine([
+    { id: line.id, reference: line.reference, quantity: line.quantity },
+  ]);
+  const current = (componentsByLine.get(line.id) ?? []).find(
+    (component) => component.originalComponentProductId === originalComponentProductId,
+  );
+  if (!current) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Komponenten hittades inte.")}`);
+  }
+
+  const newResolved = await resolveCartLine(newSku, { requirePublished: true });
+  if (!newResolved) {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent(`"${newSku}" hittades inte eller är inte publicerad.`)}`,
+    );
+  }
+  if (newResolved.productId === current.productId && newResolved.variantId === current.variantId) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Redan samma vara.")}`);
+  }
+  if ((await computeBundleAvailability(db, newResolved.productId)) !== null) {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent("Kan inte byta till ett annat kit som komponent.")}`,
+    );
+  }
+  if (newResolved.available < current.quantity) {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent(
+        `Inte tillräckligt i lager av "${newSku}" (${newResolved.available} tillgängligt, behöver ${current.quantity}).`,
+      )}`,
+    );
+  }
+
+  await db.transaction(async (tx) => {
+    const releaseCondition = current.variantId
+      ? and(
+          eq(schema.inventory.productId, current.productId),
+          eq(schema.inventory.variantId, current.variantId),
+        )
+      : and(eq(schema.inventory.productId, current.productId), isNull(schema.inventory.variantId));
+
+    const [releaseRow] = await tx
+      .select({ id: schema.inventory.id })
+      .from(schema.inventory)
+      .where(releaseCondition);
+    if (releaseRow) {
+      await tx
+        .update(schema.inventory)
+        .set({
+          reservedQuantity: sql`${schema.inventory.reservedQuantity} - ${current.quantity}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.inventory.id, releaseRow.id));
+      await tx.insert(schema.inventoryMovements).values({
+        inventoryId: releaseRow.id,
+        changeAmount: -current.quantity,
+        reason: "order_released",
+        orderId,
+        note: `Reservation släppt: kit-komponent bytt till "${newSku}" (komponent i "${line.name}")`,
+      });
+    }
+
+    const reserveCondition = newResolved.variantId
+      ? and(
+          eq(schema.inventory.productId, newResolved.productId),
+          eq(schema.inventory.variantId, newResolved.variantId),
+        )
+      : and(
+          eq(schema.inventory.productId, newResolved.productId),
+          isNull(schema.inventory.variantId),
+        );
+
+    const [reserveRow] = await tx
+      .select({ id: schema.inventory.id })
+      .from(schema.inventory)
+      .where(reserveCondition);
+    if (reserveRow) {
+      await tx
+        .update(schema.inventory)
+        .set({
+          reservedQuantity: sql`${schema.inventory.reservedQuantity} + ${current.quantity}`,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.inventory.id, reserveRow.id));
+      await tx.insert(schema.inventoryMovements).values({
+        inventoryId: reserveRow.id,
+        changeAmount: current.quantity,
+        reason: "order_reserved",
+        orderId,
+        note: `Reserverat: kit-komponent bytt från annan vara (komponent i "${line.name}")`,
+      });
+    }
+
+    await tx
+      .insert(schema.orderLineComponentSwaps)
+      .values({
+        orderLineId: line.id,
+        originalComponentProductId,
+        newProductId: newResolved.productId,
+        newVariantId: newResolved.variantId,
+      })
+      .onConflictDoUpdate({
+        target: [
+          schema.orderLineComponentSwaps.orderLineId,
+          schema.orderLineComponentSwaps.originalComponentProductId,
+        ],
+        set: {
+          newProductId: newResolved.productId,
+          newVariantId: newResolved.variantId,
+          createdAt: new Date(),
+        },
+      });
+  });
+
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/orders");
+  revalidatePath("/inventory");
+  redirect(`/orders/${orderId}?saved=1`);
+}
+
+/**
+ * Registrerar en (eventuellt partiell) retur av EN komponent från en
+ * skickad order - t.ex. bara kaffet från ett kit, inte phin-filtret
+ * eller mjölken. Lägger tillbaka antalet i "I lager" (quantity) direkt -
+ * rör INTE reservedQuantity/shippedQuantity (de är kumulativa "totalt
+ * genom tiderna"-räknare, se schema/catalog.ts - en retur är en NY
+ * leverans-händelse, inte en ångring av leveransen). Samma `reason:
+ * "return"` som redan fanns reserverad i inventory_movement_reason men
+ * inte användes förrän nu. Hänger INTE ihop med återbetalning - det
+ * gör ni separat via Återbetala-knapparna, som idag.
+ */
+export async function returnLineComponentAction(
+  orderId: string,
+  lineId: string,
+  formData: FormData,
+) {
+  const admin = await requireCurrentAdmin();
+  const order = await getOrderOrRedirect(orderId);
+
+  if (order.fulfillmentStatus !== "shipped") {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent("Bara skickade ordrar kan få en retur registrerad.")}`,
+    );
+  }
+
+  const [line] = await db
+    .select()
+    .from(schema.orderLines)
+    .where(and(eq(schema.orderLines.id, lineId), eq(schema.orderLines.orderId, orderId)));
+  if (!line || line.type !== "physical") {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Orderraden hittades inte.")}`);
+  }
+
+  const originalComponentProductId = formData.get("originalComponentProductId")?.toString();
+  const quantity = Number(formData.get("quantity"));
+  if (!originalComponentProductId || !Number.isInteger(quantity) || quantity <= 0) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Ange ett giltigt antal att returnera.")}`);
+  }
+
+  const componentsByLine = await getOrderLineComponentsByLine([
+    { id: line.id, reference: line.reference, quantity: line.quantity },
+  ]);
+  const current = (componentsByLine.get(line.id) ?? []).find(
+    (component) => component.originalComponentProductId === originalComponentProductId,
+  );
+  if (!current) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Komponenten hittades inte.")}`);
+  }
+
+  const condition = current.variantId
+    ? and(
+        eq(schema.inventory.productId, current.productId),
+        eq(schema.inventory.variantId, current.variantId),
+      )
+    : and(eq(schema.inventory.productId, current.productId), isNull(schema.inventory.variantId));
+
+  const [inventoryRow] = await db
+    .select({ id: schema.inventory.id })
+    .from(schema.inventory)
+    .where(condition);
+  if (!inventoryRow) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Lagerraden hittades inte.")}`);
+  }
+
+  const previousReturns = await db
+    .select({ changeAmount: schema.inventoryMovements.changeAmount })
+    .from(schema.inventoryMovements)
+    .where(
+      and(
+        eq(schema.inventoryMovements.inventoryId, inventoryRow.id),
+        eq(schema.inventoryMovements.orderId, orderId),
+        eq(schema.inventoryMovements.reason, "return"),
+      ),
+    );
+  const alreadyReturned = previousReturns.reduce((sum, row) => sum + row.changeAmount, 0);
+  const remaining = current.quantity - alreadyReturned;
+
+  if (quantity > remaining) {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent(
+        `Kan max returnera ${remaining} st (${alreadyReturned} redan registrerat av totalt ${current.quantity}).`,
+      )}`,
+    );
+  }
+
+  await db.transaction(async (tx) => {
+    await tx
+      .update(schema.inventory)
+      .set({
+        quantity: sql`${schema.inventory.quantity} + ${quantity}`,
+        updatedAt: new Date(),
+      })
+      .where(eq(schema.inventory.id, inventoryRow.id));
+
+    await tx.insert(schema.inventoryMovements).values({
+      inventoryId: inventoryRow.id,
+      changeAmount: quantity,
+      reason: "return",
+      orderId,
+      causedByAdminId: admin.id,
+      note: `Retur: order #${order.orderNumber} (${current.name}, komponent i "${line.name}")`,
+    });
   });
 
   revalidatePath(`/orders/${orderId}`);
@@ -454,6 +732,7 @@ export async function markShippedAction(orderId: string, formData: FormData) {
         resolved.productId,
         resolved.variantId,
         line.quantity,
+        line.id,
       );
 
       for (const target of targets) {

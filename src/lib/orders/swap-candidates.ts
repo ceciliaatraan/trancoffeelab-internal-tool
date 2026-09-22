@@ -7,6 +7,7 @@ export type SwapCandidate = {
   label: string;
   priceOre: number;
   taxRate: number;
+  isBundle: boolean;
 };
 
 /**
@@ -21,7 +22,7 @@ export type SwapCandidate = {
  * av systemet).
  */
 export async function getSwapCandidates(): Promise<SwapCandidate[]> {
-  const [baseProducts, variants] = await Promise.all([
+  const [baseProducts, variants, bundleItems] = await Promise.all([
     db
       .select({
         sku: schema.products.sku,
@@ -44,19 +45,30 @@ export async function getSwapCandidates(): Promise<SwapCandidate[]> {
       .from(schema.productVariants)
       .innerJoin(schema.products, eq(schema.products.id, schema.productVariants.productId))
       .where(eq(schema.products.status, "published")),
+    db
+      .selectDistinct({ bundleProductId: schema.productBundleItems.bundleProductId })
+      .from(schema.productBundleItems),
   ]);
 
   const productIdsWithVariants = new Set(variants.map((v) => v.productId));
+  const bundleProductIds = new Set(bundleItems.map((b) => b.bundleProductId));
 
   const candidates: SwapCandidate[] = [
     ...baseProducts
       .filter((p) => !productIdsWithVariants.has(p.productId))
-      .map((p) => ({ sku: p.sku, label: p.label, priceOre: p.priceOre, taxRate: p.taxRate })),
+      .map((p) => ({
+        sku: p.sku,
+        label: p.label,
+        priceOre: p.priceOre,
+        taxRate: p.taxRate,
+        isBundle: bundleProductIds.has(p.productId),
+      })),
     ...variants.map((v) => ({
       sku: v.sku,
       label: `${v.productLabel} - ${v.variantLabel}`,
       priceOre: v.priceOre,
       taxRate: v.taxRate,
+      isBundle: false,
     })),
   ];
 

@@ -160,6 +160,29 @@ skickas ingen notis alls (ingen krasch) - funktionen är helt valfri. Ett fel
 från Slack (nätverksfel, ogiltig webhook m.m.) stoppar aldrig själva ordern -
 den sparas, captureas och mejlar kunden precis som vanligt, felet loggas bara.
 
+## Kit-komponenter: byta en enskild vara i kitet, och partiell retur
+
+För en kit-rad (t.ex. Komplett Kit) visar orderdetaljen numera "Innehåll i
+kitet" - varje komponent (kaffe, phin-filter, mjölk osv.) som en egen rad,
+inte bara kitets egen SKU. Där kan ni:
+
+- **Byta en enskild komponent** (t.ex. helböna i stället för malet) utan att
+  röra kitets eget pris/SKU/summa - kunden betalade för HELA kitet, inte för
+  den enskilda varan, så inget priskrav gäller här (till skillnad från "Byt"
+  på en hel rad, se ovan). Lagret uppdateras automatiskt: den gamla varans
+  reservation släpps, den nya reserveras. Bara tillgängligt innan ordern
+  skickats/avbrutits, och bara mot enskilda varor (inte mot ett annat kit).
+- **Registrera en partiell retur** - t.ex. bara kaffet kommer tillbaka, inte
+  phin-filtret eller mjölken. Lägger automatiskt tillbaka antalet i "I
+  lager" (precis som en ny leverans - påverkar inte den historiska
+  skickat-räknaren). Bara tillgängligt på skickade ordrar, och bara upp till
+  vad som faktiskt skickades minus ev. tidigare returer på samma komponent.
+  Hänger INTE ihop med återbetalning - det gör ni separat via de befintliga
+  Återbetala-knapparna.
+
+Samma retur-funktion finns även för en vanlig (icke-kit) orderrad, som en
+enda "komponent".
+
 ## Byta SKU på en orderrad
 
 Om en kund ändrar sig efter köp (t.ex. vill ha helböna i stället för malet) -

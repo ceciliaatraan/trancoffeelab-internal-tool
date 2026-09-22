@@ -1,7 +1,9 @@
 import Link from "next/link";
+import { Fragment } from "react";
 import { notFound } from "next/navigation";
-import { asc, desc, eq } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { getSwapCandidates } from "@/lib/orders/swap-candidates";
+import { getOrderLineComponentsByLine } from "@/lib/orders/line-components";
 import { db, schema } from "@/db";
 import { formatDateTime, formatOre } from "@/lib/format";
 import { oreToKronorInput } from "@/lib/money-input";
@@ -19,6 +21,8 @@ import {
   markShippedAction,
   refundFullAction,
   refundPartialAction,
+  returnLineComponentAction,
+  swapLineComponentAction,
 } from "../actions";
 import {
   PostnordApiError,
@@ -108,6 +112,12 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
     getSwapCandidates(),
   ]);
 
+  // Kit-rader bryts ner till sina komponenter (för "byt komponent"/
+  // "retur") - kräver `lines` (och därmed line.id) från ovan.
+  const lineComponentsByLineId = await getOrderLineComponentsByLine(
+    lines.map((line) => ({ id: line.id, reference: line.reference, quantity: line.quantity })),
+  );
+
   // Fraktstatus hämtas live från PostNords Track & Trace-API för
   // riktiga PostNord-spårningsnummer (inte "(ingen spårning)" för
   // handleveranser) - läsning bara, bokar/ändrar aldrig något. Ett fel
@@ -158,6 +168,68 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
     order.fulfillmentStatus === "unfulfilled" || order.fulfillmentStatus === "label_created";
   /** Samma villkor som canShip - en orderrad går att byta så länge paketet inte fysiskt lämnat/avbrutits. */
   const canEditLines = canShip;
+  /** Retur går bara att registrera på nåt som faktiskt skickats. */
+  const canReturn = order.fulfillmentStatus === "shipped";
+  /** Kit-komponenter får bara bytas mot enskilda varor, inte mot ett annat kit (inga nästlade kit). */
+  const componentSwapCandidates = swapCandidates.filter((candidate) => !candidate.isBundle);
+
+  // Hur mycket av varje komponent som redan returnerats på den här
+  // ordern (för att sätta rätt tak i retur-formulären och inte kunna
+  // returnera mer än vad som skickades). En batch: alla inventory-rader
+  // som förekommer bland ordens komponenter, sen alla retur-rörelser
+  // för DEN ordern mot just de raderna.
+  const alreadyReturnedByComponentKey = new Map<string, number>();
+  if (canReturn) {
+    const allComponents = [...lineComponentsByLineId.values()].flat();
+    const componentTargets = allComponents.map((c) => ({
+      productId: c.productId,
+      variantId: c.variantId,
+    }));
+    if (componentTargets.length > 0) {
+      const inventoryRows = await db
+        .select({
+          id: schema.inventory.id,
+          productId: schema.inventory.productId,
+          variantId: schema.inventory.variantId,
+        })
+        .from(schema.inventory)
+        .where(
+          inArray(
+            schema.inventory.productId,
+            componentTargets.map((t) => t.productId),
+          ),
+        );
+      const inventoryIdByKey = new Map(
+        inventoryRows.map((row) => [`${row.productId}|${row.variantId ?? ""}`, row.id]),
+      );
+      const relevantInventoryIds = inventoryRows.map((row) => row.id);
+      if (relevantInventoryIds.length > 0) {
+        const returnMovements = await db
+          .select({
+            inventoryId: schema.inventoryMovements.inventoryId,
+            changeAmount: schema.inventoryMovements.changeAmount,
+          })
+          .from(schema.inventoryMovements)
+          .where(
+            and(
+              eq(schema.inventoryMovements.orderId, order.id),
+              eq(schema.inventoryMovements.reason, "return"),
+              inArray(schema.inventoryMovements.inventoryId, relevantInventoryIds),
+            ),
+          );
+        const returnedByInventoryId = new Map<string, number>();
+        for (const movement of returnMovements) {
+          returnedByInventoryId.set(
+            movement.inventoryId,
+            (returnedByInventoryId.get(movement.inventoryId) ?? 0) + movement.changeAmount,
+          );
+        }
+        for (const [key, inventoryId] of inventoryIdByKey) {
+          alreadyReturnedByComponentKey.set(key, returnedByInventoryId.get(inventoryId) ?? 0);
+        }
+      }
+    }
+  }
   // Sökresultatens "Använd"-länk hoppar till nästa relevanta steg: om
   // fraktsedeln inte redan är markerad som skapad är det naturliga
   // nästa steget att markera det, annars är ordern redo att skickas.
@@ -245,11 +317,17 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         <h2 className="tran-label text-xs text-tran-muted">Orderrader</h2>
         {canEditLines ? (
           <p className="text-xs text-tran-muted">
-            Om en kund ändrat sig (t.ex. vill ha helböna i stället för malet) - byt raden mot en
-            annan SKU av EXAKT samma pris nedan. Lagret uppdateras automatiskt: reservationen på
-            den gamla SKU:n släpps och den nya reserveras i stället. Går bara mellan SKU:er med
-            samma pris, för att ordersumman aldrig ska ändras utan att ni själva hanterar
-            debitering/återbetalning.
+            Om en kund ändrat sig: &quot;Byt&quot; på en hel rad byter till en annan SKU av EXAKT
+            samma pris (t.ex. ett annat kit) - ordersumman ändras aldrig. För en kit-rad kan du i
+            stället byta en ENSKILD komponent inuti kitet (t.ex. helböna i stället för malet)
+            under &quot;Innehåll i kitet&quot; nedan, utan att röra kitets eget pris. Lagret
+            uppdateras automatiskt i båda fallen.
+          </p>
+        ) : null}
+        {canReturn ? (
+          <p className="text-xs text-tran-muted">
+            Retur: lägger tillbaka antalet i &quot;I lager&quot; direkt. Påverkar inte
+            betalningen - hantera en ev. återbetalning separat via Betalning nedan.
           </p>
         ) : null}
         <table className="w-full border-collapse text-sm">
@@ -275,49 +353,148 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                     )
                   : [];
 
+              const components = lineComponentsByLineId.get(line.id) ?? [];
+              const isBundleLine =
+                components.length > 0 &&
+                !(components.length === 1 && components[0].originalComponentProductId === line.productId);
+              const showBreakdown = line.type === "physical" && (canReturn || (canEditLines && isBundleLine));
+
               return (
-                <tr key={line.id} className="border-b border-tran-hairline">
-                  <td className="py-3 pr-4">{line.name}</td>
-                  <td className="tran-tabular py-3 pr-4 text-tran-muted">{line.reference}</td>
-                  <td className="tran-tabular py-3 pr-4">{line.quantity}</td>
-                  <td className="tran-tabular py-3 pr-4 text-tran-muted">
-                    {formatOre(line.unitPriceOre)}
-                  </td>
-                  <td className="tran-tabular py-3 pr-4">{formatOre(line.totalAmountOre)}</td>
-                  {canEditLines ? (
-                    <td className="py-3 pr-4">
-                      {line.type !== "physical" ? null : options.length === 0 ? (
-                        <span className="text-xs text-tran-muted">
-                          Ingen annan SKU till samma pris
-                        </span>
-                      ) : (
-                        <form
-                          action={editOrderLineAction.bind(null, order.id, line.id)}
-                          className="flex items-center gap-2"
-                        >
-                          <select
-                            name="newSku"
-                            required
-                            defaultValue=""
-                            className="border border-tran-hairline bg-tran-white px-2 py-1 text-xs focus:border-tran-black focus:outline-none"
-                          >
-                            <option value="" disabled>
-                              Välj ny SKU…
-                            </option>
-                            {options.map((option) => (
-                              <option key={option.sku} value={option.sku}>
-                                {option.label} ({option.sku})
-                              </option>
-                            ))}
-                          </select>
-                          <SubmitButton className="tran-label border border-tran-black px-2 py-1 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red">
-                            Byt
-                          </SubmitButton>
-                        </form>
-                      )}
+                <Fragment key={line.id}>
+                  <tr className="border-b border-tran-hairline">
+                    <td className="py-3 pr-4">{line.name}</td>
+                    <td className="tran-tabular py-3 pr-4 text-tran-muted">{line.reference}</td>
+                    <td className="tran-tabular py-3 pr-4">{line.quantity}</td>
+                    <td className="tran-tabular py-3 pr-4 text-tran-muted">
+                      {formatOre(line.unitPriceOre)}
                     </td>
+                    <td className="tran-tabular py-3 pr-4">{formatOre(line.totalAmountOre)}</td>
+                    {canEditLines ? (
+                      <td className="py-3 pr-4">
+                        {line.type !== "physical" ? null : options.length === 0 ? (
+                          <span className="text-xs text-tran-muted">
+                            Ingen annan SKU till samma pris
+                          </span>
+                        ) : (
+                          <form
+                            action={editOrderLineAction.bind(null, order.id, line.id)}
+                            className="flex items-center gap-2"
+                          >
+                            <select
+                              name="newSku"
+                              required
+                              defaultValue=""
+                              className="border border-tran-hairline bg-tran-white px-2 py-1 text-xs focus:border-tran-black focus:outline-none"
+                            >
+                              <option value="" disabled>
+                                Välj ny SKU…
+                              </option>
+                              {options.map((option) => (
+                                <option key={option.sku} value={option.sku}>
+                                  {option.label} ({option.sku})
+                                </option>
+                              ))}
+                            </select>
+                            <SubmitButton className="tran-label border border-tran-black px-2 py-1 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red">
+                              Byt
+                            </SubmitButton>
+                          </form>
+                        )}
+                      </td>
+                    ) : null}
+                  </tr>
+                  {showBreakdown ? (
+                    <tr key={`${line.id}-components`} className="border-b border-tran-hairline bg-tran-hairline/5">
+                      <td colSpan={canEditLines ? 6 : 5} className="py-3 pr-4 pl-8">
+                        <p className="tran-label mb-2 text-[11px] text-tran-muted">
+                          {isBundleLine ? "Innehåll i kitet" : "Komponent"}
+                        </p>
+                        <ul className="flex flex-col gap-2">
+                          {components.map((component) => {
+                            const key = `${component.productId}|${component.variantId ?? ""}`;
+                            const alreadyReturned = alreadyReturnedByComponentKey.get(key) ?? 0;
+                            const remainingReturnable = component.quantity - alreadyReturned;
+
+                            return (
+                              <li
+                                key={component.originalComponentProductId}
+                                className="flex flex-wrap items-center gap-3 text-xs"
+                              >
+                                <span className="tran-tabular">{component.quantity}x</span>
+                                <span>
+                                  {component.name}
+                                  {component.isSwapped ? (
+                                    <span className="ml-1 text-tran-blue">(bytt)</span>
+                                  ) : null}
+                                </span>
+
+                                {canEditLines && isBundleLine ? (
+                                  <form
+                                    action={swapLineComponentAction.bind(null, order.id, line.id)}
+                                    className="flex items-center gap-1.5"
+                                  >
+                                    <input
+                                      type="hidden"
+                                      name="originalComponentProductId"
+                                      value={component.originalComponentProductId}
+                                    />
+                                    <select
+                                      name="newSku"
+                                      required
+                                      defaultValue=""
+                                      className="border border-tran-hairline bg-tran-white px-1.5 py-1 text-[11px] focus:border-tran-black focus:outline-none"
+                                    >
+                                      <option value="" disabled>
+                                        Byt mot…
+                                      </option>
+                                      {componentSwapCandidates.map((option) => (
+                                        <option key={option.sku} value={option.sku}>
+                                          {option.label} ({option.sku})
+                                        </option>
+                                      ))}
+                                    </select>
+                                    <SubmitButton className="tran-label border border-tran-black px-1.5 py-1 text-[10px] transition-colors hover:border-tran-red hover:text-tran-red">
+                                      Byt
+                                    </SubmitButton>
+                                  </form>
+                                ) : null}
+
+                                {canReturn && remainingReturnable > 0 ? (
+                                  <form
+                                    action={returnLineComponentAction.bind(null, order.id, line.id)}
+                                    className="flex items-center gap-1.5"
+                                  >
+                                    <input
+                                      type="hidden"
+                                      name="originalComponentProductId"
+                                      value={component.originalComponentProductId}
+                                    />
+                                    <input
+                                      type="number"
+                                      name="quantity"
+                                      min={1}
+                                      max={remainingReturnable}
+                                      defaultValue={remainingReturnable}
+                                      required
+                                      className="w-14 border border-tran-hairline bg-tran-white px-1.5 py-1 text-[11px] focus:border-tran-black focus:outline-none"
+                                    />
+                                    <SubmitButton className="tran-label border border-tran-black px-1.5 py-1 text-[10px] transition-colors hover:border-tran-red hover:text-tran-red">
+                                      Retur
+                                    </SubmitButton>
+                                  </form>
+                                ) : canReturn && alreadyReturned > 0 ? (
+                                  <span className="text-tran-muted">
+                                    Allt returnerat ({alreadyReturned} st)
+                                  </span>
+                                ) : null}
+                              </li>
+                            );
+                          })}
+                        </ul>
+                      </td>
+                    </tr>
                   ) : null}
-                </tr>
+                </Fragment>
               );
             })}
           </tbody>

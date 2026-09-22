@@ -8,9 +8,10 @@ import {
   pgEnum,
   index,
   boolean,
+  unique,
 } from "drizzle-orm/pg-core";
 import { customers } from "./customers";
-import { products } from "./catalog";
+import { products, productVariants } from "./catalog";
 import { adminUsers } from "./admin";
 
 /**
@@ -124,6 +125,54 @@ export const orderLines = pgTable("order_lines", {
   sortOrder: integer("sort_order").notNull().default(0),
 });
 orderLines.enableRLS();
+
+/**
+ * Per-order-substitution av EN komponent i en kit-orderrad - t.ex. en
+ * kund som ändrat sig och vill ha helböna i stället för malet i ett
+ * redan köpt Komplett Kit. Kitets EGEN orderrad (SKU/pris/summa) rörs
+ * aldrig - bara VILKEN lagervara som faktiskt reserveras/skickas för
+ * just den komponent-"platsen" i kitet, för den här specifika ordern.
+ *
+ * `originalComponentProductId` identifierar "platsen" i kitets recept
+ * (från product_bundle_items) - stabil även om själva bytet i sig byts
+ * igen. Unik per (orderLineId, originalComponentProductId): en kit-
+ * komponent kan bara ha EN aktiv substitution åt gången (ett nytt byte
+ * skriver över/ersätter, se swapLineComponentAction).
+ *
+ * VIKTIGT: expandLineToInventoryTargets (lib/inventory/bundles.ts) och
+ * den "sanna" reserverat/skickat-beräkningen (lib/inventory/order-line-
+ * totals.ts) MÅSTE slå upp och tillämpa den här tabellen vid kit-
+ * expansion - annars "läker" Synka lager bort bytet, och skickad/
+ * annullerad-hanteringen skulle träffa fel lagervara.
+ */
+export const orderLineComponentSwaps = pgTable(
+  "order_line_component_swaps",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    orderLineId: uuid("order_line_id")
+      .notNull()
+      .references(() => orderLines.id, { onDelete: "cascade" }),
+    originalComponentProductId: uuid("original_component_product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict" }),
+    newProductId: uuid("new_product_id")
+      .notNull()
+      .references(() => products.id, { onDelete: "restrict" }),
+    newVariantId: uuid("new_variant_id").references(() => productVariants.id, {
+      onDelete: "restrict",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    unique("order_line_component_swaps_unique").on(
+      table.orderLineId,
+      table.originalComponentProductId,
+    ),
+  ],
+);
+orderLineComponentSwaps.enableRLS();
 
 export const shipments = pgTable("shipments", {
   id: uuid("id").primaryKey().defaultRandom(),
