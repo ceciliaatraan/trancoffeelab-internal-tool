@@ -176,7 +176,19 @@ export type KustomCreateOrderPayload = {
    * KSA-konfiguration i Kustom-portalen. Satt till true alltid (er sajt
    * säljer bara fysiska varor - inget digitalt-only-fall att hantera).
    */
-  options: { allow_separate_shipping_address: true };
+  options: {
+    allow_separate_shipping_address: true;
+    /**
+     * Aktiverar "Köper som företag" i Kustoms EGEN checkout-widget
+     * (bekräftat 2026-09-22, se docs/kustom.md) - kräver att B2B är
+     * aktiverat på kontot (ägaren aktiverade det samma dag). Kunden
+     * väljer själv företag/privatperson och fyller i uppgifterna INNE i
+     * Kustoms iframe - vi bygger ingen egen ruta för det här.
+     */
+    allowed_customer_types: ["person", "organization"];
+    /** Visar ett extra, valfritt momsregistreringsnummer-fält i adressformuläret - bara relevant för B2B-ordrar. */
+    show_vat_registration_number_field: true;
+  };
   /**
    * Statisk fallback KSA visar om TMS/Shipping API-anropet till PostNord
    * misslyckas - se KustomShippingOption ovan. Alltid exakt en post
@@ -215,7 +227,11 @@ export function buildCreateOrderPayload({
     order_tax_amount: orderTaxAmount,
     order_lines: orderLines,
     merchant_urls: merchantUrls,
-    options: { allow_separate_shipping_address: true },
+    options: {
+      allow_separate_shipping_address: true,
+      allowed_customer_types: ["person", "organization"],
+      show_vat_registration_number_field: true,
+    },
     shipping_options: [shippingOption],
   };
 }

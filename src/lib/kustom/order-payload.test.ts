@@ -256,7 +256,11 @@ describe("buildCreateOrderPayload", () => {
       merchantUrls,
     });
 
-    expect(payload.options).toEqual({ allow_separate_shipping_address: true });
+    expect(payload.options).toEqual({
+      allow_separate_shipping_address: true,
+      allowed_customer_types: ["person", "organization"],
+      show_vat_registration_number_field: true,
+    });
   });
 
   it("skickar med det angivna shipping_option som KSA:s fallback, alltid exakt en post", () => {

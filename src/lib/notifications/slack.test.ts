@@ -23,6 +23,7 @@ const baseOrder: PersistedOrder = {
   shippingLine: null,
   discount: null,
   businessName: null,
+  businessOrgNumber: null,
   businessVatNumber: null,
 };
 

@@ -425,38 +425,67 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
     tysta ett saknat belopp till 0 hade varit farligare än att låta
     insertet krascha (nu åtminstone diagnostiserbart och reprocessbart).
 
-## "Köper som företag" - egen lösning runt Kustom, 2026-09-22
+## "Köper som företag" (B2B checkout), 2026-09-22
 
 Ägaren ville lägga till en "I'm purchasing as a business"-ruta i
-checkouten (företagsnamn, adress, momsregistreringsnummer). Frågade
-Kustom - **de har en sådan checkbox i sin egen checkout-widget, men den
-kräver ett separat avtal som ägaren inte har skrivit under än.** Så
-länge det avtalet inte är på plats visar Kustoms checkout INGEN sådan
-ruta, oavsett vad vi skickar i vår create-order-payload.
+checkouten (företagsnamn, adress, momsregistreringsnummer). Kustom
+svarade först att det kräver ett separat avtal - ägaren skrev under och
+**aktiverade B2B på kontot samma dag.** Ägaren delade därefter det
+riktiga schemat för `POST /checkout/v3/orders` från docs.kustom.co
+(kopierat direkt från sidan, inte bara sökträffar) - så det här är
+**bekräftat**, inte en gissning.
 
-**Beslut:** bygga en egen "lösning runt omkring det" tills vidare, helt
-frikopplad från Kustoms checkout-widget:
+**Viktig insikt: hela B2B-formuläret sköts av Kustoms EGEN
+checkout-widget.** Vi bygger ingen egen kryssruta/formulär någonstans
+(varken i adminet eller på trancoffeelab.com) - kunden väljer
+"organisation" och fyller i företagsnamn/org.nr/momsnr INNE i Kustoms
+iframe. Vår enda uppgift är att (1) be om att rutan visas, och (2) läsa
+av vad Kustom skickar tillbaka när ordern är klar.
 
-- Fälten fylls i på VÅR egen kundvagnssida (trancoffeelab-website),
-  INTE i Kustoms iframe - kunden kryssar i en ruta där, som fäller ut
-  företagsnamn/adress/momsregnummer.
-- `POST /api/public/checkout/session` tar nu emot ett valfritt
-  `business`-objekt (`cartRequestSchema`, `src/lib/validation/cart.ts`).
-- Eftersom Kustoms `order_id` inte är känt förrän EFTER
-  `createOrder`-anropet svarat, mellanlagras uppgifterna i en ny tabell,
-  `pending_business_purchases` (nyckel: `kustom_order_id`) - se
-  `checkout/session/route.ts`. Ett fel vid den här insert:en blockerar
-  ALDRIG själva köpet (samma princip som resten av integrationen: extra
-  information får aldrig krascha betalningsflödet).
-- När push-webhooken senare sparar ordern (`persist-order.ts`) slås
-  `pending_business_purchases` upp på `order.order_id`, flyttas in på
-  `orders`-raden (`is_business_purchase`, `business_name`,
-  `business_vat_number`, `business_address`) och raden städas bort.
-- Syns nu på orderdetaljen (`/orders/[id]`), i orderbekräftelsemejlet
-  (en rad under ordernumret: "Företag: X (Momsregnr: Y)") och i
-  PostNord-exporten (företagsnamnet hamnar i CSV-kolumnen
-  "Company Name", kontaktpersonens namn i "Att (Company only)" i
-  stället för "First and last name").
+**Bekräftade fält (Checkout v3 create-order-schema, docs.kustom.co):**
+
+- `options.allowed_customer_types`: array, t.ex. `["person",
+  "organization"]` - måste innehålla `"organization"` för att B2B-läget
+  överhuvudtaget ska visas i checkouten. Satt alltid i
+  `buildCreateOrderPayload` (`src/lib/kustom/order-payload.ts`).
+- `options.show_vat_registration_number_field`: boolean - visar ett
+  extra, valfritt momsregistreringsnummer-fält i adressformuläret. Satt
+  till `true` alltid, av samma anledning.
+- `customer.type`: `"person"` (standard) eller `"organization"` - vad
+  kunden faktiskt valde.
+- `customer.organization_registration_id`: organisationsnumret,
+  t.ex. `"556737-0431"`. Bara för B2B-ordrar.
+- `customer.vat_id`: momsregistreringsnumret. Bara för B2B-ordrar.
+- `billing_address.organization_name`: företagsnamnet - ligger på
+  adressen, inte på `customer`-objektet. Gäller bara när
+  `customer.type = "organization"`.
+
+**Hur det används i koden:**
+
+- `order-payload.ts` sätter de två `options`-fälten ovan på VARJE
+  checkout-session, inte villkorat - B2B-läget är alltid tillgängligt
+  som ett val för kunden, precis som Kustoms egen dokumentation visar
+  det (`allowed_customer_types` med båda värdena).
+- `lib/kustom/client.ts`: `KustomOrderManagementOrder` har nu ett
+  valfritt `customer`-fält (`KustomCustomer`:
+  `type`/`organization_registration_id`/`vat_id`).
+- `persist-order.ts` läser `order.customer?.type === "organization"`,
+  `order.customer?.organization_registration_id`,
+  `order.customer?.vat_id` och `order.billing_address?.organization_name`
+  direkt ur Kustoms orderdata och sparar på `orders.is_business_purchase`
+  / `business_org_number` / `business_vat_number` / `business_name`.
+  **Fallback:** om `customer` av någon anledning skulle saknas i
+  Order Management-svaret (bara Checkout v3-schemat är bekräftat ovan,
+  INTE separat bekräftat att Order Management-svaret har med samma
+  `customer`-objekt - se "Overifierat" nedan), räknas ordern ändå som
+  ett företagsköp om `billing_address.organization_name` finns, eftersom
+  DET fältet är bekräftat sedan tidigare för Order Management-API:et.
+- Syns på orderdetaljen (`/orders/[id]` - organisationsnamnet visas
+  högst upp i faktura-/leveransadressen, org.nr och momsnr i en egen
+  "Företagsuppgifter"-ruta), i orderbekräftelsemejlet (en rad under
+  ordernumret: "Företag: X (Momsregnr: Y)") och i PostNord-exporten
+  (företagsnamnet hamnar i CSV-kolumnen "Company Name", kontaktpersonens
+  namn i "Att (Company only)" i stället för "First and last name").
 
 **VIKTIGT, egen tolkning - INTE bekräftad av Kustom eller Skatteverket:**
 momsregistreringsnumret är bara INFORMATION på kvittot/fakturan, inte en
@@ -464,23 +493,26 @@ signal att nolla moms. "Omvänd skattskyldighet" (0 % moms mot ett
 momsnummer) gäller normalt bara B2B-försäljning till ANDRA EU-länder -
 en svensk B2B-kund betalar moms som vanligt och drar av den själv i sin
 egen deklaration. Momsberäkningen i `order-payload.ts`/`tax.ts` är
-alltså MEDVETET helt orörd av det här tillägget.
+alltså MEDVETET helt orörd av det här tillägget - `options.vat_removed`
+(finns i Kustoms schema, nollar moms i Order Summary) används INTE.
 
 **Overifierat/kvarstår:**
 
-1. **Storefrontens egen kryssruta/formulär är INTE byggd än** - det här
-   förberedde bara mottagarsidan (adminet). Utan ett UI på
-   trancoffeelab.com som skickar med `business` i anropet gör det här
-   ingenting i praktiken.
-2. **Om/när Kustom-avtalet signeras och deras egen checkbox aktiveras**,
-   måste vi bestämma vad som händer med VÅR lösning - troligen stänga av
-   vårt eget formulär och i stället läsa av vad Kustom skickar tillbaka
-   (kräver att veta exakt vilka fältnamn Kustom då använder - inte
-   bekräftat, se toppen av det här dokumentet för principen "skriv inte
-   av ett antagande som bekräftat").
-3. Momsnummerformatet valideras INTE (varken svenskt SE-format eller mot
-   EU:s VIES-register) - bara att fältet inte är tomt. Ett medvetet
-   avgränsat första steg.
+1. Om Order Management-API:ets svar (`getOrderManagementOrder`, det
+   push-hanteraren faktiskt läser) verkligen har med `customer`-objektet
+   är INTE separat bekräftat - bara Checkout v3-schemat (create-order)
+   visades. Om det saknas fångas `organization_registration_id`/`vat_id`
+   inte upp (blir `null`), men `is_business_purchase`/`business_name`
+   fungerar ändå tack vare fallbacken på `organization_name` ovan.
+   Stäms av vid första riktiga företagsordern.
+2. En tidigare version av det här (2026-09-22, innan B2B var aktiverat)
+   byggde en egen mellanlagringslösning (`pending_business_purchases`,
+   ett eget `business`-fält i `cartRequestSchema`) - helt riven ut nu,
+   eftersom Kustom sköter hela flödet själva. Migreringarna
+   0013-0015 skapar och tar sedan bort den tabellen/kolumnen i samma
+   svep (0012 skapade den, redan pushad innan den hann köras - se
+   git-historiken, ofarligt men lite onödigt db-arbete vid nästa
+   `db:migrate`).
 
 ## Status i koden
 

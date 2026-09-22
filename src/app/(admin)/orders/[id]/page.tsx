@@ -34,17 +34,11 @@ import {
 type Address = {
   given_name?: string;
   family_name?: string;
+  organization_name?: string;
   email?: string;
   phone?: string;
   street_address?: string;
   postal_code?: string;
-  city?: string;
-  country?: string;
-};
-
-type BusinessAddress = {
-  street?: string;
-  postalCode?: string;
   city?: string;
   country?: string;
 };
@@ -62,6 +56,12 @@ function AddressBlock({ address, title }: { address: Address | null; title: stri
     <div>
       <h3 className="tran-label mb-2 text-xs text-tran-muted">{title}</h3>
       <p className="text-sm">
+        {address.organization_name ? (
+          <>
+            {address.organization_name}
+            <br />
+          </>
+        ) : null}
         {address.given_name} {address.family_name}
         <br />
         {address.street_address}
@@ -322,21 +322,16 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
 
       {order.isBusinessPurchase ? (
         <section className="border border-tran-hairline p-6">
-          <h3 className="tran-label mb-2 text-xs text-tran-muted">Företagsköp</h3>
+          <h3 className="tran-label mb-2 text-xs text-tran-muted">Företagsuppgifter</h3>
           <p className="text-sm">
-            {order.businessName}
-            <br />
-            Momsregistreringsnummer: {order.businessVatNumber}
-            {order.businessAddress ? (
+            {order.businessOrgNumber ? (
               <>
+                Organisationsnummer: {order.businessOrgNumber}
                 <br />
-                {(order.businessAddress as BusinessAddress).street}
-                <br />
-                {(order.businessAddress as BusinessAddress).postalCode}{" "}
-                {(order.businessAddress as BusinessAddress).city}
-                <br />
-                {(order.businessAddress as BusinessAddress).country?.toUpperCase()}
               </>
+            ) : null}
+            {order.businessVatNumber ? (
+              <>Momsregistreringsnummer: {order.businessVatNumber}</>
             ) : null}
           </p>
         </section>

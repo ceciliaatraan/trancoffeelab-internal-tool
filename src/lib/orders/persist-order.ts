@@ -27,6 +27,7 @@ export type PersistedOrder = {
   discount: { code: string; amountOre: number } | null;
   /** "Köper som företag"-uppgifter, se orders.is_business_purchase i schema/orders.ts. Null om ordern inte var ett företagsköp. */
   businessName: string | null;
+  businessOrgNumber: string | null;
   businessVatNumber: string | null;
 };
 
@@ -86,13 +87,16 @@ export async function persistOrderFromKustom(
     const isFinal = order.status !== "CANCELLED" && order.status !== "EXPIRED";
 
     // "Köper som företag" - se orders.is_business_purchase i
-    // schema/orders.ts. Uppgifterna mellanlagrades av checkout/session/
-    // route.ts nyckelt på Kustoms order_id, eftersom Kustom själva ännu
-    // inte har ett fält för det här (kräver ett osignerat avtal).
-    const [pendingBusiness] = await tx
-      .select()
-      .from(schema.pendingBusinessPurchases)
-      .where(eq(schema.pendingBusinessPurchases.kustomOrderId, order.order_id));
+    // schema/orders.ts. Läses direkt ur Kustoms egen orderdata (kunden
+    // fyllde i det INNE i Kustoms checkout-widget). organization_name
+    // ligger på billing_address (bekräftat för Order Management-API:et
+    // sedan tidigare) - customer.type/vat_id/organization_registration_id
+    // är bara bekräftade för Checkout v3-svaret, så det faller tillbaka
+    // på organization_name om customer-objektet skulle saknas här.
+    const businessName = order.billing_address?.organization_name || null;
+    const isBusinessPurchase = order.customer?.type === "organization" || Boolean(businessName);
+    const businessOrgNumber = order.customer?.organization_registration_id || null;
+    const businessVatNumber = order.customer?.vat_id || null;
 
     /**
      * Slås upp INNAN orders-raden skapas så `containsPreorder` kan sättas
@@ -154,10 +158,10 @@ export async function persistOrderFromKustom(
         isTest: process.env.KUSTOM_ENV !== "live",
         shippingAddress: order.shipping_address ?? null,
         billingAddress: order.billing_address ?? null,
-        isBusinessPurchase: Boolean(pendingBusiness),
-        businessName: pendingBusiness?.businessName ?? null,
-        businessVatNumber: pendingBusiness?.businessVatNumber ?? null,
-        businessAddress: pendingBusiness?.businessAddress ?? null,
+        isBusinessPurchase,
+        businessName,
+        businessOrgNumber,
+        businessVatNumber,
         rawKustomOrder: order,
         paidAt: isFinal ? new Date() : null,
       })
@@ -182,14 +186,9 @@ export async function persistOrderFromKustom(
         shippingLine: null,
         discount: null,
         businessName: null,
+        businessOrgNumber: null,
         businessVatNumber: null,
       };
-    }
-
-    if (pendingBusiness) {
-      await tx
-        .delete(schema.pendingBusinessPurchases)
-        .where(eq(schema.pendingBusinessPurchases.kustomOrderId, order.order_id));
     }
 
     for (const [index, line] of order.order_lines.entries()) {
@@ -274,8 +273,9 @@ export async function persistOrderFromKustom(
       physicalLines,
       shippingLine,
       discount,
-      businessName: pendingBusiness?.businessName ?? null,
-      businessVatNumber: pendingBusiness?.businessVatNumber ?? null,
+      businessName,
+      businessOrgNumber,
+      businessVatNumber,
     };
   });
 }

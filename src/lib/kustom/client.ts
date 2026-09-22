@@ -157,6 +157,26 @@ export type KustomAddress = {
   title?: string;
 };
 
+/**
+ * "Köper som företag" - bekräftat mot Checkout v3:s create-order-schema
+ * (docs.kustom.co, delat av ägaren 2026-09-22, se docs/kustom.md).
+ * `customer.type` styr B2C/B2B: "organization" när kunden valt att köpa
+ * som företag i Kustoms egen checkout-widget (aktiveras via
+ * options.allowed_customer_types, se order-payload.ts). ÖPPET: om
+ * Order Management-svaret (den här typen, `getOrderManagementOrder`)
+ * verkligen har med `customer`-objektet är INTE separat bekräftat -
+ * bara Checkout v3-schemat visades. Fältet är därför valfritt här och
+ * persist-order.ts faller tillbaka på billing_address.organization_name
+ * (som ÄR bekräftat för Order Management) om customer saknas.
+ */
+export type KustomCustomer = {
+  type?: "person" | "organization";
+  /** Organisationsnummer - bara för B2B-ordrar. */
+  organization_registration_id?: string;
+  /** Momsregistreringsnummer - bara för B2B-ordrar. */
+  vat_id?: string;
+};
+
 export type KustomOrderManagementLine = {
   type?: string;
   reference?: string;
@@ -181,6 +201,7 @@ export type KustomOrderManagementOrder = {
   order_lines: KustomOrderManagementLine[];
   billing_address?: KustomAddress;
   shipping_address?: KustomAddress;
+  customer?: KustomCustomer;
   captured_amount: number;
   refunded_amount: number;
   remaining_authorized_amount: number;

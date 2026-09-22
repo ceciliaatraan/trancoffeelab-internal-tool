@@ -87,23 +87,24 @@ export const orders = pgTable("orders", {
   billingAddress: jsonb("billing_address"),
 
   /**
-   * Eget "köper som företag"-tillägg, 2026-09-22 - INTE ett fält Kustom
-   * skickar. Kustoms egen checkbox för detta i deras checkout-widget
-   * kräver ett separat avtal ägaren inte skrivit under än (se
-   * docs/kustom.md) - det här är en egen lösning runt omkring det tills
-   * dess: fälten fylls i på VÅR kundvagnssida innan Kustoms checkout
-   * öppnas, mellanlagras i pending_business_purchases (kustom_order_id
-   * är inte känt förrän create-order-anropet svarat, se
-   * checkout/session/route.ts) och flyttas hit när ordern landar
-   * (persist-order.ts). ÄNDRAR INTE momsberäkningen - momsregnumret är
-   * bara information på kvittot/fakturan, inte en signal om
-   * omvänd skattskyldighet (den gäller normalt bara B2B-försäljning till
-   * ANDRA EU-länder, inte inhemska svenska köp).
+   * "Köper som företag", 2026-09-22 - Kustoms EGEN checkout-widget
+   * (aktiverat på kontot samma dag, se docs/kustom.md för de bekräftade
+   * fältnamnen). Kunden väljer själv och fyller i allt INNE i Kustoms
+   * iframe - vi skickar bara options.allowed_customer_types/
+   * show_vat_registration_number_field (order-payload.ts) för att visa
+   * rutan, och läser sedan av vad Kustom skickade tillbaka
+   * (persist-order.ts: customer.type/organization_registration_id/
+   * vat_id + billing_address.organization_name). ÄNDRAR INTE
+   * momsberäkningen - momsregnumret är bara information på kvittot/
+   * fakturan, inte en signal om omvänd skattskyldighet (den gäller
+   * normalt bara B2B-försäljning till ANDRA EU-länder, inte inhemska
+   * svenska köp).
    */
   isBusinessPurchase: boolean("is_business_purchase").notNull().default(false),
+  /** Speglar billing_address.organization_name - se ovan. */
   businessName: text("business_name"),
+  businessOrgNumber: text("business_org_number"),
   businessVatNumber: text("business_vat_number"),
-  businessAddress: jsonb("business_address"),
 
   /** Senaste rå orderdata hämtad FRÅN Kustom (push litar aldrig på egen body). */
   rawKustomOrder: jsonb("raw_kustom_order"),
@@ -208,26 +209,6 @@ export const shipments = pgTable("shipments", {
     .defaultNow(),
 });
 shipments.enableRLS();
-
-/**
- * Mellanlagring av företagsuppgifter från VÅR egen kundvagnssida (inte
- * från Kustom, se orders.is_business_purchase ovan) - kundvagnen känner
- * inte till Kustoms order_id förrän EFTER att create-order-anropet
- * svarat, så uppgifterna sparas här nyckelt på kustom_order_id
- * (checkout/session/route.ts) och flyttas in i orders-raden när push-
- * webhooken faktiskt sparar ordern (persist-order.ts), som sedan tar
- * bort raden härifrån. En rad för en övergiven kundvagn (kunden avbryter
- * innan betalning) blir kvarliggande skräp - ofarligt (ingen
- * betalningsdata), men städas inte bort automatiskt ännu.
- */
-export const pendingBusinessPurchases = pgTable("pending_business_purchases", {
-  kustomOrderId: text("kustom_order_id").primaryKey(),
-  businessName: text("business_name").notNull(),
-  businessVatNumber: text("business_vat_number").notNull(),
-  businessAddress: jsonb("business_address"),
-  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
-});
-pendingBusinessPurchases.enableRLS();
 
 export const orderEventTypeEnum = pgEnum("order_event_type", [
   "capture",

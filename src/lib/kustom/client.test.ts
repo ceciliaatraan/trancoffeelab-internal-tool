@@ -48,7 +48,10 @@ function mockFetchOnceRaw(status: number, rawText: string) {
 
 describe("createOrder", () => {
   it("POSTar till /checkout/v3/orders med Basic auth-header", async () => {
-    const fetchMock = mockFetchOnce(200, { order_id: "abc123", html_snippet: "<div></div>" });
+    const fetchMock = mockFetchOnce(200, {
+      order_id: "abc123",
+      html_snippet: "<div></div>",
+    });
 
     await createOrder({
       purchase_country: "SE",
@@ -57,7 +60,11 @@ describe("createOrder", () => {
       order_amount: 100,
       order_tax_amount: 10,
       order_lines: [],
-      options: { allow_separate_shipping_address: true },
+      options: {
+        allow_separate_shipping_address: true,
+        allowed_customer_types: ["person", "organization"],
+        show_vat_registration_number_field: true,
+      },
       shipping_options: [],
       merchant_urls: {
         terms: "t",
@@ -88,9 +95,19 @@ describe("createOrder", () => {
         order_amount: 0,
         order_tax_amount: 0,
         order_lines: [],
-        options: { allow_separate_shipping_address: true },
+        options: {
+          allow_separate_shipping_address: true,
+          allowed_customer_types: ["person", "organization"],
+          show_vat_registration_number_field: true,
+        },
         shipping_options: [],
-        merchant_urls: { terms: "t", checkout: "c", confirmation: "conf", push: "p", validation: "v" },
+        merchant_urls: {
+          terms: "t",
+          checkout: "c",
+          confirmation: "conf",
+          push: "p",
+          validation: "v",
+        },
       });
     } catch (err) {
       caught = err;
@@ -111,9 +128,19 @@ describe("createOrder", () => {
         order_amount: 0,
         order_tax_amount: 0,
         order_lines: [],
-        options: { allow_separate_shipping_address: true },
+        options: {
+          allow_separate_shipping_address: true,
+          allowed_customer_types: ["person", "organization"],
+          show_vat_registration_number_field: true,
+        },
         shipping_options: [],
-        merchant_urls: { terms: "t", checkout: "c", confirmation: "conf", push: "p", validation: "v" },
+        merchant_urls: {
+          terms: "t",
+          checkout: "c",
+          confirmation: "conf",
+          push: "p",
+          validation: "v",
+        },
       }),
     ).rejects.toBeInstanceOf(KustomApiError);
   });
@@ -124,7 +151,9 @@ describe("readOrder / updateOrder", () => {
     const fetchMock = mockFetchOnce(200, { order_id: "abc123" });
     await readOrder("abc123");
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("https://api.playground.kustom.co/checkout/v3/orders/abc123");
+    expect(url).toBe(
+      "https://api.playground.kustom.co/checkout/v3/orders/abc123",
+    );
     expect(init.method).toBeUndefined();
   });
 
@@ -132,7 +161,9 @@ describe("readOrder / updateOrder", () => {
     const fetchMock = mockFetchOnce(200, { order_id: "abc123" });
     await updateOrder("abc123", { order_amount: 500 });
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("https://api.playground.kustom.co/checkout/v3/orders/abc123");
+    expect(url).toBe(
+      "https://api.playground.kustom.co/checkout/v3/orders/abc123",
+    );
     expect(init.method).toBe("POST");
   });
 
@@ -146,10 +177,15 @@ describe("readOrder / updateOrder", () => {
 
 describe("Order Management", () => {
   it("GET:ar /ordermanagement/v1/orders/{order_id}", async () => {
-    const fetchMock = mockFetchOnce(200, { order_id: "abc123", status: "AUTHORIZED" });
+    const fetchMock = mockFetchOnce(200, {
+      order_id: "abc123",
+      status: "AUTHORIZED",
+    });
     await getOrderManagementOrder("abc123");
     const [url, init] = fetchMock.mock.calls[0];
-    expect(url).toBe("https://api.playground.kustom.co/ordermanagement/v1/orders/abc123");
+    expect(url).toBe(
+      "https://api.playground.kustom.co/ordermanagement/v1/orders/abc123",
+    );
     expect(init.method).toBeUndefined();
   });
 
@@ -203,9 +239,9 @@ describe("Order Management", () => {
 
   it("kastar KustomApiError när Order Management svarar 403 CAPTURE_NOT_ALLOWED", async () => {
     mockFetchOnce(403, { error_code: "CAPTURE_NOT_ALLOWED" });
-    await expect(captureOrder("abc123", { captured_amount: 100 })).rejects.toBeInstanceOf(
-      KustomApiError,
-    );
+    await expect(
+      captureOrder("abc123", { captured_amount: 100 }),
+    ).rejects.toBeInstanceOf(KustomApiError);
   });
 });
 

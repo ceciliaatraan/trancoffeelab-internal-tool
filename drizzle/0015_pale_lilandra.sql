@@ -1,0 +1,1 @@
+ALTER TABLE "orders" ADD COLUMN "business_org_number" text;
