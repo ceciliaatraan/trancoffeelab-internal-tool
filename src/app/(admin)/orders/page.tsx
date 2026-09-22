@@ -1,22 +1,24 @@
 import Link from "next/link";
-import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatOre, formatDateTime } from "@/lib/format";
 import { OrderStatusChip } from "@/components/order-status-chip";
 import { PreorderChip } from "@/components/preorder-chip";
 import { TestOrderChip } from "@/components/test-order-chip";
 import { SubmitButton } from "@/components/submit-button";
-import {
-  PostnordApiError,
-  shortPostnordStatusLabel,
-  trackPostnordShipment,
-} from "@/lib/postnord/client";
+import { FraktStatusBadge } from "@/components/frakt-status-badge";
+import { TableRowLink } from "@/components/table-row-link";
+import { resolveFraktStatus } from "@/lib/orders/fulfillment-status";
+import { PostnordApiError, trackPostnordShipment } from "@/lib/postnord/client";
 
-const FULFILLMENT_LABELS: Record<string, string> = {
-  unfulfilled: "Ej skickad",
-  shipped: "Skickad",
-  cancelled: "Avbruten",
-};
+type ShippingAddress = { given_name?: string; family_name?: string };
+
+/** Namn från leveransadressen om det finns, annars e-post. */
+function customerDisplayName(order: { customerEmail: string; shippingAddress: unknown }): string {
+  const address = order.shippingAddress as ShippingAddress | null;
+  const name = [address?.given_name, address?.family_name].filter(Boolean).join(" ").trim();
+  return name || order.customerEmail;
+}
 
 export default async function OrdersPage({ searchParams }: PageProps<"/orders">) {
   const params = await searchParams;
@@ -46,6 +48,29 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
     .orderBy(desc(schema.orders.createdAt))
     .limit(100);
 
+  // Namn på det som beställts, till hover-tooltip på "Belopp".
+  const orderIds = orders.map((order) => order.id);
+  const itemsByOrderId = new Map<string, string[]>();
+  if (orderIds.length > 0) {
+    const lines = await db
+      .select({
+        orderId: schema.orderLines.orderId,
+        name: schema.orderLines.name,
+        quantity: schema.orderLines.quantity,
+        type: schema.orderLines.type,
+      })
+      .from(schema.orderLines)
+      .where(inArray(schema.orderLines.orderId, orderIds))
+      .orderBy(asc(schema.orderLines.sortOrder));
+
+    for (const line of lines) {
+      if (line.type !== "physical") continue;
+      const existing = itemsByOrderId.get(line.orderId) ?? [];
+      existing.push(`${line.quantity}x ${line.name}`);
+      itemsByOrderId.set(line.orderId, existing);
+    }
+  }
+
   // Live PostNord-status i "Frakt"-kolumnen för skickade ordrar med ett
   // riktigt PostNord-spårningsnummer - läsning bara (se lib/postnord/
   // client.ts). Ett fel för EN order (fel nummer, PostNord nere) visar
@@ -55,12 +80,20 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
     .filter((order) => order.fulfillmentStatus === "shipped")
     .map((order) => order.id);
 
+  const latestShipmentCarrierByOrderId = new Map<string, string>();
   const postnordStatusByOrderId = new Map<string, string>();
   if (shippedOrderIds.length > 0) {
     const shipmentsForShippedOrders = await db
       .select()
       .from(schema.shipments)
-      .where(inArray(schema.shipments.orderId, shippedOrderIds));
+      .where(inArray(schema.shipments.orderId, shippedOrderIds))
+      .orderBy(asc(schema.shipments.shippedAt));
+
+    // Senaste skickningen per order "vinner" (sista i den asc-sorterade
+    // listan skriver över) - normalfallet är en enda skickning per order.
+    for (const shipment of shipmentsForShippedOrders) {
+      latestShipmentCarrierByOrderId.set(shipment.orderId, shipment.carrier);
+    }
 
     await Promise.all(
       shipmentsForShippedOrders
@@ -73,11 +106,11 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
           try {
             const tracking = await trackPostnordShipment(shipment.trackingNumber, "sv");
             if (tracking) {
-              postnordStatusByOrderId.set(shipment.orderId, shortPostnordStatusLabel(tracking.status));
+              postnordStatusByOrderId.set(shipment.orderId, tracking.status);
             }
           } catch (err) {
             if (!(err instanceof PostnordApiError)) throw err;
-            // Tyst - raden faller tillbaka på FULFILLMENT_LABELS nedan.
+            // Tyst - raden faller tillbaka på "Skickad" nedan.
           }
         }),
     );
@@ -152,32 +185,51 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
             </tr>
           </thead>
           <tbody>
-            {orders.map((order) => (
-              <tr key={order.id} className="border-b border-tran-hairline">
-                <td className="py-4 pr-4">
-                  <Link href={`/orders/${order.id}`} className="tran-tabular hover:text-tran-red">
-                    #{order.orderNumber}
-                  </Link>
-                </td>
-                <td className="py-4 pr-4 text-tran-muted">{order.customerEmail}</td>
-                <td className="tran-tabular py-4 pr-4">{formatOre(order.orderAmountOre)}</td>
-                <td className="py-4 pr-4">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <OrderStatusChip status={order.status} />
-                    {order.containsPreorder && <PreorderChip />}
-                    {order.isTest && <TestOrderChip />}
-                  </div>
-                </td>
-                <td className="py-4 pr-4 text-tran-muted">
-                  {postnordStatusByOrderId.get(order.id) ??
-                    FULFILLMENT_LABELS[order.fulfillmentStatus] ??
-                    order.fulfillmentStatus}
-                </td>
-                <td className="tran-tabular py-4 pr-4 text-tran-muted">
-                  {formatDateTime(order.createdAt)}
-                </td>
-              </tr>
-            ))}
+            {orders.map((order) => {
+              const items = itemsByOrderId.get(order.id);
+              const fraktStatus = resolveFraktStatus(
+                order.fulfillmentStatus,
+                latestShipmentCarrierByOrderId.get(order.id) ?? null,
+                postnordStatusByOrderId.get(order.id) ?? null,
+              );
+
+              return (
+                <TableRowLink
+                  key={order.id}
+                  href={`/orders/${order.id}`}
+                  className="border-b border-tran-hairline hover:bg-tran-hairline/20"
+                >
+                  <td className="py-4 pr-4">
+                    <Link
+                      href={`/orders/${order.id}`}
+                      className="tran-tabular hover:text-tran-red"
+                    >
+                      #{order.orderNumber}
+                    </Link>
+                  </td>
+                  <td className="py-4 pr-4 text-tran-muted">{customerDisplayName(order)}</td>
+                  <td
+                    className="tran-tabular py-4 pr-4"
+                    title={items && items.length > 0 ? items.join("\n") : undefined}
+                  >
+                    {formatOre(order.orderAmountOre)}
+                  </td>
+                  <td className="py-4 pr-4">
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <OrderStatusChip status={order.status} />
+                      {order.containsPreorder && <PreorderChip />}
+                      {order.isTest && <TestOrderChip />}
+                    </div>
+                  </td>
+                  <td className="py-4 pr-4">
+                    <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
+                  </td>
+                  <td className="tran-tabular py-4 pr-4 text-tran-muted">
+                    {formatDateTime(order.createdAt)}
+                  </td>
+                </TableRowLink>
+              );
+            })}
           </tbody>
         </table>
       )}

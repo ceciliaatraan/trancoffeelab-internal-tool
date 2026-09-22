@@ -7,6 +7,8 @@ import { oreToKronorInput } from "@/lib/money-input";
 import { OrderStatusChip } from "@/components/order-status-chip";
 import { TestOrderChip } from "@/components/test-order-chip";
 import { SubmitButton } from "@/components/submit-button";
+import { FraktStatusBadge } from "@/components/frakt-status-badge";
+import { resolveFraktStatus } from "@/lib/orders/fulfillment-status";
 import {
   cancelOrderAction,
   captureOrderAction,
@@ -89,7 +91,11 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       .from(schema.orderEvents)
       .where(eq(schema.orderEvents.orderId, id))
       .orderBy(desc(schema.orderEvents.createdAt)),
-    db.select().from(schema.shipments).where(eq(schema.shipments.orderId, id)),
+    db
+      .select()
+      .from(schema.shipments)
+      .where(eq(schema.shipments.orderId, id))
+      .orderBy(asc(schema.shipments.shippedAt)),
   ]);
 
   // Fraktstatus hämtas live från PostNords Track & Trace-API för
@@ -122,6 +128,16 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           });
         }
       }),
+  );
+
+  const latestShipment = shipmentRows.at(-1) ?? null;
+  const latestPostnordStatus = latestShipment
+    ? (postnordTracking.get(latestShipment.id)?.data?.status ?? null)
+    : null;
+  const fraktStatus = resolveFraktStatus(
+    order.fulfillmentStatus,
+    latestShipment?.carrier ?? null,
+    latestPostnordStatus,
   );
 
   const remainingToCapture = order.orderAmountOre - order.capturedAmountOre;
@@ -301,7 +317,10 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       </section>
 
       <section className="flex flex-col gap-4">
-        <h2 className="tran-label text-xs text-tran-muted">Frakt</h2>
+        <div className="flex items-center gap-3">
+          <h2 className="tran-label text-xs text-tran-muted">Frakt</h2>
+          <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
+        </div>
         {shipmentRows.length > 0 ? (
           <ul className="flex flex-col gap-3 text-sm">
             {shipmentRows.map((shipment) => {

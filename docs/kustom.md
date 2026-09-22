@@ -306,6 +306,17 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
   README "PostNord-fraktstatus på orderdetaljen" för miljövariabler.
   Auth: `apikey` som query-parameter (inte header) - bekräftat från
   PostNords egen dokumentation, inte ett antagande.
+- **Samma live PostNord-status + tydligare fraktindikator i orderlistan,
+  2026-09-22.** `/orders` visar nu samma status som orderdetaljen (t.ex.
+  "Levererad") som en färgad ruta i stället för statisk text - röd/gul/
+  grön/grå, se `src/lib/orders/fulfillment-status.ts`. "Levererad för
+  hand" (carrier från den knappen i `markShippedAction`) räknas alltid
+  som grönt/"Levererad" direkt, utan att fråga PostNord (finns inget
+  spårningsnummer). Kolumnen "Kund" visar nu namnet från
+  leveransadressen (fallback: e-post), "Belopp" har en hover-tooltip med
+  vad ordern innehåller, och hela raden är klickbar in till
+  orderdetaljen (`<TableRowLink>`, en klient-komponent eftersom
+  `router.push` inte går i en server-komponent).
 
 ## Status i koden
 

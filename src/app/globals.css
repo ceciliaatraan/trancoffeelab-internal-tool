@@ -28,6 +28,11 @@
   --tran-muted: rgba(0, 0, 0, 0.55);
   --tran-faint: rgba(0, 0, 0, 0.35);
 
+  /* Statusfärger - funktionella (grön/gul), inte varumärkesfärger. Bara
+     för trafikljus-liknande statusindikatorer (t.ex. fraktstatus). */
+  --tran-green: #1a7a3c;
+  --tran-amber: #b9770e;
+
   /* Kaffesorternas färgkodning. */
   --tran-horse: #eb1c24;
   --tran-dragon: #000000;
@@ -47,6 +52,8 @@
   --color-tran-black: var(--tran-black);
   --color-tran-red: var(--tran-red);
   --color-tran-blue: var(--tran-blue);
+  --color-tran-green: var(--tran-green);
+  --color-tran-amber: var(--tran-amber);
 
   --color-tran-hairline: var(--tran-hairline);
   --color-tran-hairline-strong: var(--tran-hairline-strong);
