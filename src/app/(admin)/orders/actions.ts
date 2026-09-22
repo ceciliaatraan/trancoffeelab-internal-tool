@@ -307,25 +307,32 @@ export async function markShippedAction(orderId: string, formData: FormData) {
 }
 
 /**
- * Tar bort en testorder (order.is_test = true) permanent - enda sättet
- * att bli av med testordrar från Kustom Playground. Blockerad för
- * riktiga ordrar oavsett vem som anropar, som ett extra skydd utöver
- * ägarkravet. Reverserar de lagerförändringar ordern orsakat (reservation
- * och/eller avdrag vid "Markera skickad") innan raden tas bort, så
- * lagersaldot blir precis som om testordern aldrig lagts - annars hade
- * borttagning bara städat bort ordern och lämnat kvar en felaktig
+ * Tar bort en order permanent - antingen en testorder (order.is_test =
+ * true, från Kustom Playground) eller en AVBRUTEN order (fulfillment_
+ * status = cancelled, t.ex. en egen testbeställning på skarpa sajten
+ * som avbrutits via "Avbryt"-knappen). Blockerad för alla andra ordrar
+ * oavsett vem som anropar, som ett extra skydd utöver ägarkravet -
+ * riktiga, pågående eller skickade ordrar kan aldrig tas bort härifrån.
+ * En avbruten order har alltid capturedAmountOre = 0 (cancelOrderAction
+ * tillåter bara avbokning innan något debiterats), så ingen pengaflytt
+ * att reversera - bara lagerrörelserna.
+ *
+ * Reverserar de lagerförändringar ordern orsakat (reservation, avbokad
+ * reservation och/eller avdrag vid "Markera skickad") innan raden tas
+ * bort, så lagersaldot blir precis som om ordern aldrig lagts - annars
+ * hade borttagning bara städat bort ordern och lämnat kvar en felaktig
  * reservation/minskning i lagret.
  */
-export async function deleteTestOrderAction(orderId: string) {
+export async function deleteOrderAction(orderId: string) {
   await requireOwner();
 
   const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, orderId));
   if (!order) {
     redirect("/orders?error=" + encodeURIComponent("Ordern hittades inte."));
   }
-  if (!order.isTest) {
+  if (!order.isTest && order.fulfillmentStatus !== "cancelled") {
     redirect(
-      `/orders/${orderId}?error=${encodeURIComponent("Endast testordrar kan tas bort - den här är inte markerad som test.")}`,
+      `/orders/${orderId}?error=${encodeURIComponent("Bara testordrar eller avbrutna ordrar kan tas bort.")}`,
     );
   }
 
@@ -336,7 +343,10 @@ export async function deleteTestOrderAction(orderId: string) {
       .where(eq(schema.inventoryMovements.orderId, orderId));
 
     for (const movement of movements) {
-      if (movement.reason === "order_reserved") {
+      if (movement.reason === "order_reserved" || movement.reason === "order_released") {
+        // Bägge påverkar bara reserved_quantity - changeAmount är redan
+        // positivt (reserverat) eller negativt (släppt), så samma
+        // reversering (dra av changeAmount) fungerar för båda.
         await tx
           .update(schema.inventory)
           .set({
@@ -358,7 +368,7 @@ export async function deleteTestOrderAction(orderId: string) {
           .where(eq(schema.inventory.id, movement.inventoryId));
       } else {
         throw new Error(
-          `Okänd lagerorsak "${movement.reason}" på testordern - avbryter borttagningen för säkerhets skull.`,
+          `Okänd lagerorsak "${movement.reason}" på ordern - avbryter borttagningen för säkerhets skull.`,
         );
       }
     }

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { PostnordApiError, trackPostnordShipment } from "./client";
+import { PostnordApiError, shortPostnordStatusLabel, trackPostnordShipment } from "./client";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -106,5 +106,17 @@ describe("trackPostnordShipment", () => {
     delete process.env.POSTNORD_API_KEY;
 
     await expect(trackPostnordShipment("96932007555SE")).rejects.toThrow(PostnordApiError);
+  });
+});
+
+describe("shortPostnordStatusLabel", () => {
+  it("översätter kända statusvärden till korta svenska etiketter", () => {
+    expect(shortPostnordStatusLabel("DELIVERED")).toBe("Levererad");
+    expect(shortPostnordStatusLabel("EN_ROUTE")).toBe("Under transport");
+    expect(shortPostnordStatusLabel("OTHER")).toBe("Info");
+  });
+
+  it("visar okända statusvärden som de är, i stället för en gissad översättning", () => {
+    expect(shortPostnordStatusLabel("AWAITING_PICKUP")).toBe("AWAITING_PICKUP");
   });
 });

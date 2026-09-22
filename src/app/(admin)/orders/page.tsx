@@ -1,11 +1,16 @@
 import Link from "next/link";
-import { and, desc, eq, ilike, or, sql } from "drizzle-orm";
+import { and, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatOre, formatDateTime } from "@/lib/format";
 import { OrderStatusChip } from "@/components/order-status-chip";
 import { PreorderChip } from "@/components/preorder-chip";
 import { TestOrderChip } from "@/components/test-order-chip";
 import { SubmitButton } from "@/components/submit-button";
+import {
+  PostnordApiError,
+  shortPostnordStatusLabel,
+  trackPostnordShipment,
+} from "@/lib/postnord/client";
 
 const FULFILLMENT_LABELS: Record<string, string> = {
   unfulfilled: "Ej skickad",
@@ -41,6 +46,43 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
     .orderBy(desc(schema.orders.createdAt))
     .limit(100);
 
+  // Live PostNord-status i "Frakt"-kolumnen för skickade ordrar med ett
+  // riktigt PostNord-spårningsnummer - läsning bara (se lib/postnord/
+  // client.ts). Ett fel för EN order (fel nummer, PostNord nere) visar
+  // bara den ordens rad med den vanliga texten, hindrar aldrig resten
+  // av listan från att laddas.
+  const shippedOrderIds = orders
+    .filter((order) => order.fulfillmentStatus === "shipped")
+    .map((order) => order.id);
+
+  const postnordStatusByOrderId = new Map<string, string>();
+  if (shippedOrderIds.length > 0) {
+    const shipmentsForShippedOrders = await db
+      .select()
+      .from(schema.shipments)
+      .where(inArray(schema.shipments.orderId, shippedOrderIds));
+
+    await Promise.all(
+      shipmentsForShippedOrders
+        .filter(
+          (shipment) =>
+            shipment.carrier.toLowerCase().includes("postnord") &&
+            shipment.trackingNumber !== "(ingen spårning)",
+        )
+        .map(async (shipment) => {
+          try {
+            const tracking = await trackPostnordShipment(shipment.trackingNumber, "sv");
+            if (tracking) {
+              postnordStatusByOrderId.set(shipment.orderId, shortPostnordStatusLabel(tracking.status));
+            }
+          } catch (err) {
+            if (!(err instanceof PostnordApiError)) throw err;
+            // Tyst - raden faller tillbaka på FULFILLMENT_LABELS nedan.
+          }
+        }),
+    );
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <h1 className="text-4xl font-bold uppercase tracking-tight">Ordrar</h1>
@@ -50,7 +92,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
       ) : null}
       {deleted ? (
         <p className="border border-tran-hairline px-4 py-3 text-sm text-tran-muted">
-          Testordern togs bort.
+          Ordern togs bort.
         </p>
       ) : null}
 
@@ -127,7 +169,9 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
                   </div>
                 </td>
                 <td className="py-4 pr-4 text-tran-muted">
-                  {FULFILLMENT_LABELS[order.fulfillmentStatus] ?? order.fulfillmentStatus}
+                  {postnordStatusByOrderId.get(order.id) ??
+                    FULFILLMENT_LABELS[order.fulfillmentStatus] ??
+                    order.fulfillmentStatus}
                 </td>
                 <td className="tran-tabular py-4 pr-4 text-tran-muted">
                   {formatDateTime(order.createdAt)}

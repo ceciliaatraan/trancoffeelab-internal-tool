@@ -10,7 +10,7 @@ import { SubmitButton } from "@/components/submit-button";
 import {
   cancelOrderAction,
   captureOrderAction,
-  deleteTestOrderAction,
+  deleteOrderAction,
   markShippedAction,
   refundFullAction,
   refundPartialAction,
@@ -381,17 +381,20 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         ) : null}
       </section>
 
-      {order.isTest ? (
+      {order.isTest || order.fulfillmentStatus === "cancelled" ? (
         <section className="flex flex-col gap-3 border border-tran-red p-6">
-          <h2 className="tran-label text-xs text-tran-red">Testorder</h2>
+          <h2 className="tran-label text-xs text-tran-red">
+            {order.isTest ? "Testorder" : "Avbruten order"}
+          </h2>
           <p className="text-sm text-tran-muted">
-            Den här ordern skapades medan Kustom stod på testmiljö och räknas
-            inte som en riktig beställning. Tar bort ordern permanent och
-            återställer det lagersaldo den påverkade.
+            {order.isTest
+              ? "Den här ordern skapades medan Kustom stod på testmiljö och räknas inte som en riktig beställning."
+              : "Den här ordern är avbruten (t.ex. en egen testbeställning på skarpa sajten) - ingenting har debiterats."}{" "}
+            Tar bort ordern permanent och återställer det lagersaldo den påverkade.
           </p>
-          <form action={deleteTestOrderAction.bind(null, order.id)}>
+          <form action={deleteOrderAction.bind(null, order.id)}>
             <SubmitButton className="tran-label border border-tran-red px-3 py-1.5 text-xs text-tran-red transition-colors hover:bg-tran-red hover:text-tran-white">
-              Ta bort testorder (permanent)
+              Ta bort ordern (permanent)
             </SubmitButton>
           </form>
         </section>

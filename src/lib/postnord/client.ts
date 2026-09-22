@@ -108,3 +108,19 @@ export async function trackPostnordShipment(
     })),
   };
 }
+
+/**
+ * Korta, svenska etiketter för PostNords `status`-fält - bara de värden
+ * som faktiskt observerats i ett riktigt svar (DELIVERED/EN_ROUTE/OTHER,
+ * se README/docs/kustom.md) har en översättning. Okända värden visas
+ * som de är i stället för en gissad översättning.
+ */
+const SHORT_STATUS_LABELS: Record<string, string> = {
+  DELIVERED: "Levererad",
+  EN_ROUTE: "Under transport",
+  OTHER: "Info",
+};
+
+export function shortPostnordStatusLabel(status: string): string {
+  return SHORT_STATUS_LABELS[status] ?? status;
+}
