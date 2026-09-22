@@ -404,6 +404,27 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
   ägaren själv rädda en order som fastnat efter en engångsmiss, utan att
   behöva vänta på en kodändring.
 
+  **Uppföljande genomgång, samma dag:** letade systematiskt efter fler
+  fält som antas garanterat satta av Kustom men saknar skydd:
+  - `orders.status`/`payment_status` (NOT NULL) - samma risk som locale,
+    fallback till `"UNKNOWN"` tillagd.
+  - `order_lines.name` (NOT NULL) - fallback till `line.reference` eller
+    `"Okänd rad"` tillagd.
+  - **Hittade en NY, tidigare dold krasch min egen locale-fix avslöjade:**
+    `sendOrderConfirmationEmail`/`renderEmail` (order-confirmation.ts)
+    körde `input.locale.toLowerCase()` rakt av. Innan fixen ovan kraschade
+    hela ordern redan vid INSERT:et, så den här raden nåddes aldrig för
+    en order utan locale. Efter fixen hade ordern sparats med `sv-SE` i
+    databasen, men `process-kustom-order.ts` skickar fortfarande Kustoms
+    RÅA (ev. tomma) `order.locale` till mejlfunktionen - `.toLowerCase()`
+    på `undefined` hade kraschat mejlutskicket i stället, en annan tyst
+    misslyckad-betalning-upplevelse för kunden. Fixat med
+    `(input.locale ?? "").toLowerCase()` + ett testfall
+    (order-confirmation.test.ts). `orderAmountOre`/`unitPriceOre`/
+    `totalAmountOre` (pengafälten) lämnades MEDVETET oskyddade - att
+    tysta ett saknat belopp till 0 hade varit farligare än att låta
+    insertet krascha (nu åtminstone diagnostiserbart och reprocessbart).
+
 ## Status i koden
 
 | Del | Status |

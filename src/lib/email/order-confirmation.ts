@@ -63,7 +63,11 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
   text: string;
   html: string;
 } {
-  const isEnglish = input.locale.toLowerCase().startsWith("en");
+  // (input.locale ?? "") - locale kommer ytterst från Kustom och är inte
+  // garanterat satt vid körning trots att typen säger string (se
+  // persist-order.ts locale-fallbacken, 2026-09-22) - .toLowerCase() på
+  // undefined/null hade kraschat hela mejlutskicket.
+  const isEnglish = (input.locale ?? "").toLowerCase().startsWith("en");
   const total = formatPrice(input.totalOre, isEnglish);
   const storefrontUrl = (input.storefrontUrl ?? "https://trancoffeelab.com").replace(/\/$/, "");
   const productPathSegment = isEnglish ? "product" : "produkt";

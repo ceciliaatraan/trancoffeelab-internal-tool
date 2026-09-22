@@ -25,6 +25,18 @@ describe("renderEmail", () => {
     expect(text).toContain("298.00 kr");
   });
 
+  it("kraschar inte och faller tillbaka på svenska om locale saknas (t.ex. tomt från Kustom)", () => {
+    // locale är typad som obligatorisk sträng, men Kustom har levererat
+    // ordrar där fältet faktiskt saknades vid körning - se
+    // persist-order.ts, 2026-09-22.
+    const { subject, text } = renderEmail({
+      ...baseInput,
+      locale: undefined as unknown as string,
+    });
+    expect(subject).toContain("Orderbekräftelse");
+    expect(text).toContain("Tack för din beställning");
+  });
+
   it("listar flera rader", () => {
     const { text } = renderEmail({
       ...baseInput,

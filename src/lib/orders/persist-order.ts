@@ -129,8 +129,10 @@ export async function persistOrderFromKustom(
         kustomOrderId: order.order_id,
         customerId,
         customerEmail: customerEmail ?? "okand@example.com",
-        status: order.status,
-        paymentStatus: order.status,
+        // status är NOT NULL (orders.status) - samma försiktighet som
+        // locale ovan, ifall Kustom nånsin skulle skicka ett tomt värde.
+        status: order.status || "UNKNOWN",
+        paymentStatus: order.status || "UNKNOWN",
         purchaseCountry: (order.purchase_country || "SE").toUpperCase(),
         currency: (order.purchase_currency || "SEK").toUpperCase(),
         locale: order.locale || "sv-SE",
@@ -174,7 +176,8 @@ export async function persistOrderFromKustom(
         productId: resolved?.productId ?? null,
         type: line.type ?? "physical",
         reference: line.reference ?? "",
-        name: line.name,
+        // order_lines.name är NOT NULL - samma försiktighet som ovan.
+        name: line.name || line.reference || "Okänd rad",
         quantity: line.quantity,
         quantityUnit: line.quantity_unit ?? "st",
         unitPriceOre: line.unit_price,
