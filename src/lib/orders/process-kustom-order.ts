@@ -36,6 +36,9 @@ export async function processKustomOrder(orderId: string): Promise<PersistedOrde
         totalOre: order.order_amount,
         lines: persisted.physicalLines,
         shipping: persisted.shippingLine,
+        business: persisted.businessName
+          ? { name: persisted.businessName, vatNumber: persisted.businessVatNumber ?? "" }
+          : null,
       });
     }
 

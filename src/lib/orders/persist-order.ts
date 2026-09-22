@@ -25,6 +25,9 @@ export type PersistedOrder = {
   shippingLine: { name: string; amountOre: number } | null;
   /** Rabattraden (type=discount) om en rabattkod användes - amountOre är ett positivt belopp (raden själv är negativ hos Kustom). */
   discount: { code: string; amountOre: number } | null;
+  /** "Köper som företag"-uppgifter, se orders.is_business_purchase i schema/orders.ts. Null om ordern inte var ett företagsköp. */
+  businessName: string | null;
+  businessVatNumber: string | null;
 };
 
 function sumTaxAmount(order: KustomOrderManagementOrder): number {
@@ -81,6 +84,15 @@ export async function persistOrderFromKustom(
 
     const orderTaxAmountOre = sumTaxAmount(order);
     const isFinal = order.status !== "CANCELLED" && order.status !== "EXPIRED";
+
+    // "Köper som företag" - se orders.is_business_purchase i
+    // schema/orders.ts. Uppgifterna mellanlagrades av checkout/session/
+    // route.ts nyckelt på Kustoms order_id, eftersom Kustom själva ännu
+    // inte har ett fält för det här (kräver ett osignerat avtal).
+    const [pendingBusiness] = await tx
+      .select()
+      .from(schema.pendingBusinessPurchases)
+      .where(eq(schema.pendingBusinessPurchases.kustomOrderId, order.order_id));
 
     /**
      * Slås upp INNAN orders-raden skapas så `containsPreorder` kan sättas
@@ -142,6 +154,10 @@ export async function persistOrderFromKustom(
         isTest: process.env.KUSTOM_ENV !== "live",
         shippingAddress: order.shipping_address ?? null,
         billingAddress: order.billing_address ?? null,
+        isBusinessPurchase: Boolean(pendingBusiness),
+        businessName: pendingBusiness?.businessName ?? null,
+        businessVatNumber: pendingBusiness?.businessVatNumber ?? null,
+        businessAddress: pendingBusiness?.businessAddress ?? null,
         rawKustomOrder: order,
         paidAt: isFinal ? new Date() : null,
       })
@@ -165,7 +181,15 @@ export async function persistOrderFromKustom(
         physicalLines: [],
         shippingLine: null,
         discount: null,
+        businessName: null,
+        businessVatNumber: null,
       };
+    }
+
+    if (pendingBusiness) {
+      await tx
+        .delete(schema.pendingBusinessPurchases)
+        .where(eq(schema.pendingBusinessPurchases.kustomOrderId, order.order_id));
     }
 
     for (const [index, line] of order.order_lines.entries()) {
@@ -250,6 +274,8 @@ export async function persistOrderFromKustom(
       physicalLines,
       shippingLine,
       discount,
+      businessName: pendingBusiness?.businessName ?? null,
+      businessVatNumber: pendingBusiness?.businessVatNumber ?? null,
     };
   });
 }

@@ -425,6 +425,63 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
     tysta ett saknat belopp till 0 hade varit farligare än att låta
     insertet krascha (nu åtminstone diagnostiserbart och reprocessbart).
 
+## "Köper som företag" - egen lösning runt Kustom, 2026-09-22
+
+Ägaren ville lägga till en "I'm purchasing as a business"-ruta i
+checkouten (företagsnamn, adress, momsregistreringsnummer). Frågade
+Kustom - **de har en sådan checkbox i sin egen checkout-widget, men den
+kräver ett separat avtal som ägaren inte har skrivit under än.** Så
+länge det avtalet inte är på plats visar Kustoms checkout INGEN sådan
+ruta, oavsett vad vi skickar i vår create-order-payload.
+
+**Beslut:** bygga en egen "lösning runt omkring det" tills vidare, helt
+frikopplad från Kustoms checkout-widget:
+
+- Fälten fylls i på VÅR egen kundvagnssida (trancoffeelab-website),
+  INTE i Kustoms iframe - kunden kryssar i en ruta där, som fäller ut
+  företagsnamn/adress/momsregnummer.
+- `POST /api/public/checkout/session` tar nu emot ett valfritt
+  `business`-objekt (`cartRequestSchema`, `src/lib/validation/cart.ts`).
+- Eftersom Kustoms `order_id` inte är känt förrän EFTER
+  `createOrder`-anropet svarat, mellanlagras uppgifterna i en ny tabell,
+  `pending_business_purchases` (nyckel: `kustom_order_id`) - se
+  `checkout/session/route.ts`. Ett fel vid den här insert:en blockerar
+  ALDRIG själva köpet (samma princip som resten av integrationen: extra
+  information får aldrig krascha betalningsflödet).
+- När push-webhooken senare sparar ordern (`persist-order.ts`) slås
+  `pending_business_purchases` upp på `order.order_id`, flyttas in på
+  `orders`-raden (`is_business_purchase`, `business_name`,
+  `business_vat_number`, `business_address`) och raden städas bort.
+- Syns nu på orderdetaljen (`/orders/[id]`), i orderbekräftelsemejlet
+  (en rad under ordernumret: "Företag: X (Momsregnr: Y)") och i
+  PostNord-exporten (företagsnamnet hamnar i CSV-kolumnen
+  "Company Name", kontaktpersonens namn i "Att (Company only)" i
+  stället för "First and last name").
+
+**VIKTIGT, egen tolkning - INTE bekräftad av Kustom eller Skatteverket:**
+momsregistreringsnumret är bara INFORMATION på kvittot/fakturan, inte en
+signal att nolla moms. "Omvänd skattskyldighet" (0 % moms mot ett
+momsnummer) gäller normalt bara B2B-försäljning till ANDRA EU-länder -
+en svensk B2B-kund betalar moms som vanligt och drar av den själv i sin
+egen deklaration. Momsberäkningen i `order-payload.ts`/`tax.ts` är
+alltså MEDVETET helt orörd av det här tillägget.
+
+**Overifierat/kvarstår:**
+
+1. **Storefrontens egen kryssruta/formulär är INTE byggd än** - det här
+   förberedde bara mottagarsidan (adminet). Utan ett UI på
+   trancoffeelab.com som skickar med `business` i anropet gör det här
+   ingenting i praktiken.
+2. **Om/när Kustom-avtalet signeras och deras egen checkbox aktiveras**,
+   måste vi bestämma vad som händer med VÅR lösning - troligen stänga av
+   vårt eget formulär och i stället läsa av vad Kustom skickar tillbaka
+   (kräver att veta exakt vilka fältnamn Kustom då använder - inte
+   bekräftat, se toppen av det här dokumentet för principen "skriv inte
+   av ett antagande som bekräftat").
+3. Momsnummerformatet valideras INTE (varken svenskt SE-format eller mot
+   EU:s VIES-register) - bara att fältet inte är tomt. Ett medvetet
+   avgränsat första steg.
+
 ## Status i koden
 
 | Del | Status |

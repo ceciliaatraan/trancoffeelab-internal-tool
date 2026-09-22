@@ -299,6 +299,41 @@ describe("renderEmail", () => {
     expect(html).toContain('<a href="https://trancoffeelab.com">');
   });
 
+  it("visar företagsuppgifter (namn + momsregnr) när ordern var ett företagsköp (sv)", () => {
+    const { html, text } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      business: { name: "Kaffehuset AB", vatNumber: "SE556677889901" },
+    });
+    expect(text).toContain("Företag: Kaffehuset AB (Momsregnr: SE556677889901)");
+    expect(html).toContain("Kaffehuset AB");
+    expect(html).toContain("SE556677889901");
+  });
+
+  it("visar företagsuppgifter på engelska", () => {
+    const { text } = renderEmail({
+      ...baseInput,
+      locale: "en-US",
+      business: { name: "Kaffehuset AB", vatNumber: "SE556677889901" },
+    });
+    expect(text).toContain("Business: Kaffehuset AB (VAT no.: SE556677889901)");
+  });
+
+  it("visar ingen företagsrad för ett vanligt (icke-företags-)köp", () => {
+    const { text } = renderEmail({ ...baseInput, locale: "sv-SE" });
+    expect(text).not.toContain("Företag:");
+  });
+
+  it("escapar företagsnamnet i html-versionen precis som produktnamn", () => {
+    const { html } = renderEmail({
+      ...baseInput,
+      locale: "sv-SE",
+      business: { name: '<script>alert("x")</script>', vatNumber: "SE123" },
+    });
+    expect(html).not.toContain("<script>alert");
+    expect(html).toContain("&lt;script&gt;");
+  });
+
   it("respekterar en egen storefrontUrl istället för default-domänen", () => {
     const { html } = renderEmail({
       ...baseInput,

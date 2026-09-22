@@ -42,6 +42,13 @@ type Address = {
   country?: string;
 };
 
+type BusinessAddress = {
+  street?: string;
+  postalCode?: string;
+  city?: string;
+  country?: string;
+};
+
 function AddressBlock({ address, title }: { address: Address | null; title: string }) {
   if (!address) {
     return (
@@ -312,6 +319,28 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         <AddressBlock address={order.billingAddress as Address | null} title="Fakturaadress" />
         <AddressBlock address={order.shippingAddress as Address | null} title="Leveransadress" />
       </section>
+
+      {order.isBusinessPurchase ? (
+        <section className="border border-tran-hairline p-6">
+          <h3 className="tran-label mb-2 text-xs text-tran-muted">Företagsköp</h3>
+          <p className="text-sm">
+            {order.businessName}
+            <br />
+            Momsregistreringsnummer: {order.businessVatNumber}
+            {order.businessAddress ? (
+              <>
+                <br />
+                {(order.businessAddress as BusinessAddress).street}
+                <br />
+                {(order.businessAddress as BusinessAddress).postalCode}{" "}
+                {(order.businessAddress as BusinessAddress).city}
+                <br />
+                {(order.businessAddress as BusinessAddress).country?.toUpperCase()}
+              </>
+            ) : null}
+          </p>
+        </section>
+      ) : null}
 
       <section className="flex flex-col gap-4">
         <h2 className="tran-label text-xs text-tran-muted">Orderrader</h2>

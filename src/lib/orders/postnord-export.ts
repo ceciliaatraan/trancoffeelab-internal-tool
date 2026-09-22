@@ -13,6 +13,8 @@ export type PostnordExportOrder = {
   orderNumber: number;
   customerEmail: string;
   shippingAddress: PostnordExportShippingAddress | null;
+  /** "Köper som företag" - se orders.is_business_purchase i schema/orders.ts. Sätts i "Company Name"-kolumnen i stället för "First and last name". */
+  businessName?: string | null;
 };
 
 /**
@@ -59,11 +61,12 @@ function csvRow(values: string[]): string {
 export function buildPostnordOrderRow(order: PostnordExportOrder): string {
   const address = order.shippingAddress ?? {};
   const name = [address.given_name, address.family_name].filter(Boolean).join(" ");
+  const isBusiness = Boolean(order.businessName);
 
   return csvRow([
-    name,
-    "",
-    "",
+    isBusiness ? "" : name,
+    isBusiness ? (order.businessName ?? "") : "",
+    isBusiness ? name : "",
     address.email ?? order.customerEmail,
     address.phone ?? "",
     address.street_address ?? "",

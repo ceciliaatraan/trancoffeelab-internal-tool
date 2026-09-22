@@ -70,6 +70,15 @@ describe("buildPostnordOrderRow", () => {
     expect(row).toContain('"Lgh ""B"""');
   });
 
+  it("lägger företagsnamnet i 'Company Name' och kontaktpersonen i 'Att' för ett företagsköp", () => {
+    const row = buildPostnordOrderRow({ ...baseOrder, businessName: "Kaffehuset AB" });
+    const fields = row.split(";").map((f) => f.slice(1, -1));
+
+    expect(fields[0]).toBe(""); // inget privatnamn
+    expect(fields[1]).toBe("Kaffehuset AB");
+    expect(fields[2]).toBe("Cecilia Tran"); // kontaktperson
+  });
+
   it("versaliserar landskoden", () => {
     const row = buildPostnordOrderRow({
       ...baseOrder,

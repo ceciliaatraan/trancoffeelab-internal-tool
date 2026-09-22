@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { db, schema } from "@/db";
 import { checkRateLimit, corsHeaders, getClientIp, resolveAllowedOrigin } from "@/lib/public-api";
 import { cartRequestSchema } from "@/lib/validation/cart";
 import { buildValidatedCart } from "@/lib/queries/cart-summary";
@@ -158,10 +159,31 @@ export async function POST(request: Request) {
 
   try {
     const order = await createOrder(payload);
+    const orderId = extractOrderId(order);
+
+    // "Köper som företag" - Kustoms egen checkout-widget har ingen sådan
+    // ruta än (kräver ett avtal som inte är signerat, se docs/kustom.md),
+    // så vi mellanlagrar uppgifterna själva här, nyckelt på Kustoms
+    // order_id, och flyttar in dem på orders-raden i persist-order.ts när
+    // ordern faktiskt landar. Ett fel här är aldrig kritiskt för själva
+    // köpet - blockerar inte checkout, bara den här extra informationen.
+    if (parsed.data.business && orderId) {
+      try {
+        await db.insert(schema.pendingBusinessPurchases).values({
+          kustomOrderId: orderId,
+          businessName: parsed.data.business.name,
+          businessVatNumber: parsed.data.business.vatNumber,
+          businessAddress: parsed.data.business.address,
+        });
+      } catch (err) {
+        console.error("Kunde inte spara företagsuppgifter för order", orderId, err);
+      }
+    }
+
     return NextResponse.json(
       {
         html_snippet: extractHtmlSnippet(order),
-        order_id: extractOrderId(order),
+        order_id: orderId,
         // The discount code's OWN amount, echoed back so the storefront's
         // "Rabatt (CODE)" line can show it - deliberately excludes any
         // free-shipping compensation folded into the Kustom payload above,

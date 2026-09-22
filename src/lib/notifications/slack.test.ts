@@ -22,6 +22,8 @@ const baseOrder: PersistedOrder = {
   ],
   shippingLine: null,
   discount: null,
+  businessName: null,
+  businessVatNumber: null,
 };
 
 beforeEach(() => {

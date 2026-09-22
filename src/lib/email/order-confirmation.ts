@@ -9,6 +9,8 @@ export type OrderConfirmationEmailInput = {
   /** Bas-URL till kundsajten, för att länka produktbild/namn till produktsidan och loggan till startsidan. Default https://trancoffeelab.com om inte satt (se sendOrderConfirmationEmail). */
   storefrontUrl?: string;
   shipping?: { name: string; amountOre: number } | null;
+  /** "Köper som företag" - se orders.is_business_purchase i schema/orders.ts. Null/undefined om det inte var ett företagsköp. */
+  business?: { name: string; vatNumber: string } | null;
   lines: {
     name: string;
     quantity: number;
@@ -115,6 +117,11 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
   const shipLabel = isEnglish ? "Estimated ship" : "Beräknad leverans";
   const shippingLabel = isEnglish ? "Shipping" : "Frakt";
   const freeShippingLabel = isEnglish ? "Free shipping" : "Fri frakt";
+  const businessLabel = isEnglish ? "Business" : "Företag";
+  const vatLabel = isEnglish ? "VAT no." : "Momsregnr";
+  const businessLine = input.business
+    ? `${businessLabel}: ${input.business.name} (${vatLabel}: ${input.business.vatNumber})`
+    : null;
   /**
    * `shipping` är null (inte undefined) för en riktig order utan
    * fraktkostnad - Kustom fick då ingen shipping_fee-rad alls (t.ex.
@@ -192,6 +199,15 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
             </h1>
           </td>
         </tr>
+        ${
+          businessLine
+            ? `<tr>
+          <td style="padding-top:8px;font-size:12px;color:rgba(0,0,0,0.55);">
+            ${escapeHtml(businessLine)}
+          </td>
+        </tr>`
+            : ""
+        }
         <tr>
           <td style="padding:16px 0;font-size:14px;line-height:1.5;color:#000000;">
             ${escapeHtml(intro)}
@@ -232,17 +248,19 @@ export function renderEmail(input: OrderConfirmationEmailInput): {
   const shippingText =
     input.shipping === undefined ? "" : `${shippingLabel}: ${shippingValueText(input.shipping)}\n`;
 
+  const businessText = businessLine ? `${businessLine}\n` : "";
+
   if (isEnglish) {
     return {
       subject: `Order confirmation #${input.orderNumber} - TRAN Coffee Lab`,
-      text: `${intro}\n\nOrder #${input.orderNumber}\n\n${lines}\n\n${shippingText}Total: ${total} kr\n\n${footer}`,
+      text: `${intro}\n\nOrder #${input.orderNumber}\n${businessText}\n${lines}\n\n${shippingText}Total: ${total} kr\n\n${footer}`,
       html,
     };
   }
 
   return {
     subject: `Orderbekräftelse #${input.orderNumber} - TRAN Coffee Lab`,
-    text: `${intro}\n\nOrder #${input.orderNumber}\n\n${lines}\n\n${shippingText}Totalt: ${total} kr\n\n${footer}`,
+    text: `${intro}\n\nOrder #${input.orderNumber}\n${businessText}\n${lines}\n\n${shippingText}Totalt: ${total} kr\n\n${footer}`,
     html,
   };
 }

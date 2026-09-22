@@ -22,6 +22,7 @@ export async function GET() {
       orderNumber: schema.orders.orderNumber,
       customerEmail: schema.orders.customerEmail,
       shippingAddress: schema.orders.shippingAddress,
+      businessName: schema.orders.businessName,
     })
     .from(schema.orders)
     .where(
@@ -38,6 +39,7 @@ export async function GET() {
       orderNumber: order.orderNumber,
       customerEmail: order.customerEmail,
       shippingAddress: order.shippingAddress as PostnordExportShippingAddress | null,
+      businessName: order.businessName,
     })),
   );
 
