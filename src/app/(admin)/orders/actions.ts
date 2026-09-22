@@ -505,7 +505,12 @@ export async function markShippedAction(orderId: string, formData: FormData) {
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders");
   revalidatePath("/inventory");
-  redirect(`/orders/${orderId}?saved=1`);
+  // handDelivered-flaggan låter sidan visa en påminnelse om att avboka
+  // fraktsedeln hos PostNord manuellt (om en redan skapats där) - vi
+  // skriver aldrig till PostNords system själva, se markLabelCreatedAction.
+  redirect(
+    `/orders/${orderId}?saved=1${carrier === "Levererad för hand" ? "&handDelivered=1" : ""}`,
+  );
 }
 
 /**

@@ -80,6 +80,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const search = await searchParams;
   const error = typeof search.error === "string" ? search.error : null;
   const saved = "saved" in search;
+  const handDelivered = "handDelivered" in search;
   const postnordSearch =
     typeof search.postnordSearch === "string" ? search.postnordSearch.trim() : "";
   const prefillTrackingNumber =
@@ -206,7 +207,13 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       {error ? (
         <p className="border border-tran-red px-4 py-3 text-sm text-tran-red">{error}</p>
       ) : null}
-      {saved ? (
+      {saved && handDelivered ? (
+        <p className="border border-tran-amber px-4 py-3 text-sm text-tran-amber">
+          Sparat - markerad som levererad för hand. Om en fraktsedel redan skapades hos PostNord
+          för den här ordern, kom ihåg att avboka den där själv (i deras portal) - vi skickar
+          inget automatiskt till PostNord om detta.
+        </p>
+      ) : saved ? (
         <p className="border border-tran-hairline px-4 py-3 text-sm text-tran-muted">Sparat.</p>
       ) : null}
 
@@ -568,7 +575,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
               <input type="hidden" name="carrier" value="Levererad för hand" />
               <input type="hidden" name="trackingNumber" value="(ingen spårning)" />
               <p className="text-xs text-tran-muted">
-                För ordrar som lämnas över personligen, utan fraktbolag.
+                För ordrar som lämnas över personligen, utan fraktbolag. Om en fraktsedel redan
+                skapats hos PostNord för den här ordern, avboka den själv i deras portal -
+                den avbokas inte automatiskt här.
               </p>
               <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
                 Markera som levererad för hand
