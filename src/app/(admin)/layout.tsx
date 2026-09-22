@@ -27,8 +27,10 @@ export default async function AdminLayout({
         <MobileNav email={session?.user?.email} signOutAction={signOutAction} />
       </div>
 
-      {/* Desktop: fast vänsterkolumn - dold under lg */}
-      <aside className="hidden w-56 shrink-0 flex-col border-r border-tran-black lg:flex">
+      {/* Desktop: vänsterkolumn - dold under lg. Sticky (inte i normalt
+          dokumentflöde) så den följer med i vyn när <main> scrollar,
+          i stället för att scrolla bort med resten av sidan. */}
+      <aside className="hidden w-56 shrink-0 flex-col border-r border-tran-black lg:sticky lg:top-0 lg:flex lg:h-screen lg:overflow-y-auto">
         <Link
           href="/"
           className="flex items-center border-b border-tran-black px-6 py-6"
