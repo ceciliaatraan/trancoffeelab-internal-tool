@@ -48,7 +48,12 @@ export default async function AdminLayout({
         </div>
       </aside>
 
-      <main className="flex-1 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
+      {/* min-w-0 är kritiskt: en flex-1-item har annars min-width:auto,
+          som låter EN lång, obruten sträng (t.ex. en rå SQL-felrad)
+          tvinga hela innehållsytan - och därmed hela sidan - bredare än
+          skärmen, så att allt annat (rutnät, tabeller) klämts ihop till
+          en smal remsa i vänsterkanten i stället för att fylla vyn. */}
+      <main className="min-w-0 flex-1 px-4 py-6 lg:px-8 lg:py-8">{children}</main>
     </div>
   );
 }
