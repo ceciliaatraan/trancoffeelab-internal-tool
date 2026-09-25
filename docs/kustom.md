@@ -514,6 +514,59 @@ alltså MEDVETET helt orörd av det här tillägget - `options.vat_removed`
    git-historiken, ofarligt men lite onödigt db-arbete vid nästa
    `db:migrate`).
 
+## BUGG: fri frakt vid tröskelbelopp drog av fraktkostnaden TVÅ gånger, 2026-09-25
+
+Ägaren upptäckte att en order med två varor á 349 kr (698 kr, över
+599 kr-gränsen för fri frakt) debiterades 649 kr i stället för
+698 kr - kunden fick alltså 49 kr extra rabatt den inte skulle ha,
+motsvarande hela den ordinarie fraktkostnaden.
+
+**Root cause:** `checkout/session/route.ts` gjorde två SKILDA saker för
+att markera "fri frakt", och båda råkade dra av samma belopp:
+
+1. `shippingOption.price` sätts till `0` när `cart.freeShipping` är
+   sant - detta ÄR hela deklarationen till Kustom att frakten kostar
+   0 kr för den här ordern (bekräftat korrekt sedan tidigare).
+2. **Dessutom** lades `cart.shippingFlatRateOre` (49 kr) till som en
+   EXTRA rad på rabattraden (`freeShippingCompensationOre`), enligt
+   samma mönster som används för rabattkoders fraktdel (se
+   "Dubbel fraktdebitering"-avsnittet ovan från 2026-09-21) - ett
+   antagande om att Kustoms checkout-widget ALLTID hämtar och lägger på
+   ett eget live PostNord-pris ovanpå `order_amount`, oavsett vad vi
+   skickar i `shipping_options`.
+
+Det antagandet stämmer tydligen inte när det pris vi själva skickar
+redan är 0 kr: Kustom lade INTE på något eget pris ovanpå i det här
+fallet (kunden betalade `order_amount` rakt av, utan tillägg) - så den
+extra rabattraden på 49 kr blev en RENT FELAKTIG extra rabatt, utöver
+den redan korrekta 0-kr-fraktdeklarationen. Två mekanismer som var och
+en för sig skulle ha räckt, kombinerade fel.
+
+**Fixat:** tog bort `freeShippingCompensationOre`-raden helt.
+`shippingOption.price: 0` är nu den ENDA mekanismen för fri frakt vid
+tröskelbelopp - ingen kompensationsrad läggs till. Rabattkoders
+fraktdel (det ORIGINALA fallet från 2026-09-21) är opåverkat: den
+`shippingOre` som skickas till `evaluateDiscountCode` är redan 0 när
+fri frakt gäller (se `cart-summary.ts`), så `shippingDiscountOre`
+räknas automatiskt ut till 0 i det läget - ingen risk att dra av
+fraktdelen två gånger även när en rabattkod OCH fri frakt är aktiva
+samtidigt.
+
+**Overifierat/kvarstår:** den här fixen bygger på vad som observerades
+i EN verklig order, inte på bekräftad Kustom-dokumentation om exakt när
+deras checkout-widget hämtar ett eget live PostNord-pris kontra
+respekterar det pris vi skickar. Om ett framtida ärende visar att en
+kund i stället blir ÖVERdebiterad på en fri-frakt-order (dvs att Kustom
+ändå lägger på ett eget pris ovanpå de 0 kr vi deklarerat) är det ett
+tecken på att antagandet ovan bara stämmer IBLAND (t.ex. beroende på om
+PostNords live-anrop lyckas eller faller tillbaka på vårt värde) - då
+krävs en annan lösning, inte den här kompensationsraden tillbaka.
+Ägaren bör hålla ett öga på de närmaste fri-frakt-ordrarna för att
+bekräfta att totalsumman blir exakt produktsumman, varken mer eller
+mindre. **Tidigare ordrar som redan drabbats av dubbelavdraget är inte
+korrigerade** - ingen automatisk efterdebitering är rimlig eller
+gjord.
+
 ## Status i koden
 
 | Del | Status |

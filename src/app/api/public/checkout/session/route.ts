@@ -107,35 +107,36 @@ export async function POST(request: Request) {
     tax_rate: shippingTaxRate,
   };
 
-  // Samma problem som rabattkoder (se ovan) gäller fri frakt vid
-  // tröskelbelopp: shippingAmountOre=0 ovan nollar bara vår egen
-  // fallback, inte Kustoms live PostNord-pris. Kompenserar därför här
-  // med cart.shippingFlatRateOre (den ORÖRDA flatraten, INTE
-  // cart.shippingOre som redan är nollad av fri frakt) på samma sätt -
-  // lägg det till på rabattraden i stället.
-  const freeShippingCompensationOre = cart.freeShipping ? cart.shippingFlatRateOre : 0;
+  // VIKTIGT: till skillnad från en rabattkods fraktdel (se kommentaren
+  // ovan) ska fri frakt vid tröskelbelopp INTE kompenseras med en extra
+  // rabattrad. shippingOption.price ovan är redan satt till 0 när
+  // cart.freeShipping är sant - det ÄR hela deklarationen av att frakten
+  // kostar 0 kr, inget mer behövs. Fram till 2026-09-25 lades
+  // cart.shippingFlatRateOre HÄR till som en extra rabattrad "för att
+  // kompensera Kustoms live-pris", av samma anledning som rabattkoders
+  // fraktdel - men det antagandet var fel för det här fallet: en riktig
+  // order visade att kunden fick betala produktsumma MINUS flatraten,
+  // dvs frakten drogs av två gånger (en gång via price:0 ovan, en gång
+  // via den extra rabattraden). Ägaren upptäckte det (349+349-49 kr i
+  // stället för 349+349 kr) - se docs/kustom.md för detaljer.
   const codeDiscountOre = cart.discount?.valid ? cart.discount.amountOre : 0;
 
   // Rabattraden kan aldrig göra order_amount negativt - frakten är inte
   // längre med i order_amount alls (se ovan), så taket är produkternas
-  // egen delsumma. En kombination värd mer än det (t.ex. en "100 % på
-  // allt, inklusive frakt"-kod, eller en redan stor rabatt PLUS fri
-  // frakt) kan alltså inte tvinga fram gratis frakt när Kustom hämtar
-  // ett live PostNord-pris - det är en gräns i hur Kustom Shipping
-  // Assistant fungerar (fraktpriset läggs på UTANFÖR order_amount),
-  // inte något vi kan runda via payloaden. Vanliga fall (rabatt +
-  // ev. fri frakt tillsammans mindre än ordersumman) blir alltid rätt.
-  const discountAmountOre = Math.min(codeDiscountOre + freeShippingCompensationOre, cart.subtotalOre);
+  // egen delsumma. En rabattkod värd mer än det (t.ex. en "100 % på
+  // allt, inklusive frakt"-kod) kan alltså inte tvinga fram gratis frakt
+  // när Kustom hämtar ett live PostNord-pris - det är en gräns i hur
+  // Kustom Shipping Assistant fungerar (fraktpriset läggs på UTANFÖR
+  // order_amount), inte något vi kan runda via payloaden.
+  const discountAmountOre = Math.min(codeDiscountOre, cart.subtotalOre);
 
   const discountLabel: DiscountInput["label"] =
-    codeDiscountOre > 0 && freeShippingCompensationOre > 0
+    codeDiscountOre > 0
       ? {
-          sv: `Rabatt (${cart.discount?.valid ? cart.discount.code : ""}) + Fri frakt`,
-          en: `Discount (${cart.discount?.valid ? cart.discount.code : ""}) + Free shipping`,
+          sv: `Rabatt (${cart.discount?.valid ? cart.discount.code : ""})`,
+          en: `Discount (${cart.discount?.valid ? cart.discount.code : ""})`,
         }
-      : freeShippingCompensationOre > 0
-        ? { sv: "Fri frakt", en: "Free shipping" }
-        : undefined;
+      : undefined;
 
   const payload = buildCreateOrderPayload({
     items,
