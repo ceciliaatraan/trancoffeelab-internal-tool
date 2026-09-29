@@ -620,7 +620,9 @@ värden), och sätter "Fraktsedel skapad" + spårningsnummer, eller "Skickad"
 visar att paketet lämnats (`isHandedOverToPostnord` - INFORMED/CREATED/
 OTHER/okänt räknas medvetet som bara fraktsedel). Körs när en öppen order
 visas, i bakgrunden (`after()`, högst var 10:e min) när /orders eller
-startsidan visas, och dagligen via Vercel Cron (`vercel.json`, en gång per
+startsidan visas (senaste 30 dagarna; en gång per dygn och första gången
+efter varje deploy ALLA öppna ordrar oavsett ålder - tillagt samma dag
+så även gamla, redan skickade ordrar/förbeställningar kopplas), och dagligen via Vercel Cron (`vercel.json`, en gång per
 dygn så det fungerar även på Hobby-planen, kräver `CRON_SECRET`). Den
 manuella sökrutan "Hitta spårningsnummer hos PostNord", "Synka från
 Kustom"-knappen och rådata-rutan är borttagna.

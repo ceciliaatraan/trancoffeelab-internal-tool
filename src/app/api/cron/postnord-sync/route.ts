@@ -6,7 +6,7 @@ export const maxDuration = 60;
 /**
  * Anropas av Vercel Cron (vercel.json) en gång per dygn - Vercel skickar
  * `Authorization: Bearer <CRON_SECRET>` när miljövariabeln CRON_SECRET är
- * satt. Utan satt hemlighet avvisas alla anrop, så ingen utomstående kan
+ * satt. Går igenom ALLA öppna ordrar oavsett ålder. Utan satt hemlighet avvisas alla anrop, så ingen utomstående kan
  * trigga synken och bränna PostNords anropskvot.
  */
 export async function GET(request: Request) {
@@ -15,6 +15,6 @@ export async function GET(request: Request) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  const counts = await syncPostnordForOpenOrders();
+  const counts = await syncPostnordForOpenOrders({ maxAgeDays: null });
   return NextResponse.json(counts);
 }

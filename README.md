@@ -278,8 +278,12 @@ postnummer, bara för värden som är globalt unika).
 
 Synken körs:
 - direkt när en öppen order öppnas i backofficet,
-- i bakgrunden när orderlistan eller startsidan öppnas (högst var 10:e minut),
-- en gång per dygn via Vercel Cron (`vercel.json` → `/api/cron/postnord-sync`).
+- i bakgrunden när orderlistan eller startsidan öppnas (högst var 10:e minut;
+  vanligtvis de senaste 30 dagarnas ordrar, men en gång per dygn - och första
+  gången efter varje deploy - ALLA öppna ordrar oavsett ålder, så även gamla
+  ordrar/förbeställningar som redan skickats kopplas),
+- en gång per dygn via Vercel Cron (`vercel.json` → `/api/cron/postnord-sync`,
+  alla öppna ordrar).
 
 Kräver, utöver `POSTNORD_API_KEY`:
 ```

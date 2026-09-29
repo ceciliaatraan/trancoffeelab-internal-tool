@@ -11,6 +11,10 @@ import { FraktStatusBadge } from "@/components/frakt-status-badge";
 import { customerDisplayName } from "@/lib/orders/customer-display-name";
 import { schedulePostnordSync } from "@/lib/orders/postnord-auto-sync";
 
+// Ger bakgrundssynken mot PostNord (schedulePostnordSync) tid att gå igenom
+// alla öppna ordrar vid dygnets fulla genomgång.
+export const maxDuration = 60;
+
 export default async function DashboardPage() {
   schedulePostnordSync();
   const [daily, recentOrders, topProducts, unprocessedOrders, inventoryOverview, webhookErrors] =

@@ -1,6 +1,6 @@
 import "server-only";
 import { after } from "next/server";
-import { and, eq, gte, inArray } from "drizzle-orm";
+import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import {
   PostnordApiError,
@@ -20,8 +20,10 @@ type OpenOrder = typeof schema.orders.$inferSelect;
 
 export type PostnordSyncOutcome = "not_found" | "label_created" | "shipped" | "unchanged";
 
-const LOOKBACK_DAYS = 30;
+const RECENT_DAYS = 30;
 const THROTTLE_MS = 10 * 60 * 1000;
+const FULL_RUN_INTERVAL_MS = 24 * 60 * 60 * 1000;
+const CONCURRENCY = 4;
 
 async function lookup(candidate: LookupCandidate): Promise<PostnordShipmentTracking[]> {
   try {
@@ -101,8 +103,17 @@ export async function syncPostnordForOrder(order: OpenOrder): Promise<PostnordSy
   return updated ? "label_created" : "unchanged";
 }
 
-/** Kör synken för alla öppna (ej skickade/avbrutna) riktiga ordrar från de senaste 30 dagarna. */
-export async function syncPostnordForOpenOrders(): Promise<Record<PostnordSyncOutcome, number>> {
+/**
+ * Kör synken för öppna (ej skickade/avbrutna) riktiga ordrar.
+ * `maxAgeDays: null` = ALLA öppna ordrar oavsett ålder - t.ex. gamla
+ * förbeställningar som skickats långt efter ordertillfället, eller ordrar
+ * som skickades innan den automatiska kopplingen fanns.
+ */
+export async function syncPostnordForOpenOrders({
+  maxAgeDays,
+}: {
+  maxAgeDays: number | null;
+}): Promise<Record<PostnordSyncOutcome, number>> {
   const counts: Record<PostnordSyncOutcome, number> = {
     not_found: 0,
     label_created: 0,
@@ -111,45 +122,60 @@ export async function syncPostnordForOpenOrders(): Promise<Record<PostnordSyncOu
   };
   if (!process.env.POSTNORD_API_KEY) return counts;
 
-  const since = new Date(Date.now() - LOOKBACK_DAYS * 24 * 60 * 60 * 1000);
+  const conditions = [
+    inArray(schema.orders.fulfillmentStatus, ["unfulfilled", "label_created"]),
+    eq(schema.orders.isTest, false),
+  ];
+  if (maxAgeDays !== null) {
+    conditions.push(
+      gte(schema.orders.createdAt, new Date(Date.now() - maxAgeDays * 24 * 60 * 60 * 1000)),
+    );
+  }
   const openOrders = await db
     .select()
     .from(schema.orders)
-    .where(
-      and(
-        inArray(schema.orders.fulfillmentStatus, ["unfulfilled", "label_created"]),
-        eq(schema.orders.isTest, false),
-        gte(schema.orders.createdAt, since),
-      ),
-    );
+    .where(and(...conditions))
+    .orderBy(desc(schema.orders.createdAt));
 
-  for (const order of openOrders) {
-    try {
-      counts[await syncPostnordForOrder(order)] += 1;
-    } catch (err) {
-      console.error("PostNord-synk misslyckades för order", order.orderNumber, err);
+  // Några ordrar i taget - en full genomgång av alla gamla ordrar ska
+  // hinna klart inom funktionens tidsgräns, utan att skicka hundratals
+  // PostNord-anrop på en gång.
+  let next = 0;
+  const worker = async () => {
+    while (next < openOrders.length) {
+      const order = openOrders[next++];
+      try {
+        counts[await syncPostnordForOrder(order)] += 1;
+      } catch (err) {
+        console.error("PostNord-synk misslyckades för order", order.orderNumber, err);
+      }
     }
-  }
+  };
+  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
   return counts;
 }
 
 let lastBackgroundRun = 0;
+let lastFullBackgroundRun = 0;
 
 /**
  * Startar synken i bakgrunden (efter att sidan skickats) när orderlistan
  * eller startsidan öppnas - högst var 10:e minut per serverinstans, så
- * sidvisningar inte bränner PostNords anropskvot. Komplement till den
- * dagliga Vercel Cron-körningen (api/cron/postnord-sync), som bara går en
- * gång per dygn.
+ * sidvisningar inte bränner PostNords anropskvot. Vanligtvis bara de
+ * senaste 30 dagarnas ordrar; högst en gång per dygn (och första gången
+ * efter varje ny deploy) ALLA öppna ordrar oavsett ålder. Komplement till
+ * den dagliga Vercel Cron-körningen (api/cron/postnord-sync).
  */
 export function schedulePostnordSync(): void {
   if (!process.env.POSTNORD_API_KEY) return;
   const now = Date.now();
   if (now - lastBackgroundRun < THROTTLE_MS) return;
   lastBackgroundRun = now;
+  const full = now - lastFullBackgroundRun >= FULL_RUN_INTERVAL_MS;
+  if (full) lastFullBackgroundRun = now;
   after(async () => {
     try {
-      await syncPostnordForOpenOrders();
+      await syncPostnordForOpenOrders({ maxAgeDays: full ? null : RECENT_DAYS });
     } catch (err) {
       console.error("PostNord-synk i bakgrunden misslyckades", err);
     }
