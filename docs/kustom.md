@@ -650,6 +650,27 @@ Kustom"-knappen och rådata-rutan är borttagna.
   har (Referens/Kundreferens/Ordernummer o.d.) och deras värden - då vet vi
   vad PostNord indexerar på och kan lägga till det som kandidat.
 
+## PostNord-synken läser om ordern från Kustom + varför nya ordrar är "Godkänd", 2026-09-29
+
+- **Synken läser nu om varje öppen order från Kustom** (`getOrderManagementOrder`
+  + `persistOrderFromKustom`) innan den letar hos PostNord, i stället för att
+  bara använda den sparade kopian - Kustom pushar inte nödvändigtvis när
+  KSA/PostNord uppdaterar frakten. Uppdaterar samtidigt status/debiterat belopp.
+  Spårningsnummer letas nu efter i ALLA fraktrelaterade delar av Kustom-ordern
+  (`shipping_info`, `selected_shipping_option`, `captures`), under alla fältnamn
+  som ser ut som spårnings-/kollinummer (`collectTrackingValues` i
+  `postnord-matching.ts`) - fortfarande OBEKRÄFTAT att Kustom exponerar
+  spårningsnumret alls.
+- **"Godkänd" (AUTHORIZED) i stället för "Debiterad" är avsiktligt, men ett
+  problem nu:** bara förbeställningar debiteras automatiskt (`capture-preorder.ts`).
+  Vanliga lagerordrar är bara reserverade hos Kustom och väntar på att någon
+  trycker "Debitera" på ordern - det var ingen som gjorde det när butiken gick
+  från förbeställning till lager. Reservationen går ut (`expires_at` i
+  Kustom-ordern, visas nu under Betalning på orderdetaljen) - debiteras ordern
+  inte innan dess går betalningen förlorad. **Automatisk debitering när ordern
+  skickas är INTE byggd** - det flyttar riktiga pengar från riktiga kunder och
+  kräver ägarens uttryckliga beslut.
+
 ## Status i koden
 
 | Del | Status |

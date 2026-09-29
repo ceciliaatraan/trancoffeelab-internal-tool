@@ -68,6 +68,20 @@ describe("postnordLookupCandidates", () => {
       }),
     ).toHaveLength(3);
   });
+
+  it("hittar spårningsnummer var Kustom än lägger dem", () => {
+    const values = postnordLookupCandidates({
+      ...base,
+      rawKustomOrder: {
+        selected_shipping_option: { id: "x", delivery: { shipment_id: "SHIP1" } },
+        captures: [{ shipping_info: [{ tracking_number: "TRACK1", shipping_company: "PostNord" }] }],
+        order_lines: [{ reference: "INTE-DETTA" }],
+      },
+    })
+      .filter((c) => c.kind === "identifier")
+      .map((c) => c.value);
+    expect(values).toEqual(["SHIP1", "TRACK1"]);
+  });
 });
 
 describe("acceptsMatch", () => {

@@ -105,7 +105,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
     console.error("PostNord-synk misslyckades för order", order.orderNumber, err);
     return "unchanged" as const;
   });
-  if (syncOutcome === "label_created" || syncOutcome === "shipped") {
+  // Synken läser även om ordern från Kustom (status/debiterat belopp), så
+  // läs alltid om raden efter den - inte bara när frakten ändrades.
+  if (syncOutcome !== "unchanged") {
     const [refreshed] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
     if (refreshed) order = refreshed;
   }
@@ -178,6 +180,11 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   );
 
   const remainingToCapture = order.orderAmountOre - order.capturedAmountOre;
+  const rawExpiresAt = (order.rawKustomOrder as { expires_at?: unknown } | null)?.expires_at;
+  const authorizationExpiresAt =
+    typeof rawExpiresAt === "string" && !Number.isNaN(Date.parse(rawExpiresAt))
+      ? new Date(rawExpiresAt)
+      : null;
   const remainingToRefund = order.capturedAmountOre - order.refundedAmountOre;
   const canCancel = order.fulfillmentStatus !== "cancelled" && order.capturedAmountOre === 0;
   const canMarkLabelCreated = order.fulfillmentStatus === "unfulfilled";
@@ -518,6 +525,15 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
 
       <section className="flex flex-col gap-4">
         <h2 className="tran-label text-xs text-tran-muted">Betalning</h2>
+        {remainingToCapture > 0 &&
+        order.fulfillmentStatus !== "cancelled" &&
+        authorizationExpiresAt ? (
+          <p className="text-xs text-tran-muted">
+            Inte debiterad än. Reservationen hos Kustom gäller till{" "}
+            {formatDateTime(authorizationExpiresAt)} - debitera innan dess, annars går
+            betalningen förlorad.
+          </p>
+        ) : null}
         <div className="flex flex-wrap gap-3">
           {remainingToCapture > 0 ? (
             <form action={captureOrderAction.bind(null, order.id)} className="flex items-end gap-2">

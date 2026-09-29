@@ -8,7 +8,9 @@ import {
   trackPostnordShipment,
   type PostnordShipmentTracking,
 } from "@/lib/postnord/client";
+import { getOrderManagementOrder } from "@/lib/kustom/client";
 import { markOrderShipped } from "@/lib/orders/mark-shipped";
+import { persistOrderFromKustom } from "@/lib/orders/persist-order";
 import {
   acceptsMatch,
   isHandedOverToPostnord,
@@ -19,6 +21,8 @@ import {
 type OpenOrder = typeof schema.orders.$inferSelect;
 
 export type PostnordSyncOutcome = "not_found" | "label_created" | "shipped" | "unchanged";
+
+type SyncCounts = Record<PostnordSyncOutcome, number>;
 
 const RECENT_DAYS = 30;
 const THROTTLE_MS = 10 * 60 * 1000;
@@ -71,7 +75,21 @@ export async function syncPostnordForOrder(order: OpenOrder): Promise<PostnordSy
     return "unchanged";
   }
 
-  const shipment = await findShipmentForOrder(order);
+  // Läs ordern färskt från Kustom först - Kustom pushar inte nödvändigtvis
+  // när Kustom Shipping Assistant/PostNord uppdaterar frakten, så vi hämtar
+  // själva. Sparar samtidigt ny status/debiterat belopp (t.ex. om något
+  // debiterats direkt i Kustoms portal) och rådata. Går Kustom inte att nå
+  // körs resten ändå, på den sparade kopian.
+  let lookupOrder = order;
+  try {
+    const fresh = await getOrderManagementOrder(order.kustomOrderId);
+    await persistOrderFromKustom(fresh);
+    lookupOrder = { ...order, rawKustomOrder: fresh };
+  } catch (err) {
+    console.error("Kunde inte läsa om order från Kustom inför PostNord-synk", order.orderNumber, err);
+  }
+
+  const shipment = await findShipmentForOrder(lookupOrder);
   if (!shipment) return "not_found";
 
   if (isHandedOverToPostnord(shipment)) {
@@ -113,8 +131,8 @@ export async function syncPostnordForOpenOrders({
   maxAgeDays,
 }: {
   maxAgeDays: number | null;
-}): Promise<Record<PostnordSyncOutcome, number>> {
-  const counts: Record<PostnordSyncOutcome, number> = {
+}): Promise<SyncCounts> {
+  const counts: SyncCounts = {
     not_found: 0,
     label_created: 0,
     shipped: 0,
@@ -152,6 +170,7 @@ export async function syncPostnordForOpenOrders({
     }
   };
   await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+
   return counts;
 }
 

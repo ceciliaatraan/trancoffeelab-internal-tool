@@ -75,7 +75,6 @@ export function postnordLookupCandidates(order: OrderForLookup): LookupCandidate
     raw.selected_shipping_option && typeof raw.selected_shipping_option === "object"
       ? (raw.selected_shipping_option as Record<string, unknown>)
       : {};
-  const shippingInfo = Array.isArray(raw.shipping_info) ? raw.shipping_info : [];
 
   const candidates: LookupCandidate[] = [];
   const add = (value: string | null, kind: LookupCandidate["kind"], unique: boolean) => {
@@ -85,10 +84,15 @@ export function postnordLookupCandidates(order: OrderForLookup): LookupCandidate
   };
 
   add(order.labelTrackingNumber?.trim() || null, "identifier", true);
-  for (const info of shippingInfo) {
-    if (info && typeof info === "object") {
-      add(stringField(info as Record<string, unknown>, "tracking_number"), "identifier", true);
-    }
+  // Exakt var Kustom lägger PostNords spårningsnummer när Kustom Shipping
+  // Assistant bokat frakten är inte bekräftat - leta i alla fraktrelaterade
+  // delar av ordern efter fält som ser ut som ett spårnings-/kollinummer.
+  for (const value of collectTrackingValues([
+    raw.shipping_info,
+    raw.selected_shipping_option,
+    raw.captures,
+  ])) {
+    add(value, "identifier", true);
   }
 
   const tmsReference = stringField(selected, "tms_reference");
@@ -102,6 +106,28 @@ export function postnordLookupCandidates(order: OrderForLookup): LookupCandidate
   add(String(order.orderNumber), "reference", false);
 
   return candidates;
+}
+
+const TRACKING_KEY = /^(tracking_?(number|id|no)|shipment_?id|parcel_?(number|id)|item_?id|consignment_?(number|id))$/i;
+
+function collectTrackingValues(roots: unknown[]): string[] {
+  const found: string[] = [];
+  const visit = (value: unknown, depth: number) => {
+    if (depth > 5 || !value || typeof value !== "object") return;
+    if (Array.isArray(value)) {
+      for (const entry of value) visit(entry, depth + 1);
+      return;
+    }
+    for (const [key, entry] of Object.entries(value as Record<string, unknown>)) {
+      if (TRACKING_KEY.test(key) && typeof entry === "string" && entry.trim()) {
+        found.push(entry.trim());
+      } else {
+        visit(entry, depth + 1);
+      }
+    }
+  };
+  for (const root of roots) visit(root, 0);
+  return found;
 }
 
 function normalizePostCode(value: string): string {
