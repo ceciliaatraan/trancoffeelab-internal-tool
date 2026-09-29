@@ -682,9 +682,12 @@ Kustom"-knappen och rådata-rutan är borttagna.
   debiteras INTE automatiskt - de väntar på "Debitera" som innan. Fältet och
   värdelistan kommer från Kustoms OpenAPI-schema (InitialPaymentMethodDto,
   delat av ägaren); `APPLE_PAY_CARD` är bekräftat i en riktig order. Det är
-  INTE bekräftat hur ett Klarna-köp inne i Kustoms checkout faktiskt märks -
-  antaget INVOICE/PAY_LATER_IN_PARTS/FIXED_AMOUNT (eller OTHER, som också
-  väntar). Ett misslyckat capture stoppar inte längre orderbekräftelsemejlet
+  **Bekräftat samma kväll** via ägarens SQL-utdrag av 30 riktiga ordrar: Klarnas
+  "betala senare" märks `INVOICE` (företag: `INVOICE_BUSINESS`) och väntar;
+  Klarnas "betala nu" märks `DIRECT_DEBIT` - som INTE finns i OpenAPI-
+  schemats uppräkning - och ska enligt ägaren debiteras direkt, så den är
+  tillagd i `isPayNowMethod`. Övriga observerade värden: CARD,
+  APPLE_PAY_CARD, SWISH. Ett misslyckat capture stoppar inte längre orderbekräftelsemejlet
   (gällde tidigare även förbeställningar) - felet loggas i webhook_events
   efteråt och ordern ligger kvar som "Godkänd". Gäller bara NYA ordrar;
   redan inkomna "Godkänd"-ordrar debiteras inte retroaktivt. Betalsättet

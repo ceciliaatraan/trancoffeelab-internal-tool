@@ -3,7 +3,7 @@ import { isPayNowMethod } from "./payment-methods";
 
 describe("isPayNowMethod", () => {
   it("debiterar direkt för kort, plånböcker och Swish", () => {
-    for (const type of ["CARD", "APPLE_PAY_CARD", "GOOGLE_PAY_CARD", "SWISH", "PAY_BY_CARD"]) {
+    for (const type of ["CARD", "APPLE_PAY_CARD", "GOOGLE_PAY_CARD", "SWISH", "PAY_BY_CARD", "DIRECT_DEBIT"]) {
       expect(isPayNowMethod(type)).toBe(true);
     }
   });

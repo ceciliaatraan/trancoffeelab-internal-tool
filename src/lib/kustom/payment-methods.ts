@@ -6,8 +6,11 @@
  * debiteras först senare, via "Debitera" på ordern.
  *
  * Värdena är `initial_payment_method.type` ur Kustoms Order Management-
- * API (OpenAPI-schemat InitialPaymentMethodDto, delat av ägaren; APPLE_PAY_CARD
- * bekräftat i en riktig order).
+ * API (OpenAPI-schemat InitialPaymentMethodDto, delat av ägaren). Bekräftat
+ * i riktiga ordrar 2026-09-29: CARD, APPLE_PAY_CARD, SWISH, DIRECT_DEBIT
+ * (Klarnas "betala nu" - debiteras direkt enligt ägaren, finns INTE med i
+ * OpenAPI-schemats uppräkning), INVOICE (Klarnas "betala senare") och
+ * INVOICE_BUSINESS (företagsfaktura).
  */
 const PAY_NOW_METHODS = new Set([
   "CARD",
@@ -18,6 +21,7 @@ const PAY_NOW_METHODS = new Set([
   "SWISH",
   "MOBILEPAY",
   "BANK_TRANSFER",
+  "DIRECT_DEBIT",
   "BLIK",
   "TWINT",
   "BANCONTACT",
