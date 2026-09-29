@@ -182,13 +182,19 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const remainingToCapture = order.orderAmountOre - order.capturedAmountOre;
   const rawKustom = order.rawKustomOrder as {
     expires_at?: unknown;
-    initial_payment_method?: { description?: unknown };
+    initial_payment_method?: { description?: unknown; type?: unknown };
   } | null;
   const rawExpiresAt = rawKustom?.expires_at;
+  const paymentMethod = rawKustom?.initial_payment_method;
+  // Kustoms typkod visas bredvid namnet - det är den som styr om ordern
+  // debiteras direkt (isPayNowMethod i lib/kustom/payment-methods.ts).
   const paymentMethodLabel =
-    typeof rawKustom?.initial_payment_method?.description === "string"
-      ? rawKustom.initial_payment_method.description
-      : null;
+    [
+      typeof paymentMethod?.description === "string" ? paymentMethod.description : null,
+      typeof paymentMethod?.type === "string" ? `(${paymentMethod.type})` : null,
+    ]
+      .filter(Boolean)
+      .join(" ") || null;
   const authorizationExpiresAt =
     typeof rawExpiresAt === "string" && !Number.isNaN(Date.parse(rawExpiresAt))
       ? new Date(rawExpiresAt)
