@@ -246,14 +246,16 @@ högt tillförlitliga, implementerade i `src/lib/kustom/client.ts`:
   innan skarp drift, det är en mer offensiv tolkning än Skatteverkets
   vanliga proportionering efter marknadsvärde.
 - **Preorder-ordrar (`orders.contains_preorder`) captureas alltid direkt
-  vid order, oavsett betalmetod** (`src/lib/orders/capture-preorder.ts`,
+  vid order, oavsett betalmetod** (`src/lib/orders/capture-at-checkout.ts`,
+  tidigare `capture-preorder.ts`,
   anropas från push-hanteraren). Ett medvetet undantag från Klarnas
   normala mönster där fakturaköp/delbetalning väntar med capture till
   fysisk leverans - den senareläggningen skyddar kunden vid KORT tid
   till leverans, vilket inte gäller en förbeställning där varan inte
   ens finns i lager än. Icke-preorder-ordrar är helt orörda av detta:
   de captureas fortsatt manuellt via "Debitera"-knappen i
-  `/orders/[id]` (`captureOrderAction`), precis som innan.
+  `/orders/[id]` (`captureOrderAction`), precis som innan. **Ändrat
+  2026-09-29:** "betala nu"-ordrar debiteras nu också direkt, se nedan.
 - **En "shipping"/"both"-rabattkod diskonterade inte det faktiska
   fraktpriset, upptäckt av ägaren 2026-09-21.** Innan detta datum
   reducerade en sådan rabatt bara `shippingOption.price` (fallback-
@@ -667,9 +669,26 @@ Kustom"-knappen och rådata-rutan är borttagna.
   trycker "Debitera" på ordern - det var ingen som gjorde det när butiken gick
   från förbeställning till lager. Reservationen går ut (`expires_at` i
   Kustom-ordern, visas nu under Betalning på orderdetaljen) - debiteras ordern
-  inte innan dess går betalningen förlorad. **Automatisk debitering när ordern
-  skickas är INTE byggd** - det flyttar riktiga pengar från riktiga kunder och
-  kräver ägarens uttryckliga beslut.
+  inte innan dess går betalningen förlorad.
+- **Ägarens beslut samma dag: debitera direkt vid order, UTOM Klarnas
+  betala-senare-sätt.** `process-kustom-order.ts` debiterar nu nya ordrar
+  direkt (`captureOrderAtCheckout`) om de är förbeställningar (som innan)
+  ELLER betalda med ett "betala nu"-sätt enligt
+  `initial_payment_method.type` (`isPayNowMethod` i
+  `lib/kustom/payment-methods.ts`: CARD, PAY_BY_CARD, APPLE_PAY_CARD,
+  GOOGLE_PAY_CARD, CARTES_BANCAIRES, SWISH, MOBILEPAY, BANK_TRANSFER, BLIK,
+  TWINT, BANCONTACT). INVOICE, INVOICE_BUSINESS, PAY_LATER_IN_PARTS,
+  FIXED_AMOUNT (Klarnas faktura/delbetalning), OTHER och saknat/okänt värde
+  debiteras INTE automatiskt - de väntar på "Debitera" som innan. Fältet och
+  värdelistan kommer från Kustoms OpenAPI-schema (InitialPaymentMethodDto,
+  delat av ägaren); `APPLE_PAY_CARD` är bekräftat i en riktig order. Det är
+  INTE bekräftat hur ett Klarna-köp inne i Kustoms checkout faktiskt märks -
+  antaget INVOICE/PAY_LATER_IN_PARTS/FIXED_AMOUNT (eller OTHER, som också
+  väntar). Ett misslyckat capture stoppar inte längre orderbekräftelsemejlet
+  (gällde tidigare även förbeställningar) - felet loggas i webhook_events
+  efteråt och ordern ligger kvar som "Godkänd". Gäller bara NYA ordrar;
+  redan inkomna "Godkänd"-ordrar debiteras inte retroaktivt. Betalsättet
+  visas nu under Betalning på orderdetaljen.
 
 ## Status i koden
 

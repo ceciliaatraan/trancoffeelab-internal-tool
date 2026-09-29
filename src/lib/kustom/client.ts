@@ -202,6 +202,8 @@ export type KustomOrderManagementOrder = {
   billing_address?: KustomAddress;
   shipping_address?: KustomAddress;
   customer?: KustomCustomer;
+  /** Betalsättet kunden valde, se payment-methods.ts. Bekräftat i en riktig order: { type: "APPLE_PAY_CARD", description: "Apple Pay card" }. */
+  initial_payment_method?: { type?: string; description?: string; number_of_installments?: number };
   captured_amount: number;
   refunded_amount: number;
   remaining_authorized_amount: number;

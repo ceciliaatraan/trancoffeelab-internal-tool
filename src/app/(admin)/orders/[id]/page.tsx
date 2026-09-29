@@ -180,7 +180,15 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   );
 
   const remainingToCapture = order.orderAmountOre - order.capturedAmountOre;
-  const rawExpiresAt = (order.rawKustomOrder as { expires_at?: unknown } | null)?.expires_at;
+  const rawKustom = order.rawKustomOrder as {
+    expires_at?: unknown;
+    initial_payment_method?: { description?: unknown };
+  } | null;
+  const rawExpiresAt = rawKustom?.expires_at;
+  const paymentMethodLabel =
+    typeof rawKustom?.initial_payment_method?.description === "string"
+      ? rawKustom.initial_payment_method.description
+      : null;
   const authorizationExpiresAt =
     typeof rawExpiresAt === "string" && !Number.isNaN(Date.parse(rawExpiresAt))
       ? new Date(rawExpiresAt)
@@ -525,6 +533,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
 
       <section className="flex flex-col gap-4">
         <h2 className="tran-label text-xs text-tran-muted">Betalning</h2>
+        {paymentMethodLabel ? (
+          <p className="text-sm">Betalsätt: {paymentMethodLabel}</p>
+        ) : null}
         {remainingToCapture > 0 &&
         order.fulfillmentStatus !== "cancelled" &&
         authorizationExpiresAt ? (

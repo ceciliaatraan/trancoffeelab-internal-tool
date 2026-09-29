@@ -1,7 +1,8 @@
 import "server-only";
 import { acknowledgeOrder, getOrderManagementOrder } from "@/lib/kustom/client";
 import { persistOrderFromKustom, type PersistedOrder } from "@/lib/orders/persist-order";
-import { capturePreorderOrder } from "@/lib/orders/capture-preorder";
+import { captureOrderAtCheckout } from "@/lib/orders/capture-at-checkout";
+import { isPayNowMethod } from "@/lib/kustom/payment-methods";
 import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
 import { formatCustomerLabel, notifyNewOrderInSlack } from "@/lib/notifications/slack";
 
@@ -20,12 +21,28 @@ export async function processKustomOrder(orderId: string): Promise<PersistedOrde
   if (!persisted.alreadyExisted) {
     await acknowledgeOrder(orderId, orderId);
 
-    // Preorder-ordrar captureas direkt, oavsett betalmetod - se den
-    // förklarande kommentaren i capture-preorder.ts. Icke-preorder-
-    // ordrar rörs INTE här; de captureas fortsatt manuellt via
-    // "Debitera"-knappen i /orders/[id] (captureOrderAction).
-    if (persisted.containsPreorder) {
-      await capturePreorderOrder(persisted.id, orderId, order.order_amount);
+    // Förbeställningar (alla betalsätt) och "betala nu"-sätt (kort, Swish
+    // m.m.) debiteras direkt - se capture-at-checkout.ts. Klarnas betala-
+    // senare-sätt (faktura, delbetalning) och okända betalsätt rörs INTE
+    // här; de debiteras manuellt via "Debitera" i /orders/[id].
+    //
+    // Ett fel vid debiteringen får inte stoppa orderbekräftelsemejlet/
+    // Slack-notisen - felet kastas i stället EFTER dem, så push-anropet
+    // ändå loggas som misslyckat i webhook_events (syns under Loggar) och
+    // ordern ligger kvar som "Godkänd" för manuell debitering.
+    let captureError: unknown = null;
+    const payNow = isPayNowMethod(order.initial_payment_method?.type);
+    if (persisted.containsPreorder || payNow) {
+      try {
+        await captureOrderAtCheckout(
+          persisted.id,
+          orderId,
+          order.order_amount,
+          persisted.containsPreorder ? "preorder" : "pay_now",
+        );
+      } catch (err) {
+        captureError = err;
+      }
     }
 
     if (order.billing_address?.email) {
@@ -48,6 +65,8 @@ export async function processKustomOrder(orderId: string): Promise<PersistedOrde
       order.billing_address?.email,
     );
     await notifyNewOrderInSlack(persisted, order.order_amount, customer);
+
+    if (captureError) throw captureError;
   }
 
   return persisted;
