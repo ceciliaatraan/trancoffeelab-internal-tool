@@ -567,6 +567,75 @@ mindre. **Tidigare ordrar som redan drabbats av dubbelavdraget är inte
 korrigerade** - ingen automatisk efterdebitering är rimlig eller
 gjord.
 
+## PostNord-spårningsnummer synkas inte automatiskt, 2026-09-29
+
+Ägaren rapporterade att spårningsnumret för en order som Kustom Shipping
+Assistant (KSA) bokat hos PostNord inte dyker upp i backofficet automatiskt
+- hon måste fortfarande leta upp det manuellt och skriva in det själv via
+"Markera som skickad".
+
+**Utredning (utan tillgång till docs.kustom.co eller Kustoms API från den
+här sandlådan - se punkt 3 högst upp i den här filen):**
+
+1. Två hypoteser om hur ett KSA-bokat PostNord-spårningsnummer skulle gå
+   att hitta via `findPostnordShipmentsByReference` (vår befintliga
+   "Sök spårningsnummer"-ruta) testades och kunde båda uteslutas av
+   ägaren direkt i gränssnittet:
+   - Vårt eget ordernummer som referens (`TRAN #<ordernummer>`) - PostNord
+     genererar sitt EGET unika spårningsnummer när KSA bokar
+     (t.ex. `ECVZHHG5EVRRWFSJ`), inte något vi själva sätter som referens.
+   - `selected_shipping_option.tms_reference` (t.ex. `"KS6LPXL50IPPGPB4ZN"`,
+     hittat i `raw_kustom_order` för en riktig order) - sökningen gav
+     "Inga skickningar hittades" hos PostNord för det värdet också.
+2. En riktig, verklig bugg hittades genom att läsa `persist-order.ts`
+   noga: `persistOrderFromKustom` sparade ordern EN gång vid första push
+   (`INSERT ... ON CONFLICT DO NOTHING`), och vid VARJE senare push för
+   samma order - vilket Kustom skickar varje gång ordern ändras hos dem,
+   enligt push-mekanismens hela poäng (ingen data i själva webhook-anropet,
+   bara en signal om att läsa om ordern) - kastades den färska datan från
+   `getOrderManagementOrder` rakt bort: koden gjorde bara en `SELECT` av
+   den gamla raden och returnerade den, utan att skriva något. Det
+   innebar att `raw_kustom_order` ALDRIG innehöll något nyare än exakt
+   ordertillfället, även om Kustom/PostNord senare fyllt i
+   spårningsinformation i ett fält vi ännu inte identifierat.
+
+**Fix:** `persistOrderFromKustom` uppdaterar nu `status`/
+`paymentStatus`/`capturedAmountOre`/`refundedAmountOre`/`rawKustomOrder`
+på den befintliga raden vid varje efterföljande push, i stället för att
+bara läsa och returnera den orörd (samma "Kustom är alltid facit"-princip
+som `syncOrderFromKustom` i `orders/actions.ts` redan använde för
+capture/refund/cancel-knapparna). En ny "Synka från Kustom"-knapp på
+orderdetaljsidan (`syncOrderFromKustomAction`) låter dessutom en admin
+hämta om en enskild order manuellt, utan att behöva vänta på/lita på att
+Kustom faktiskt pushar igen. En ny "Rådata från Kustom (frakt)"-ruta
+(ihopfällbar, under Frakt-sektionen) visar `shipping_info`/
+`selected_shipping_option` rått direkt i gränssnittet, så nästa steg i
+utredningen inte längre kräver en SQL-fråga via Supabase.
+
+**Overifierat/kvarstår - VIKTIGT:**
+- Det är INTE bekräftat att Kustom faktiskt pushar igen när PostNord
+  bokar/uppdaterar en frakt hos dem via KSA - bara att push-mekanismen
+  designmässigt ÄR till för att signalera "något ändrades, läs om
+  ordern", och att vår kod fram till idag strukturellt hade uteslutit
+  att någonsin se det även om de gjorde det.
+- Det är INTE bekräftat vilket fält ett riktigt PostNord-spårningsnummer
+  hamnar i när det väl finns - `shipping_info` var en tom lista (`[]`)
+  i det enda exemplet vi sett (taget vid ordertillfället, innan PostNord
+  hunnit bearbeta skickningen). Ingen extraktionslogik (automatisk
+  ifyllning av `shipments`/spårningsnummer) är byggd än - det vore att
+  gissa ett fältnamn/format utan bekräftelse, vilket den här filens egen
+  regel uttryckligen varnar för.
+- **Nästa steg:** be ägaren klicka "Synka från Kustom" på en order där
+  KSA bokat en PostNord-frakt (t.ex. en redan levererad order, som Ebbas)
+  och läsa "Rådata från Kustom (frakt)"-rutan - om `shipping_info` nu är
+  ifylld (inte längre `[]`), bekräftar det både att Kustom uppdaterar
+  fältet i efterhand OCH visar exakt vilket format spårningsnumret har,
+  så en riktig automatisk extraktion kan byggas. Om den fortfarande är
+  tom även efter synk, tyder det på att KSA:s PostNord-integration inte
+  skriver tillbaka spårningsnumret till Order Management-API:et alls (då
+  krävs troligen en helt annan lösning, t.ex. en fråga till Kustom
+  support om hur/var spårningsnumret faktiskt exponeras).
+
 ## Status i koden
 
 | Del | Status |

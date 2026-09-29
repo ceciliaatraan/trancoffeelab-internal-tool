@@ -23,6 +23,7 @@ import {
   refundPartialAction,
   returnLineComponentAction,
   swapLineComponentAction,
+  syncOrderFromKustomAction,
 } from "../actions";
 import {
   PostnordApiError,
@@ -85,6 +86,25 @@ const EVENT_LABELS: Record<string, string> = {
   refund: "Återbetalning",
   cancel: "Annullering",
 };
+
+/**
+ * Plockar ut de fraktrelaterade fälten ur den rå Kustom-ordern, om de
+ * finns - `shipping_info`/`selected_shipping_option` sågs första gången
+ * 2026-09-26 (inte tidigare dokumenterat mot docs.kustom.co, blockerad
+ * nätverksåtkomst under utveckling). Visas rått i stället för tolkat,
+ * eftersom vi ännu inte vet hur fälten ser ut när PostNord faktiskt fyllt
+ * i ett spårningsnummer - se "Rådata från Kustom (frakt)" nedan och
+ * docs/kustom.md.
+ */
+function extractShippingDebug(raw: unknown): Record<string, unknown> | null {
+  if (!raw || typeof raw !== "object") return null;
+  const record = raw as Record<string, unknown>;
+  if (!("shipping_info" in record) && !("selected_shipping_option" in record)) return null;
+  return {
+    shipping_info: record.shipping_info ?? null,
+    selected_shipping_option: record.selected_shipping_option ?? null,
+  };
+}
 
 export default async function OrderDetailPage({ params, searchParams }: PageProps<"/orders/[id]">) {
   const { id } = await params;
@@ -156,6 +176,8 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         }
       }),
   );
+
+  const shippingDebug = extractShippingDebug(order.rawKustomOrder);
 
   const latestShipment = shipmentRows.at(-1) ?? null;
   const latestPostnordStatus = latestShipment
@@ -619,10 +641,30 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       </section>
 
       <section className="flex flex-col gap-4">
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <h2 className="tran-label text-xs text-tran-muted">Frakt</h2>
           <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
+          <form action={syncOrderFromKustomAction.bind(null, order.id)}>
+            <SubmitButton className="tran-label border border-tran-black px-2 py-1 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red">
+              Synka från Kustom
+            </SubmitButton>
+          </form>
         </div>
+        {shippingDebug ? (
+          <details className="border border-tran-hairline p-4 text-xs">
+            <summary className="tran-label cursor-pointer text-[11px] text-tran-muted">
+              Rådata från Kustom (frakt)
+            </summary>
+            <p className="mt-2 text-tran-muted">
+              Fälten Kustom skickar för Kustom Shipping Assistant/PostNord - visas rått eftersom
+              vi ännu inte vet exakt hur de ser ut när PostNord fyllt i ett spårningsnummer. Klicka
+              &quot;Synka från Kustom&quot; ovan för att hämta det senaste innan du läser här.
+            </p>
+            <pre className="tran-tabular mt-2 overflow-x-auto whitespace-pre-wrap break-all">
+              {JSON.stringify(shippingDebug, null, 2)}
+            </pre>
+          </details>
+        ) : null}
         {shipmentRows.length > 0 ? (
           <ul className="flex flex-col gap-3 text-sm">
             {shipmentRows.map((shipment) => {

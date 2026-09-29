@@ -169,14 +169,37 @@ export async function persistOrderFromKustom(
       .returning({ id: schema.orders.id, orderNumber: schema.orders.orderNumber });
 
     if (!inserted) {
+      // Ordern fanns redan - men Kustom är fortfarande facit (samma
+      // princip som syncOrderFromKustom i orders/actions.ts), så vi
+      // uppdaterar i alla fall status/belopp OCH raw_kustom_order med det
+      // färska svaret i stället för att bara returnera den gamla raden
+      // orörd. Kustom pushar på nytt varje gång ordern ändras hos dem -
+      // fram till 2026-09-29 kastade vi den nya datan rakt i papperskorgen
+      // här (onConflictDoNothing, sen bara en läsning), vilket bl.a.
+      // innebar att raw_kustom_order aldrig innehöll nåt nyare än
+      // ordertillfället - t.ex. spårningsinfo som Kustom Shipping
+      // Assistant/PostNord eventuellt fyller i EFTER att ordern lagts
+      // (se docs/kustom.md, "PostNord-spårningsnummer synkas inte
+      // automatiskt"). Fortfarande OBEKRÄFTAT att Kustom faktiskt pushar
+      // igen när det händer, eller vilket fält spårningsnumret i så fall
+      // hamnar i - den här ändringen gör bara att VI FÖRSTA GÅNGEN kan se
+      // det om/när det kommer, i stället för att strukturellt utesluta det.
       const [existing] = await tx
-        .select({
+        .update(schema.orders)
+        .set({
+          status: order.status || "UNKNOWN",
+          paymentStatus: order.status || "UNKNOWN",
+          capturedAmountOre: order.captured_amount,
+          refundedAmountOre: order.refunded_amount,
+          rawKustomOrder: order,
+          updatedAt: new Date(),
+        })
+        .where(eq(schema.orders.kustomOrderId, order.order_id))
+        .returning({
           id: schema.orders.id,
           orderNumber: schema.orders.orderNumber,
           containsPreorder: schema.orders.containsPreorder,
-        })
-        .from(schema.orders)
-        .where(eq(schema.orders.kustomOrderId, order.order_id));
+        });
       return {
         id: existing.id,
         orderNumber: existing.orderNumber,

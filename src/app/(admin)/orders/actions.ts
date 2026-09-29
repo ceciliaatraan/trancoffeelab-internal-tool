@@ -17,6 +17,7 @@ import {
   getOrderManagementOrder,
   refundOrder,
 } from "@/lib/kustom/client";
+import { persistOrderFromKustom } from "@/lib/orders/persist-order";
 
 function kustomErrorMessage(err: unknown): string {
   if (err instanceof KustomApiError) {
@@ -46,6 +47,33 @@ async function syncOrderFromKustom(orderId: string, kustomOrderId: string) {
       updatedAt: new Date(),
     })
     .where(eq(schema.orders.id, orderId));
+}
+
+/**
+ * Hämtar ordern på nytt direkt från Kustoms Order Management API och
+ * skriver över vår cachade kopia (status/belopp/raw_kustom_order) - läsning
+ * bara, bokar/ändrar inget hos Kustom. Sedan 2026-09-29 gör push-hanteraren
+ * (persist-order.ts) samma sak automatiskt varje gång Kustom pushar en
+ * uppdatering, men den knappen är till för att kunna kolla en enskild
+ * order UTAN att vänta på/lita på att Kustom faktiskt pushar igen (fortsatt
+ * obekräftat om/när de gör det för fraktuppdateringar från Kustom Shipping
+ * Assistant/PostNord) - se "Rådata från Kustom (frakt)" nedan på sidan och
+ * docs/kustom.md.
+ */
+export async function syncOrderFromKustomAction(orderId: string) {
+  await requireCurrentAdmin();
+  const order = await getOrderOrRedirect(orderId);
+
+  try {
+    const fresh = await getOrderManagementOrder(order.kustomOrderId);
+    await persistOrderFromKustom(fresh);
+  } catch (err) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent(kustomErrorMessage(err))}`);
+  }
+
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/orders");
+  redirect(`/orders/${orderId}?saved=1`);
 }
 
 export async function captureOrderAction(orderId: string, formData: FormData) {
