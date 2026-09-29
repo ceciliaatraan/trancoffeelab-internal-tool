@@ -61,3 +61,23 @@ export async function refreshUnsettledOrdersFromKustom(): Promise<number> {
   });
   return unsettled.length;
 }
+
+const UNSETTLED_REFRESH_INTERVAL_MS = 2 * 60 * 1000;
+let lastUnsettledRefresh = 0;
+
+/**
+ * refreshUnsettledOrdersFromKustom, högst varannan minut per serverinstans.
+ * Orderlistan väntar in den innan den läser ordrarna, så en debitering gjord
+ * i Kustoms portal syns direkt när listan öppnas; startsidan kör den i
+ * bakgrunden. Fel loggas bara - listan visas alltid.
+ */
+export async function refreshUnsettledOrdersFromKustomIfDue(): Promise<void> {
+  const now = Date.now();
+  if (now - lastUnsettledRefresh < UNSETTLED_REFRESH_INTERVAL_MS) return;
+  lastUnsettledRefresh = now;
+  try {
+    await refreshUnsettledOrdersFromKustom();
+  } catch (err) {
+    console.error("Kunde inte läsa om ej debiterade ordrar från Kustom", err);
+  }
+}

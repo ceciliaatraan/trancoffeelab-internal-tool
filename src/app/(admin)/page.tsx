@@ -1,3 +1,4 @@
+import { connection } from "next/server";
 import Link from "next/link";
 import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
@@ -16,6 +17,9 @@ import { scheduleBackgroundSync } from "@/lib/orders/postnord-auto-sync";
 export const maxDuration = 60;
 
 export default async function DashboardPage() {
+  // Så bakgrundssynken (Kustom/PostNord) bara startas vid riktiga
+  // sidvisningar, aldrig när sidan förrenderas under bygget.
+  await connection();
   scheduleBackgroundSync();
   const [daily, recentOrders, topProducts, unprocessedOrders, inventoryOverview, webhookErrors] =
     await Promise.all([

@@ -12,7 +12,7 @@ import { markOrderShipped } from "@/lib/orders/mark-shipped";
 import {
   forEachConcurrently,
   refreshOrderFromKustom,
-  refreshUnsettledOrdersFromKustom,
+  refreshUnsettledOrdersFromKustomIfDue,
 } from "@/lib/orders/kustom-refresh";
 import {
   acceptsMatch,
@@ -29,7 +29,6 @@ type SyncCounts = Record<PostnordSyncOutcome, number>;
 
 const RECENT_DAYS = 30;
 const THROTTLE_MS = 10 * 60 * 1000;
-const KUSTOM_THROTTLE_MS = 2 * 60 * 1000;
 const FULL_RUN_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const CONCURRENCY = 4;
 
@@ -161,7 +160,6 @@ export async function syncPostnordForOpenOrders({
   return counts;
 }
 
-let lastKustomRun = 0;
 let lastPostnordRun = 0;
 let lastFullPostnordRun = 0;
 
@@ -170,7 +168,8 @@ let lastFullPostnordRun = 0;
  * startsidan öppnas:
  * - Kustom: läser om alla ej färdigdebiterade ordrar (så debiteringar/
  *   annulleringar gjorda i Kustoms portal syns hos oss) - högst varannan
- *   minut per serverinstans, oberoende av PostNord.
+ *   minut, oberoende av PostNord (refreshUnsettledOrdersFromKustomIfDue;
+ *   orderlistan har redan väntat in den själv innan den visades).
  * - PostNord: kopplar öppna ordrar till sina skickningar - högst var 10:e
  *   minut, så sidvisningar inte bränner PostNords anropskvot. Vanligtvis de
  *   senaste 30 dagarnas ordrar; högst en gång per dygn (och första gången
@@ -179,10 +178,7 @@ let lastFullPostnordRun = 0;
  */
 export function scheduleBackgroundSync(): void {
   const now = Date.now();
-  const runKustom = now - lastKustomRun >= KUSTOM_THROTTLE_MS;
   const runPostnord = Boolean(process.env.POSTNORD_API_KEY) && now - lastPostnordRun >= THROTTLE_MS;
-  if (!runKustom && !runPostnord) return;
-  if (runKustom) lastKustomRun = now;
   let full = false;
   if (runPostnord) {
     lastPostnordRun = now;
@@ -191,13 +187,7 @@ export function scheduleBackgroundSync(): void {
   }
 
   after(async () => {
-    if (runKustom) {
-      try {
-        await refreshUnsettledOrdersFromKustom();
-      } catch (err) {
-        console.error("Kustom-synk i bakgrunden misslyckades", err);
-      }
-    }
+    await refreshUnsettledOrdersFromKustomIfDue();
     if (runPostnord) {
       try {
         await syncPostnordForOpenOrders({ maxAgeDays: full ? null : RECENT_DAYS });

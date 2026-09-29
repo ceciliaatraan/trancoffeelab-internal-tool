@@ -11,14 +11,20 @@ import { TableRowLink } from "@/components/table-row-link";
 import { getFraktStatusByOrderId } from "@/lib/orders/frakt-status-for-orders";
 import { customerDisplayName } from "@/lib/orders/customer-display-name";
 import { scheduleBackgroundSync } from "@/lib/orders/postnord-auto-sync";
+import { refreshUnsettledOrdersFromKustomIfDue } from "@/lib/orders/kustom-refresh";
 
 // Ger bakgrundssynken mot Kustom/PostNord (scheduleBackgroundSync) tid att gå igenom
 // alla öppna ordrar vid dygnets fulla genomgång.
 export const maxDuration = 60;
 
 export default async function OrdersPage({ searchParams }: PageProps<"/orders">) {
-  scheduleBackgroundSync();
+  // searchParams först - det gör sidan dynamisk, så Kustom-anropet nedan
+  // aldrig körs under bygget, bara vid riktiga sidvisningar.
   const params = await searchParams;
+  // Hämta betalstatus från Kustom INNAN listan läses, så ordrar som
+  // debiterats i Kustoms portal visas som "Debiterad" direkt.
+  await refreshUnsettledOrdersFromKustomIfDue();
+  scheduleBackgroundSync();
   const statusFilter = typeof params.status === "string" ? params.status : "";
   const query = typeof params.q === "string" ? params.q.trim() : "";
   const error = typeof params.error === "string" ? params.error : null;
