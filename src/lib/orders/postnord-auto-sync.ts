@@ -8,9 +8,12 @@ import {
   trackPostnordShipment,
   type PostnordShipmentTracking,
 } from "@/lib/postnord/client";
-import { getOrderManagementOrder } from "@/lib/kustom/client";
 import { markOrderShipped } from "@/lib/orders/mark-shipped";
-import { persistOrderFromKustom } from "@/lib/orders/persist-order";
+import {
+  forEachConcurrently,
+  refreshOrderFromKustom,
+  refreshUnsettledOrdersFromKustom,
+} from "@/lib/orders/kustom-refresh";
 import {
   acceptsMatch,
   isHandedOverToPostnord,
@@ -26,6 +29,7 @@ type SyncCounts = Record<PostnordSyncOutcome, number>;
 
 const RECENT_DAYS = 30;
 const THROTTLE_MS = 10 * 60 * 1000;
+const KUSTOM_THROTTLE_MS = 2 * 60 * 1000;
 const FULL_RUN_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const CONCURRENCY = 4;
 
@@ -67,7 +71,9 @@ async function findShipmentForOrder(order: OpenOrder): Promise<PostnordShipmentT
  * Kopplar EN öppen order till dess PostNord-skickning, om den går att
  * hitta: fraktsedel skapad hos PostNord → "Fraktsedel skapad" + spårnings-
  * nummer; paketet lämnat/på väg → "Skickad" (med lagerflytt, precis som
- * knappen). Läser bara från PostNord - skriver aldrig dit.
+ * knappen). Läser bara från PostNord - skriver aldrig dit. Använder den
+ * Kustom-data ordern har - läs om den med refreshOrderFromKustom först
+ * (Kustom pushar inte när KSA/PostNord uppdaterar frakten).
  */
 export async function syncPostnordForOrder(order: OpenOrder): Promise<PostnordSyncOutcome> {
   if (!process.env.POSTNORD_API_KEY) return "unchanged";
@@ -75,21 +81,7 @@ export async function syncPostnordForOrder(order: OpenOrder): Promise<PostnordSy
     return "unchanged";
   }
 
-  // Läs ordern färskt från Kustom först - Kustom pushar inte nödvändigtvis
-  // när Kustom Shipping Assistant/PostNord uppdaterar frakten, så vi hämtar
-  // själva. Sparar samtidigt ny status/debiterat belopp (t.ex. om något
-  // debiterats direkt i Kustoms portal) och rådata. Går Kustom inte att nå
-  // körs resten ändå, på den sparade kopian.
-  let lookupOrder = order;
-  try {
-    const fresh = await getOrderManagementOrder(order.kustomOrderId);
-    await persistOrderFromKustom(fresh);
-    lookupOrder = { ...order, rawKustomOrder: fresh };
-  } catch (err) {
-    console.error("Kunde inte läsa om order från Kustom inför PostNord-synk", order.orderNumber, err);
-  }
-
-  const shipment = await findShipmentForOrder(lookupOrder);
+  const shipment = await findShipmentForOrder(order);
   if (!shipment) return "not_found";
 
   if (isHandedOverToPostnord(shipment)) {
@@ -158,45 +150,60 @@ export async function syncPostnordForOpenOrders({
   // Några ordrar i taget - en full genomgång av alla gamla ordrar ska
   // hinna klart inom funktionens tidsgräns, utan att skicka hundratals
   // PostNord-anrop på en gång.
-  let next = 0;
-  const worker = async () => {
-    while (next < openOrders.length) {
-      const order = openOrders[next++];
-      try {
-        counts[await syncPostnordForOrder(order)] += 1;
-      } catch (err) {
-        console.error("PostNord-synk misslyckades för order", order.orderNumber, err);
-      }
+  await forEachConcurrently(openOrders, CONCURRENCY, async (order) => {
+    try {
+      counts[await syncPostnordForOrder(await refreshOrderFromKustom(order))] += 1;
+    } catch (err) {
+      console.error("PostNord-synk misslyckades för order", order.orderNumber, err);
     }
-  };
-  await Promise.all(Array.from({ length: CONCURRENCY }, worker));
+  });
 
   return counts;
 }
 
-let lastBackgroundRun = 0;
-let lastFullBackgroundRun = 0;
+let lastKustomRun = 0;
+let lastPostnordRun = 0;
+let lastFullPostnordRun = 0;
 
 /**
- * Startar synken i bakgrunden (efter att sidan skickats) när orderlistan
- * eller startsidan öppnas - högst var 10:e minut per serverinstans, så
- * sidvisningar inte bränner PostNords anropskvot. Vanligtvis bara de
- * senaste 30 dagarnas ordrar; högst en gång per dygn (och första gången
- * efter varje ny deploy) ALLA öppna ordrar oavsett ålder. Komplement till
- * den dagliga Vercel Cron-körningen (api/cron/postnord-sync).
+ * Startar bakgrundssynken (efter att sidan skickats) när orderlistan eller
+ * startsidan öppnas:
+ * - Kustom: läser om alla ej färdigdebiterade ordrar (så debiteringar/
+ *   annulleringar gjorda i Kustoms portal syns hos oss) - högst varannan
+ *   minut per serverinstans, oberoende av PostNord.
+ * - PostNord: kopplar öppna ordrar till sina skickningar - högst var 10:e
+ *   minut, så sidvisningar inte bränner PostNords anropskvot. Vanligtvis de
+ *   senaste 30 dagarnas ordrar; högst en gång per dygn (och första gången
+ *   efter varje deploy) ALLA öppna ordrar oavsett ålder.
+ * Komplement till den dagliga Vercel Cron-körningen (api/cron/postnord-sync).
  */
-export function schedulePostnordSync(): void {
-  if (!process.env.POSTNORD_API_KEY) return;
+export function scheduleBackgroundSync(): void {
   const now = Date.now();
-  if (now - lastBackgroundRun < THROTTLE_MS) return;
-  lastBackgroundRun = now;
-  const full = now - lastFullBackgroundRun >= FULL_RUN_INTERVAL_MS;
-  if (full) lastFullBackgroundRun = now;
+  const runKustom = now - lastKustomRun >= KUSTOM_THROTTLE_MS;
+  const runPostnord = Boolean(process.env.POSTNORD_API_KEY) && now - lastPostnordRun >= THROTTLE_MS;
+  if (!runKustom && !runPostnord) return;
+  if (runKustom) lastKustomRun = now;
+  let full = false;
+  if (runPostnord) {
+    lastPostnordRun = now;
+    full = now - lastFullPostnordRun >= FULL_RUN_INTERVAL_MS;
+    if (full) lastFullPostnordRun = now;
+  }
+
   after(async () => {
-    try {
-      await syncPostnordForOpenOrders({ maxAgeDays: full ? null : RECENT_DAYS });
-    } catch (err) {
-      console.error("PostNord-synk i bakgrunden misslyckades", err);
+    if (runKustom) {
+      try {
+        await refreshUnsettledOrdersFromKustom();
+      } catch (err) {
+        console.error("Kustom-synk i bakgrunden misslyckades", err);
+      }
+    }
+    if (runPostnord) {
+      try {
+        await syncPostnordForOpenOrders({ maxAgeDays: full ? null : RECENT_DAYS });
+      } catch (err) {
+        console.error("PostNord-synk i bakgrunden misslyckades", err);
+      }
     }
   });
 }

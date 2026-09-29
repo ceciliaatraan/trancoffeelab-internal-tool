@@ -693,6 +693,27 @@ Kustom"-knappen och rådata-rutan är borttagna.
   redan inkomna "Godkänd"-ordrar debiteras inte retroaktivt. Betalsättet
   visas nu under Betalning på orderdetaljen.
 
+## Debiteringar gjorda i Kustoms portal syntes inte hos oss, 2026-09-29
+
+Ägaren debiterade ordrar manuellt i Kustoms portal, men de stod kvar som
+"Godkänd" i backofficet. **Orsak:** Kustom pushar bara till oss när en order
+LÄGGS (push-URL:en i merchant_urls) - inte när något görs i deras portal
+efteråt. Vi läste bara om en order från Kustom när någon tryckte en knapp hos
+oss, eller inne i PostNord-synken - och den synken körde bara för ej skickade
+ordrar och bara om `POSTNORD_API_KEY` var satt.
+
+**Fix:** ny `src/lib/orders/kustom-refresh.ts`:
+- `refreshOrderFromKustom` läser om en order (via `persistOrderFromKustom`)
+  varje gång orderdetaljen öppnas (utom testordrar).
+- `refreshUnsettledOrdersFromKustom` läser om ALLA riktiga ordrar med status
+  AUTHORIZED/PART_CAPTURED, oavsett ålder/fraktstatus - i bakgrunden när
+  /orders eller startsidan öppnas (högst varannan minut per serverinstans,
+  oberoende av PostNord; `scheduleBackgroundSync` ersätter
+  `schedulePostnordSync`) och i den dagliga cron-körningen.
+Färdigdebiterade ordrar (CAPTURED) läses bara om när de öppnas - en
+återbetalning gjord i Kustoms portal syns alltså i listan först när ordern
+öppnats en gång.
+
 ## Status i koden
 
 | Del | Status |

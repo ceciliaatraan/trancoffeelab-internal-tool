@@ -30,6 +30,7 @@ import {
   type PostnordShipmentTracking,
 } from "@/lib/postnord/client";
 import { syncPostnordForOrder } from "@/lib/orders/postnord-auto-sync";
+import { refreshOrderFromKustom } from "@/lib/orders/kustom-refresh";
 
 type Address = {
   given_name?: string;
@@ -96,18 +97,21 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const [initialOrder] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
   if (!initialOrder) notFound();
 
+  // Läs om ordern från Kustom varje gång den öppnas - Kustom pushar inte
+  // till oss när något görs i deras portal (t.ex. en debitering), så annars
+  // visade vi en inaktuell status. Testordrar hoppas över (de finns bara i
+  // Kustoms testmiljö). Ett Kustom-fel visar den sparade kopian.
+  let order = initialOrder.isTest ? initialOrder : await refreshOrderFromKustom(initialOrder);
+
   // Kolla PostNord direkt när en öppen order visas, så en nyss skapad
   // fraktsedel/ett nyss lämnat paket syns utan att vänta på bakgrunds-
   // synken - se postnord-auto-sync.ts. Ett PostNord-fel får aldrig hindra
   // sidan från att visas.
-  let order = initialOrder;
   const syncOutcome = await syncPostnordForOrder(order).catch((err) => {
     console.error("PostNord-synk misslyckades för order", order.orderNumber, err);
     return "unchanged" as const;
   });
-  // Synken läser även om ordern från Kustom (status/debiterat belopp), så
-  // läs alltid om raden efter den - inte bara när frakten ändrades.
-  if (syncOutcome !== "unchanged") {
+  if (syncOutcome === "label_created" || syncOutcome === "shipped") {
     const [refreshed] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
     if (refreshed) order = refreshed;
   }

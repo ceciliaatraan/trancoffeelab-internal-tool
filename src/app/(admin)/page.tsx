@@ -9,14 +9,14 @@ import { SalesBarChart } from "@/components/sales-bar-chart";
 import { TopProductsList } from "@/components/top-products-list";
 import { FraktStatusBadge } from "@/components/frakt-status-badge";
 import { customerDisplayName } from "@/lib/orders/customer-display-name";
-import { schedulePostnordSync } from "@/lib/orders/postnord-auto-sync";
+import { scheduleBackgroundSync } from "@/lib/orders/postnord-auto-sync";
 
-// Ger bakgrundssynken mot PostNord (schedulePostnordSync) tid att gå igenom
+// Ger bakgrundssynken mot Kustom/PostNord (scheduleBackgroundSync) tid att gå igenom
 // alla öppna ordrar vid dygnets fulla genomgång.
 export const maxDuration = 60;
 
 export default async function DashboardPage() {
-  schedulePostnordSync();
+  scheduleBackgroundSync();
   const [daily, recentOrders, topProducts, unprocessedOrders, inventoryOverview, webhookErrors] =
     await Promise.all([
       getDailySales(30),
