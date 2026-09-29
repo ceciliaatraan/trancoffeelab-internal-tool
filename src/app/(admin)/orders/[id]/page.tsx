@@ -23,14 +23,13 @@ import {
   refundPartialAction,
   returnLineComponentAction,
   swapLineComponentAction,
-  syncOrderFromKustomAction,
 } from "../actions";
 import {
   PostnordApiError,
-  findPostnordShipmentsByReference,
   trackPostnordShipment,
   type PostnordShipmentTracking,
 } from "@/lib/postnord/client";
+import { syncPostnordForOrder } from "@/lib/orders/postnord-auto-sync";
 
 type Address = {
   given_name?: string;
@@ -87,38 +86,29 @@ const EVENT_LABELS: Record<string, string> = {
   cancel: "Annullering",
 };
 
-/**
- * Plockar ut de fraktrelaterade fälten ur den rå Kustom-ordern, om de
- * finns - `shipping_info`/`selected_shipping_option` sågs första gången
- * 2026-09-26 (inte tidigare dokumenterat mot docs.kustom.co, blockerad
- * nätverksåtkomst under utveckling). Visas rått i stället för tolkat,
- * eftersom vi ännu inte vet hur fälten ser ut när PostNord faktiskt fyllt
- * i ett spårningsnummer - se "Rådata från Kustom (frakt)" nedan och
- * docs/kustom.md.
- */
-function extractShippingDebug(raw: unknown): Record<string, unknown> | null {
-  if (!raw || typeof raw !== "object") return null;
-  const record = raw as Record<string, unknown>;
-  if (!("shipping_info" in record) && !("selected_shipping_option" in record)) return null;
-  return {
-    shipping_info: record.shipping_info ?? null,
-    selected_shipping_option: record.selected_shipping_option ?? null,
-  };
-}
-
 export default async function OrderDetailPage({ params, searchParams }: PageProps<"/orders/[id]">) {
   const { id } = await params;
   const search = await searchParams;
   const error = typeof search.error === "string" ? search.error : null;
   const saved = "saved" in search;
   const handDelivered = "handDelivered" in search;
-  const postnordSearch =
-    typeof search.postnordSearch === "string" ? search.postnordSearch.trim() : "";
-  const prefillTrackingNumber =
-    typeof search.trackingNumber === "string" ? search.trackingNumber : "";
 
-  const [order] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
-  if (!order) notFound();
+  const [initialOrder] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
+  if (!initialOrder) notFound();
+
+  // Kolla PostNord direkt när en öppen order visas, så en nyss skapad
+  // fraktsedel/ett nyss lämnat paket syns utan att vänta på bakgrunds-
+  // synken - se postnord-auto-sync.ts. Ett PostNord-fel får aldrig hindra
+  // sidan från att visas.
+  let order = initialOrder;
+  const syncOutcome = await syncPostnordForOrder(order).catch((err) => {
+    console.error("PostNord-synk misslyckades för order", order.orderNumber, err);
+    return "unchanged" as const;
+  });
+  if (syncOutcome === "label_created" || syncOutcome === "shipped") {
+    const [refreshed] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
+    if (refreshed) order = refreshed;
+  }
 
   const [lines, events, shipmentRows, swapCandidates] = await Promise.all([
     db
@@ -176,8 +166,6 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         }
       }),
   );
-
-  const shippingDebug = extractShippingDebug(order.rawKustomOrder);
 
   const latestShipment = shipmentRows.at(-1) ?? null;
   const latestPostnordStatus = latestShipment
@@ -259,29 +247,6 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       }
     }
   }
-  // Sökresultatens "Använd"-länk hoppar till nästa relevanta steg: om
-  // fraktsedeln inte redan är markerad som skapad är det naturliga
-  // nästa steget att markera det, annars är ordern redo att skickas.
-  const nextStepAnchor = canMarkLabelCreated ? "fraktsedel-skapad" : "markera-skickad";
-
-  // Sök upp spårningsnummer hos PostNord via en egen referens (t.ex. det
-  // som skrevs i PostNords portal när en fraktsedel skapades manuellt,
-  // utan att gå via vår CSV-export) - för ordrar där vi inte redan har
-  // fått spårningsnumret inmatat. Läsning bara, bokar/ändrar aldrig
-  // något. Körs bara när det faktiskt går att markera som skickad.
-  let postnordSearchResults: PostnordShipmentTracking[] | null = null;
-  let postnordSearchError: string | null = null;
-  if (canShip && postnordSearch) {
-    try {
-      postnordSearchResults = await findPostnordShipmentsByReference(postnordSearch, "sv");
-    } catch (err) {
-      postnordSearchError =
-        err instanceof PostnordApiError
-          ? err.message
-          : "Kunde inte söka hos PostNord just nu.";
-    }
-  }
-
   return (
     <div className="flex max-w-3xl flex-col gap-10">
       <div className="flex items-center gap-4">
@@ -641,30 +606,10 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
       </section>
 
       <section className="flex flex-col gap-4">
-        <div className="flex flex-wrap items-center gap-3">
+        <div className="flex items-center gap-3">
           <h2 className="tran-label text-xs text-tran-muted">Frakt</h2>
           <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
-          <form action={syncOrderFromKustomAction.bind(null, order.id)}>
-            <SubmitButton className="tran-label border border-tran-black px-2 py-1 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red">
-              Synka från Kustom
-            </SubmitButton>
-          </form>
         </div>
-        {shippingDebug ? (
-          <details className="border border-tran-hairline p-4 text-xs">
-            <summary className="tran-label cursor-pointer text-[11px] text-tran-muted">
-              Rådata från Kustom (frakt)
-            </summary>
-            <p className="mt-2 text-tran-muted">
-              Fälten Kustom skickar för Kustom Shipping Assistant/PostNord - visas rått eftersom
-              vi ännu inte vet exakt hur de ser ut när PostNord fyllt i ett spårningsnummer. Klicka
-              &quot;Synka från Kustom&quot; ovan för att hämta det senaste innan du läser här.
-            </p>
-            <pre className="tran-tabular mt-2 overflow-x-auto whitespace-pre-wrap break-all">
-              {JSON.stringify(shippingDebug, null, 2)}
-            </pre>
-          </details>
-        ) : null}
         {shipmentRows.length > 0 ? (
           <ul className="flex flex-col gap-3 text-sm">
             {shipmentRows.map((shipment) => {
@@ -702,58 +647,11 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         )}
 
         {canShip ? (
-          <div className="flex flex-col gap-3 border border-tran-hairline p-4">
-            <p className="tran-label text-[11px] text-tran-muted">
-              Hitta spårningsnummer hos PostNord
-            </p>
-            <p className="text-xs text-tran-muted">
-              Om fraktsedeln skapades i PostNords portal utan att spårningsnumret matats in här
-              - sök på referensen ni skrev in där (t.ex. ordernummer eller kundens namn).
-            </p>
-            <form method="get" className="flex flex-wrap items-end gap-3">
-              <div>
-                <label className="tran-label mb-1 block text-[11px] text-tran-muted">
-                  Referens
-                </label>
-                <input
-                  name="postnordSearch"
-                  defaultValue={postnordSearch || `TRAN #${order.orderNumber}`}
-                  className="w-52 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
-                />
-              </div>
-              <button
-                type="submit"
-                className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red"
-              >
-                Sök hos PostNord
-              </button>
-            </form>
-
-            {postnordSearchError ? (
-              <p className="text-xs text-tran-muted">
-                Sökningen kunde inte genomföras: {postnordSearchError}
-              </p>
-            ) : postnordSearchResults ? postnordSearchResults.length === 0 ? (
-              <p className="text-xs text-tran-muted">
-                Inga skickningar hittades hos PostNord för &quot;{postnordSearch}&quot;.
-              </p>
-            ) : (
-              <ul className="flex flex-col gap-1.5 text-xs">
-                {postnordSearchResults.map((result) => (
-                  <li key={result.shipmentId} className="flex items-center gap-2">
-                    <span className="tran-tabular">{result.shipmentId}</span>
-                    <span className="text-tran-muted">{result.statusText.header}</span>
-                    <Link
-                      href={`/orders/${order.id}?trackingNumber=${encodeURIComponent(result.shipmentId)}#${nextStepAnchor}`}
-                      className="tran-label border border-tran-black px-2 py-1 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red"
-                    >
-                      Använd
-                    </Link>
-                  </li>
-                ))}
-              </ul>
-            ) : null}
-          </div>
+          <p className="text-xs text-tran-muted">
+            Kopplas automatiskt: när fraktsedeln skapats hos PostNord fylls spårningsnumret i här,
+            och när paketet lämnats/hämtats markeras ordern som skickad. Formulären nedan behövs
+            bara om något ska fyllas i för hand.
+          </p>
         ) : null}
 
         {canMarkLabelCreated ? (
@@ -771,7 +669,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                 </label>
                 <input
                   name="trackingNumber"
-                  defaultValue={prefillTrackingNumber}
+                  defaultValue={order.labelTrackingNumber ?? ""}
                   className="w-52 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
                 />
               </div>
@@ -806,7 +704,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
                 <input
                   name="trackingNumber"
                   required
-                  defaultValue={prefillTrackingNumber || order.labelTrackingNumber || ""}
+                  defaultValue={order.labelTrackingNumber ?? ""}
                   className="w-52 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
                 />
               </div>

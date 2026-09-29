@@ -10,8 +10,10 @@ import { FraktStatusBadge } from "@/components/frakt-status-badge";
 import { TableRowLink } from "@/components/table-row-link";
 import { getFraktStatusByOrderId } from "@/lib/orders/frakt-status-for-orders";
 import { customerDisplayName } from "@/lib/orders/customer-display-name";
+import { schedulePostnordSync } from "@/lib/orders/postnord-auto-sync";
 
 export default async function OrdersPage({ searchParams }: PageProps<"/orders">) {
+  schedulePostnordSync();
   const params = await searchParams;
   const statusFilter = typeof params.status === "string" ? params.status : "";
   const query = typeof params.q === "string" ? params.q.trim() : "";

@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { NextResponse } from "next/server";
 
-const PUBLIC_PREFIXES = ["/api/public", "/api/kustom", "/api/auth"];
+const PUBLIC_PREFIXES = ["/api/public", "/api/kustom", "/api/auth", "/api/cron"];
 const PUBLIC_PATHS = ["/login"];
 
 export default auth((req) => {

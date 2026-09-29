@@ -17,7 +17,7 @@ import {
   getOrderManagementOrder,
   refundOrder,
 } from "@/lib/kustom/client";
-import { persistOrderFromKustom } from "@/lib/orders/persist-order";
+import { markOrderShipped } from "@/lib/orders/mark-shipped";
 
 function kustomErrorMessage(err: unknown): string {
   if (err instanceof KustomApiError) {
@@ -47,33 +47,6 @@ async function syncOrderFromKustom(orderId: string, kustomOrderId: string) {
       updatedAt: new Date(),
     })
     .where(eq(schema.orders.id, orderId));
-}
-
-/**
- * Hämtar ordern på nytt direkt från Kustoms Order Management API och
- * skriver över vår cachade kopia (status/belopp/raw_kustom_order) - läsning
- * bara, bokar/ändrar inget hos Kustom. Sedan 2026-09-29 gör push-hanteraren
- * (persist-order.ts) samma sak automatiskt varje gång Kustom pushar en
- * uppdatering, men den knappen är till för att kunna kolla en enskild
- * order UTAN att vänta på/lita på att Kustom faktiskt pushar igen (fortsatt
- * obekräftat om/när de gör det för fraktuppdateringar från Kustom Shipping
- * Assistant/PostNord) - se "Rådata från Kustom (frakt)" nedan på sidan och
- * docs/kustom.md.
- */
-export async function syncOrderFromKustomAction(orderId: string) {
-  await requireCurrentAdmin();
-  const order = await getOrderOrRedirect(orderId);
-
-  try {
-    const fresh = await getOrderManagementOrder(order.kustomOrderId);
-    await persistOrderFromKustom(fresh);
-  } catch (err) {
-    redirect(`/orders/${orderId}?error=${encodeURIComponent(kustomErrorMessage(err))}`);
-  }
-
-  revalidatePath(`/orders/${orderId}`);
-  revalidatePath("/orders");
-  redirect(`/orders/${orderId}?saved=1`);
 }
 
 export async function captureOrderAction(orderId: string, formData: FormData) {
@@ -738,76 +711,12 @@ export async function markShippedAction(orderId: string, formData: FormData) {
     );
   }
 
-  const lines = await db
-    .select()
-    .from(schema.orderLines)
-    .where(eq(schema.orderLines.orderId, orderId));
-
-  await db.transaction(async (tx) => {
-    await tx.insert(schema.shipments).values({ orderId, carrier, trackingNumber });
-    await tx
-      .update(schema.orders)
-      .set({ fulfillmentStatus: "shipped", updatedAt: new Date() })
-      .where(eq(schema.orders.id, orderId));
-
-    for (const line of lines) {
-      if (line.type !== "physical" || !line.reference) continue;
-      const resolved = await resolveCartLine(line.reference, { requirePublished: false });
-      if (!resolved) continue;
-
-      const targets = await expandLineToInventoryTargets(
-        tx,
-        resolved.productId,
-        resolved.variantId,
-        line.quantity,
-        line.id,
-      );
-
-      for (const target of targets) {
-        const condition = target.variantId
-          ? and(
-              eq(schema.inventory.productId, target.productId),
-              eq(schema.inventory.variantId, target.variantId),
-            )
-          : and(
-              eq(schema.inventory.productId, target.productId),
-              isNull(schema.inventory.variantId),
-            );
-
-        const [inventoryRow] = await tx
-          .select({ id: schema.inventory.id })
-          .from(schema.inventory)
-          .where(condition);
-
-        if (!inventoryRow) continue;
-
-        // "I lager" (quantity) rörs INTE vid leverans - den är
-        // ursprungslager, satt bara av admin (se schema/catalog.ts).
-        // Reservationen släpps och skickat-räknaren ökar i stället, så
-        // "Tillgängligt"/kassans lagerkoll (quantity - reserverat -
-        // skickat) blir rätt automatiskt.
-        await tx
-          .update(schema.inventory)
-          .set({
-            reservedQuantity: sql`${schema.inventory.reservedQuantity} - ${target.quantity}`,
-            shippedQuantity: sql`${schema.inventory.shippedQuantity} + ${target.quantity}`,
-            updatedAt: new Date(),
-          })
-          .where(eq(schema.inventory.id, inventoryRow.id));
-
-        await tx.insert(schema.inventoryMovements).values({
-          inventoryId: inventoryRow.id,
-          changeAmount: target.quantity,
-          reason: "order_shipped",
-          orderId,
-          note:
-            target.productId === resolved.productId
-              ? `Skickad: ${carrier} ${trackingNumber}`
-              : `Skickad: ${carrier} ${trackingNumber} (komponent i "${resolved.nameSv}")`,
-        });
-      }
-    }
-  });
+  const shipped = await markOrderShipped(orderId, carrier, trackingNumber);
+  if (!shipped) {
+    redirect(
+      `/orders/${orderId}?error=${encodeURIComponent("Ordern är redan skickad eller avbruten.")}`,
+    );
+  }
 
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders");

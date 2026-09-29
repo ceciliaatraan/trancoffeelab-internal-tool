@@ -599,42 +599,54 @@ här sandlådan - se punkt 3 högst upp i den här filen):**
    ordertillfället, även om Kustom/PostNord senare fyllt i
    spårningsinformation i ett fält vi ännu inte identifierat.
 
-**Fix:** `persistOrderFromKustom` uppdaterar nu `status`/
+**Fix 1:** `persistOrderFromKustom` uppdaterar nu `status`/
 `paymentStatus`/`capturedAmountOre`/`refundedAmountOre`/`rawKustomOrder`
 på den befintliga raden vid varje efterföljande push, i stället för att
 bara läsa och returnera den orörd (samma "Kustom är alltid facit"-princip
-som `syncOrderFromKustom` i `orders/actions.ts` redan använde för
-capture/refund/cancel-knapparna). En ny "Synka från Kustom"-knapp på
-orderdetaljsidan (`syncOrderFromKustomAction`) låter dessutom en admin
-hämta om en enskild order manuellt, utan att behöva vänta på/lita på att
-Kustom faktiskt pushar igen. En ny "Rådata från Kustom (frakt)"-ruta
-(ihopfällbar, under Frakt-sektionen) visar `shipping_info`/
-`selected_shipping_option` rått direkt i gränssnittet, så nästa steg i
-utredningen inte längre kräver en SQL-fråga via Supabase.
+som `syncOrderFromKustom` i `orders/actions.ts`).
+
+**Fix 2 - automatisk koppling, samma dag:** ägaren ville inte ha någon
+manuell sök-/synkknapp alls, utan att fraktsedeln kopplas till ordern
+automatiskt. `src/lib/orders/postnord-auto-sync.ts` gör det för varje
+öppen order: provar ALLA identifierare vi har (`postnordLookupCandidates`
+i `postnord-matching.ts`: redan känt spårningsnummer,
+`shipping_info[].tracking_number`, `selected_shipping_option.tms_reference`
+som både identifierare och referens, Kustoms `order_id`,
+`klarna_reference`, `merchant_reference1/2`, `TRAN #<nr>`, `<nr>`) mot
+PostNords Track & Trace, godkänner en träff bara om mottagarens postnummer
+stämmer (eller, om PostNord inte skickar postnummer, bara för globalt unika
+värden), och sätter "Fraktsedel skapad" + spårningsnummer, eller "Skickad"
+(med lagerflytt via den nu delade `markOrderShipped`) när PostNord-statusen
+visar att paketet lämnats (`isHandedOverToPostnord` - INFORMED/CREATED/
+OTHER/okänt räknas medvetet som bara fraktsedel). Körs när en öppen order
+visas, i bakgrunden (`after()`, högst var 10:e min) när /orders eller
+startsidan visas, och dagligen via Vercel Cron (`vercel.json`, en gång per
+dygn så det fungerar även på Hobby-planen, kräver `CRON_SECRET`). Den
+manuella sökrutan "Hitta spårningsnummer hos PostNord", "Synka från
+Kustom"-knappen och rådata-rutan är borttagna.
 
 **Overifierat/kvarstår - VIKTIGT:**
-- Det är INTE bekräftat att Kustom faktiskt pushar igen när PostNord
-  bokar/uppdaterar en frakt hos dem via KSA - bara att push-mekanismen
-  designmässigt ÄR till för att signalera "något ändrades, läs om
-  ordern", och att vår kod fram till idag strukturellt hade uteslutit
-  att någonsin se det även om de gjorde det.
-- Det är INTE bekräftat vilket fält ett riktigt PostNord-spårningsnummer
-  hamnar i när det väl finns - `shipping_info` var en tom lista (`[]`)
-  i det enda exemplet vi sett (taget vid ordertillfället, innan PostNord
-  hunnit bearbeta skickningen). Ingen extraktionslogik (automatisk
-  ifyllning av `shipments`/spårningsnummer) är byggd än - det vore att
-  gissa ett fältnamn/format utan bekräftelse, vilket den här filens egen
-  regel uttryckligen varnar för.
-- **Nästa steg:** be ägaren klicka "Synka från Kustom" på en order där
-  KSA bokat en PostNord-frakt (t.ex. en redan levererad order, som Ebbas)
-  och läsa "Rådata från Kustom (frakt)"-rutan - om `shipping_info` nu är
-  ifylld (inte längre `[]`), bekräftar det både att Kustom uppdaterar
-  fältet i efterhand OCH visar exakt vilket format spårningsnumret har,
-  så en riktig automatisk extraktion kan byggas. Om den fortfarande är
-  tom även efter synk, tyder det på att KSA:s PostNord-integration inte
-  skriver tillbaka spårningsnumret till Order Management-API:et alls (då
-  krävs troligen en helt annan lösning, t.ex. en fråga till Kustom
-  support om hur/var spårningsnumret faktiskt exponeras).
+- **Vilken av identifierarna PostNord faktiskt hittar en KSA-bokad
+  skickning under är INTE bekräftat.** `tms_reference` via
+  `findByReference` gav redan INGEN träff för Ebbas order (se ovan) - om
+  ingen av de andra kandidaterna heller träffar förblir ordrarna "Ej
+  skickad" precis som innan (synken gör då ingenting, den gissar aldrig).
+  Det har inte gått att prova härifrån: sandlådan når varken PostNords
+  eller Kustoms API ("Host not in allowlist").
+- `findByReference` har fortfarande aldrig gett ett bekräftat LYCKAT svar
+  för oss - fel `POSTNORD_CUSTOMER_NUMBER` skulle se exakt likadant ut som
+  "ingen träff".
+- PostNords Track & Trace känner bara till en skickning efter att EDI
+  skickats (fraktsedeln bekräftad/utskriven i portalen) - en bokning som
+  fortfarande ligger under "Obekräftade" hittas inte.
+- `consignee.address.postCode` i Track & Trace-svaret är PostNords
+  dokumenterade svarsform, inte observerad i ett av våra egna svar.
+- **Så bekräftas det:** titta på nästa order efter att dess fraktsedel
+  skapats hos PostNord. Står den som "Fraktsedel skapad" med ett
+  spårningsnummer fungerar kopplingen. Står den kvar som "Ej skickad",
+  öppna skickningen i PostNords portal och notera vilka referensfält den
+  har (Referens/Kundreferens/Ordernummer o.d.) och deras värden - då vet vi
+  vad PostNord indexerar på och kan lägga till det som kandidat.
 
 ## Status i koden
 

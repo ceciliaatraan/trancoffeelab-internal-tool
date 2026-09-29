@@ -258,30 +258,37 @@ nere, rate limit m.m.), visas bara det ni själva skrivit in
 på grund av PostNord. Slås bara på för skickningar där fraktbolaget innehåller
 "PostNord" och spårningsnumret inte är "(ingen spårning)" (handleveranser).
 
-### Hitta spårningsnummer hos PostNord via referens
+### Automatisk koppling till PostNord-skickningen
 
-På orderdetaljen, innan en order markerats som skickad, finns en sökruta
-"Hitta spårningsnummer hos PostNord" - för fraktsedlar som skapats direkt i
-PostNords portal (t.ex. manuellt, utan att gå via "Exportera till PostNord
-(CSV)"-knappen i orderlistan) och där spårningsnumret därför inte redan finns
-inskrivet hos oss. Sök på samma referens ni skrev in i PostNords portal när
-sedeln skapades (t.ex. ordernummer eller kundens namn) - PostNords
-`findByReference`-API (`GET .../trackandtrace/findByReference.json`) letar
-upp matchande skickningar, och "Använd"-knappen fyller i spårningsnumret i
-formuläret nedanför.
+Kustom Shipping Assistant skapar en fraktsedel hos PostNord för varje order.
+Backofficet letar själv upp den skickningen (`src/lib/orders/postnord-auto-sync.ts`)
+och för varje öppen order:
 
-Kräver, utöver `POSTNORD_API_KEY`, även:
+- fraktsedel skapad hos PostNord → ordern får status "Fraktsedel skapad" och
+  PostNords spårningsnummer,
+- paketet lämnat/på väg/levererat → ordern markeras som "Skickad" (lagret
+  flyttas från reserverat till skickat, precis som med knappen).
+
+Skickningen söks upp med alla identifierare vi har för ordern (Kustoms
+order-id, KSA:s `tms_reference`, Kustoms egna referenser, ordernumret) via
+PostNords Track & Trace (`findByIdentifier`/`findByReference`) - bara läsning,
+inget skrivs någonsin till PostNord. En träff godkänns bara om mottagarens
+postnummer stämmer med orderns leveransadress (eller, om PostNord inte skickar
+postnummer, bara för värden som är globalt unika).
+
+Synken körs:
+- direkt när en öppen order öppnas i backofficet,
+- i bakgrunden när orderlistan eller startsidan öppnas (högst var 10:e minut),
+- en gång per dygn via Vercel Cron (`vercel.json` → `/api/cron/postnord-sync`).
+
+Kräver, utöver `POSTNORD_API_KEY`:
 ```
-POSTNORD_CUSTOMER_NUMBER=<ert PostNord-kundnummer>
+POSTNORD_CUSTOMER_NUMBER=<ert PostNord-kundnummer>   # för referenssökningen
+CRON_SECRET=<valfri slumpad sträng>                  # bara för den dagliga körningen
 ```
 
-Ger inga träffar om referensen aldrig skrevs in vid bokningstillfället - då
-får spårningsnumret slås upp manuellt hos PostNord och skrivas in som
-tidigare. **Observera:** PostNords egen dokumentation visade bara ett
-exempel med ett 403-felsvar för det här API:et, aldrig ett lyckat svar - vi
-antar att svarsformen är densamma som för `findByIdentifier` (samma
-API-familj/version). Ett fel eller en avvikande svarsform visas som "inga
-träffar" i stället för att krascha sidan.
+Formulären "Markera: fraktsedel skapad"/"Markera som skickad"/"Levererad för
+hand" finns kvar för det som behöver göras för hand.
 
 ## Byggordning
 

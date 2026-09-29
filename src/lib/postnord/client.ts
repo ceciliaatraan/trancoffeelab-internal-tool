@@ -31,6 +31,8 @@ export type PostnordShipmentTracking = {
   status: string;
   statusText: { header: string; body: string };
   deliveryDate: string | null;
+  /** Mottagarens postnummer enligt PostNord, om svaret innehåller det - används för att bekräfta att en automatiskt hittad skickning hör till rätt order. */
+  consigneePostCode: string | null;
   items: PostnordTrackingItem[];
 };
 
@@ -39,7 +41,8 @@ type RawShipment = {
   status: string;
   statusText: { header: string; body: string };
   deliveryDate?: string;
-  items: {
+  consignee?: { address?: { postCode?: string } };
+  items?: {
     itemId: string;
     status: string;
     statusText: { header: string; body: string };
@@ -63,7 +66,8 @@ function toShipmentTracking(shipment: RawShipment): PostnordShipmentTracking {
     status: shipment.status,
     statusText: shipment.statusText,
     deliveryDate: shipment.deliveryDate ?? null,
-    items: shipment.items.map((item) => ({
+    consigneePostCode: shipment.consignee?.address?.postCode ?? null,
+    items: (shipment.items ?? []).map((item) => ({
       itemId: item.itemId,
       status: item.status,
       statusText: item.statusText,
@@ -76,7 +80,13 @@ function toShipmentTracking(shipment: RawShipment): PostnordShipmentTracking {
 async function getTrackAndTrace(url: string): Promise<RawShipment[]> {
   let response: Response;
   try {
-    response = await fetch(url, { next: { revalidate: 300 } });
+    response = await fetch(url, {
+      next: { revalidate: 300 },
+      // Den automatiska synken (postnord-auto-sync.ts) körs bl.a. medan
+      // orderdetaljen renderas - ett hängande PostNord-anrop får inte
+      // hänga sidan.
+      signal: AbortSignal.timeout(6000),
+    });
   } catch (err) {
     throw new PostnordApiError(
       err instanceof Error ? err.message : "Kunde inte nå PostNords API.",

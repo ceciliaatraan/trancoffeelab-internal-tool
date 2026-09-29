@@ -9,8 +9,10 @@ import { SalesBarChart } from "@/components/sales-bar-chart";
 import { TopProductsList } from "@/components/top-products-list";
 import { FraktStatusBadge } from "@/components/frakt-status-badge";
 import { customerDisplayName } from "@/lib/orders/customer-display-name";
+import { schedulePostnordSync } from "@/lib/orders/postnord-auto-sync";
 
 export default async function DashboardPage() {
+  schedulePostnordSync();
   const [daily, recentOrders, topProducts, unprocessedOrders, inventoryOverview, webhookErrors] =
     await Promise.all([
       getDailySales(30),
