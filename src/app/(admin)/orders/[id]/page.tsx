@@ -33,6 +33,7 @@ import {
 import { syncPostnordForOrder } from "@/lib/orders/postnord-auto-sync";
 import { refreshOrderFromKustom } from "@/lib/orders/kustom-refresh";
 import { postnordBookingId } from "@/lib/orders/postnord-matching";
+import { paymentMethodInfo } from "@/lib/kustom/payment-methods";
 
 type Address = {
   given_name?: string;
@@ -189,21 +190,8 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   );
 
   const remainingToCapture = order.orderAmountOre - order.capturedAmountOre;
-  const rawKustom = order.rawKustomOrder as {
-    expires_at?: unknown;
-    initial_payment_method?: { description?: unknown; type?: unknown };
-  } | null;
-  const rawExpiresAt = rawKustom?.expires_at;
-  const paymentMethod = rawKustom?.initial_payment_method;
-  // Kustoms typkod visas bredvid namnet - det är den som styr om ordern
-  // debiteras direkt (isPayNowMethod i lib/kustom/payment-methods.ts).
-  const paymentMethodLabel =
-    [
-      typeof paymentMethod?.description === "string" ? paymentMethod.description : null,
-      typeof paymentMethod?.type === "string" ? `(${paymentMethod.type})` : null,
-    ]
-      .filter(Boolean)
-      .join(" ") || null;
+  const rawExpiresAt = (order.rawKustomOrder as { expires_at?: unknown } | null)?.expires_at;
+  const paymentMethod = paymentMethodInfo(order.rawKustomOrder);
   const authorizationExpiresAt =
     typeof rawExpiresAt === "string" && !Number.isNaN(Date.parse(rawExpiresAt))
       ? new Date(rawExpiresAt)
@@ -548,8 +536,21 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
 
       <section className="flex flex-col gap-4">
         <h2 className="tran-label text-xs text-tran-muted">Betalning</h2>
-        {paymentMethodLabel ? (
-          <p className="text-sm">Betalsätt: {paymentMethodLabel}</p>
+        {paymentMethod ? (
+          <p className="text-sm">
+            Betalsätt: {paymentMethod.label}
+            {/* Kustoms typkod - den styr om ordern debiteras direkt (isPayNowMethod). */}
+            {paymentMethod.type ? (
+              <span className="tran-tabular ml-1 text-xs text-tran-muted">({paymentMethod.type})</span>
+            ) : null}
+          </p>
+        ) : null}
+        {paymentMethod?.payLater && remainingToCapture > 0 && order.fulfillmentStatus !== "cancelled" ? (
+          <p className="text-xs text-tran-muted">
+            Betala senare: kunden betalar ingenting förrän ordern debiteras. När du trycker
+            &quot;Debitera&quot; skickas fakturan till kunden (i Klarnas app) och betalfristen
+            börjar räknas - debitera därför när paketet skickas.
+          </p>
         ) : null}
         {remainingToCapture > 0 &&
         order.fulfillmentStatus !== "cancelled" &&

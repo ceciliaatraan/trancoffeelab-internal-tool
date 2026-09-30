@@ -13,6 +13,7 @@ import { customerDisplayName } from "@/lib/orders/customer-display-name";
 import { scheduleBackgroundSync } from "@/lib/orders/postnord-auto-sync";
 import { refreshUnsettledOrdersFromKustomIfDue } from "@/lib/orders/kustom-refresh";
 import { postnordBookingId } from "@/lib/orders/postnord-matching";
+import { paymentMethodInfo } from "@/lib/kustom/payment-methods";
 
 // Ger bakgrundssynken mot Kustom/PostNord (scheduleBackgroundSync) tid att gå igenom
 // alla öppna ordrar vid dygnets fulla genomgång.
@@ -176,6 +177,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
               <th className="py-3 pr-4 font-medium">Kund</th>
               <th className="py-3 pr-4 font-medium">Belopp</th>
               <th className="py-3 pr-4 font-medium">Status</th>
+              <th className="py-3 pr-4 font-medium">Betalsätt</th>
               <th className="py-3 pr-4 font-medium">Frakt</th>
               <th className="py-3 pr-4 font-medium">Datum</th>
             </tr>
@@ -219,6 +221,9 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
                       {order.containsPreorder && <PreorderChip />}
                       {order.isTest && <TestOrderChip />}
                     </div>
+                  </td>
+                  <td className="py-4 pr-4 text-xs text-tran-muted">
+                    {paymentMethodInfo(order.rawKustomOrder)?.label ?? "-"}
                   </td>
                   <td className="py-4 pr-4">
                     <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
