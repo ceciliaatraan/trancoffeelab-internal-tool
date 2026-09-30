@@ -83,6 +83,27 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
     }
   }
 
+  // PostNord-nummer under fraktstatusen: spårningsnumret om ordern har en
+  // skickning (inmatat för hand eller hittat av PostNord-synken), annars
+  // PostNords boknings-ID från Kustom (postnordBookingId) - det finns bara
+  // för ordrar lagda efter att Kustom Shipping Assistant kopplades in
+  // 2026-09-21, äldre ordrar har bara spårningsnumret.
+  const trackingNumberByOrderId = new Map<string, string>();
+  if (orderIds.length > 0) {
+    const shipmentRows = await db
+      .select({
+        orderId: schema.shipments.orderId,
+        trackingNumber: schema.shipments.trackingNumber,
+      })
+      .from(schema.shipments)
+      .where(inArray(schema.shipments.orderId, orderIds))
+      .orderBy(asc(schema.shipments.shippedAt));
+    for (const row of shipmentRows) {
+      if (row.trackingNumber === "(ingen spårning)") continue;
+      trackingNumberByOrderId.set(row.orderId, row.trackingNumber);
+    }
+  }
+
   // Live PostNord-status i "Frakt"-kolumnen - läsning bara (se
   // lib/postnord/client.ts). Ett fel för EN order (fel nummer, PostNord
   // nere) visar bara den ordens rad med den vanliga texten, hindrar
@@ -166,6 +187,10 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
                 kind: "ej_skickad" as const,
                 label: order.fulfillmentStatus,
               };
+              const postnordNumber =
+                trackingNumberByOrderId.get(order.id) ??
+                order.labelTrackingNumber ??
+                postnordBookingId(order.rawKustomOrder);
 
               return (
                 <TableRowLink
@@ -197,9 +222,9 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
                   </td>
                   <td className="py-4 pr-4">
                     <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
-                    {postnordBookingId(order.rawKustomOrder) ? (
+                    {postnordNumber ? (
                       <p className="tran-tabular mt-1 text-[11px] text-tran-muted">
-                        {postnordBookingId(order.rawKustomOrder)}
+                        {postnordNumber}
                       </p>
                     ) : null}
                   </td>
