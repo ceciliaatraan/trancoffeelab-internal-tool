@@ -284,6 +284,27 @@ describe("buildCreateOrderPayload", () => {
     expect(payload.shipping_options).toEqual([standardShippingOption]);
   });
 
+  it("skickar vårt reserverade ordernummer som merchant_reference1, och utelämnar fältet utan", () => {
+    const base = {
+      items: [
+        {
+          sku: "NRH-250",
+          nameSv: "x",
+          nameEn: "x",
+          quantity: 1,
+          unitPriceOre: 10000,
+          taxRateHundredthsPercent: 1200,
+          weightGrams: 250,
+        },
+      ],
+      shippingOption: standardShippingOption,
+      locale: "sv-SE" as const,
+      merchantUrls,
+    };
+    expect(buildCreateOrderPayload({ ...base, merchantReference1: "1340" }).merchant_reference1).toBe("1340");
+    expect("merchant_reference1" in buildCreateOrderPayload(base)).toBe(false);
+  });
+
   it("skickar shipping_options även vid fri frakt (0 kr), inte utelämnat", () => {
     const freeShippingOption = { ...standardShippingOption, price: 0, tax_amount: 0 };
     const payload = buildCreateOrderPayload({

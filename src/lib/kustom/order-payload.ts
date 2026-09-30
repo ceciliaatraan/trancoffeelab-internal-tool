@@ -197,6 +197,15 @@ export type KustomCreateOrderPayload = {
    * allow_separate_shipping_address.
    */
   shipping_options: KustomShippingOption[];
+  /**
+   * Vårt ordernummer, reserverat redan när kassan öppnas (se
+   * reserve-order-number.ts) - bekräftat fält i Kustoms Order Management-
+   * API (UpdateMerchantReferencesDto, max 255 tecken). Syns i Kustoms
+   * portal och kan följa med till PostNord-bokningen via Kustom Shipping
+   * Assistant, så PostNord-synken kan matcha på ordernumret (obekräftat
+   * att KSA för det vidare, se docs/kustom.md).
+   */
+  merchant_reference1?: string;
 };
 
 export function buildCreateOrderPayload({
@@ -206,6 +215,7 @@ export function buildCreateOrderPayload({
   discount,
   locale,
   merchantUrls,
+  merchantReference1,
 }: {
   items: CartItemInput[];
   shipping?: ShippingInput;
@@ -214,6 +224,7 @@ export function buildCreateOrderPayload({
   discount?: DiscountInput;
   locale: Locale;
   merchantUrls: MerchantUrls;
+  merchantReference1?: string;
 }): KustomCreateOrderPayload {
   const orderLines = buildOrderLines({ items, shipping, discount, locale });
   const orderAmount = orderLines.reduce((sum, line) => sum + line.total_amount, 0);
@@ -233,5 +244,6 @@ export function buildCreateOrderPayload({
       show_vat_registration_number_field: true,
     },
     shipping_options: [shippingOption],
+    ...(merchantReference1 ? { merchant_reference1: merchantReference1 } : {}),
   };
 }

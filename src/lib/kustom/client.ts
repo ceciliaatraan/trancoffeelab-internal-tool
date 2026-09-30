@@ -237,6 +237,27 @@ export function acknowledgeOrder(orderId: string, idempotencyKey?: string) {
   );
 }
 
+/**
+ * PATCH /ordermanagement/v1/orders/{order_id}/merchant-references - 204.
+ * Bekräftat i Kustoms OpenAPI-schema (UpdateMerchantReferencesDto). Används
+ * för att sätta vårt ordernummer som merchant_reference1 på ordrar som inte
+ * fick det redan i kassan, så det syns i Kustoms portal.
+ */
+export function updateMerchantReferences(
+  orderId: string,
+  payload: { merchant_reference1?: string; merchant_reference2?: string },
+  idempotencyKey?: string,
+) {
+  return kustomFetch<KustomOrderResponse>(
+    `/ordermanagement/v1/orders/${encodeURIComponent(orderId)}/merchant-references`,
+    {
+      method: "PATCH",
+      body: JSON.stringify(payload),
+      headers: idempotencyHeader(idempotencyKey),
+    },
+  );
+}
+
 export type CaptureOrderPayload = {
   captured_amount: number;
   description?: string;

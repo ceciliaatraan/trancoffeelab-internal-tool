@@ -1,5 +1,5 @@
 import "server-only";
-import { acknowledgeOrder, getOrderManagementOrder } from "@/lib/kustom/client";
+import { acknowledgeOrder, getOrderManagementOrder, updateMerchantReferences } from "@/lib/kustom/client";
 import { persistOrderFromKustom, type PersistedOrder } from "@/lib/orders/persist-order";
 import { captureOrderAtCheckout } from "@/lib/orders/capture-at-checkout";
 import { isPayNowMethod } from "@/lib/kustom/payment-methods";
@@ -20,6 +20,21 @@ export async function processKustomOrder(orderId: string): Promise<PersistedOrde
 
   if (!persisted.alreadyExisted) {
     await acknowledgeOrder(orderId, orderId);
+
+    // Vårt ordernummer som merchant_reference1 hos Kustom, om det inte redan
+    // sattes i kassan (reserverat nummer, se reserve-order-number.ts) - så
+    // numret alltid syns i Kustoms portal. Får aldrig stoppa resten.
+    if (order.merchant_reference1 !== String(persisted.orderNumber)) {
+      try {
+        await updateMerchantReferences(
+          orderId,
+          { merchant_reference1: String(persisted.orderNumber) },
+          `merchant-ref-${orderId}`,
+        );
+      } catch (err) {
+        console.error("Kunde inte sätta ordernummer som merchant_reference1 hos Kustom", persisted.orderNumber, err);
+      }
+    }
 
     // Förbeställningar (alla betalsätt) och "betala nu"-sätt (kort, Swish
     // m.m.) debiteras direkt - se capture-at-checkout.ts. Klarnas betala-

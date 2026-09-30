@@ -762,6 +762,30 @@ fraktstatusen är nu bara spårningsnummer (skickningens eller fraktsedelns).
 Det finns fortfarande inget bekräftat fält i Kustoms orderdata som pekar ut
 PostNords unika bokning.
 
+## Vårt ordernummer skickas till Kustom (merchant_reference1), 2026-09-30
+
+Mål: PostNord-försändelsen som Kustom Shipping Assistant (KSA) bokar vid köpet
+ska kunna kopplas till rätt order via vårt ordernummer.
+
+- När kassan öppnas reserveras nästa ordernummer direkt ur sekvensen för
+  `orders.order_number` (`reserve-order-number.ts`) och skickas med i
+  create-order som `merchant_reference1` (fältet finns i Kustoms spec, max
+  255 tecken). Nekar Kustom anropet med 400 försöker vi igen utan fältet -
+  kassan får aldrig stoppas av det här.
+- När ordern sparas (`persist-order.ts`) används det reserverade numret
+  (`overridingSystemValue()`), så numret i Kustom och hos oss är samma.
+  Saknas det eller är det redan upptaget får ordern ett nytt nummer som förut.
+- Efter acknowledge sätts `merchant_reference1` i efterhand via
+  `PATCH /ordermanagement/v1/orders/{id}/merchant-references` om Kustom inte
+  redan har rätt nummer (icke-fatalt).
+- Övergivna kassor lämnar luckor i nummerserien - det fanns redan luckor och
+  det påverkar inget.
+
+OBEKRÄFTAT: om KSA för över `merchant_reference1` till PostNord-bokningen
+(t.ex. som referens). Gör den det hittar PostNord-synken ordern via
+`findByReference` på ordernumret (`postnord-matching.ts` provar redan
+`merchant_reference1`, `TRAN #n` och `n`, med postnummerkontroll).
+
 ## Status i koden
 
 | Del | Status |

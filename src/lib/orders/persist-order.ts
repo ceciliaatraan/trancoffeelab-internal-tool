@@ -4,6 +4,7 @@ import { db, schema } from "@/db";
 import { expandLineToInventoryTargets } from "@/lib/inventory/bundles";
 import type { KustomOrderManagementOrder } from "@/lib/kustom/client";
 import { resolveCartLine, type ResolvedCartLine } from "@/lib/queries/cart";
+import { parseReservedOrderNumber } from "@/lib/orders/reserved-order-number";
 
 export type PersistedOrder = {
   id: string;
@@ -139,34 +140,58 @@ export async function persistOrderFromKustom(
     // bekräftelse, inget lager, inget mejl) - se webhook_events för
     // 2026-09-22. Faller tillbaka på svenska (majoriteten av kunderna)
     // i stället för att krascha på en enda saknad fält.
-    const [inserted] = await tx
-      .insert(schema.orders)
-      .values({
-        kustomOrderId: order.order_id,
-        customerId,
-        customerEmail: customerEmail ?? "okand@example.com",
-        // status är NOT NULL (orders.status) - samma försiktighet som
-        // locale ovan, ifall Kustom nånsin skulle skicka ett tomt värde.
-        status: order.status || "UNKNOWN",
-        paymentStatus: order.status || "UNKNOWN",
-        purchaseCountry: (order.purchase_country || "SE").toUpperCase(),
-        currency: (order.purchase_currency || "SEK").toUpperCase(),
-        locale: order.locale || "sv-SE",
-        orderAmountOre: order.order_amount,
-        orderTaxAmountOre,
-        containsPreorder,
-        isTest: process.env.KUSTOM_ENV !== "live",
-        shippingAddress: order.shipping_address ?? null,
-        billingAddress: order.billing_address ?? null,
-        isBusinessPurchase,
-        businessName,
-        businessOrgNumber,
-        businessVatNumber,
-        rawKustomOrder: order,
-        paidAt: isFinal ? new Date() : null,
-      })
-      .onConflictDoNothing({ target: schema.orders.kustomOrderId })
-      .returning({ id: schema.orders.id, orderNumber: schema.orders.orderNumber });
+    const orderValues = {
+      kustomOrderId: order.order_id,
+      customerId,
+      customerEmail: customerEmail ?? "okand@example.com",
+      // status är NOT NULL (orders.status) - samma försiktighet som
+      // locale ovan, ifall Kustom nånsin skulle skicka ett tomt värde.
+      status: order.status || "UNKNOWN",
+      paymentStatus: order.status || "UNKNOWN",
+      purchaseCountry: (order.purchase_country || "SE").toUpperCase(),
+      currency: (order.purchase_currency || "SEK").toUpperCase(),
+      locale: order.locale || "sv-SE",
+      orderAmountOre: order.order_amount,
+      orderTaxAmountOre,
+      containsPreorder,
+      isTest: process.env.KUSTOM_ENV !== "live",
+      shippingAddress: order.shipping_address ?? null,
+      billingAddress: order.billing_address ?? null,
+      isBusinessPurchase,
+      businessName,
+      businessOrgNumber,
+      businessVatNumber,
+      rawKustomOrder: order,
+      paidAt: isFinal ? new Date() : null,
+    };
+
+    // Ordernumret reserverades redan när kassan öppnades och skickades till
+    // Kustom som merchant_reference1 (se reserve-order-number.ts) - använd
+    // det, så numret i Kustom (och ev. PostNord) stämmer med vårt. Faller
+    // tillbaka på ett nytt nummer om referensen saknas eller numret av
+    // någon anledning redan är taget av en annan order.
+    let reservedOrderNumber = parseReservedOrderNumber(order.merchant_reference1);
+    if (reservedOrderNumber !== null) {
+      const [taken] = await tx
+        .select({ kustomOrderId: schema.orders.kustomOrderId })
+        .from(schema.orders)
+        .where(eq(schema.orders.orderNumber, reservedOrderNumber));
+      if (taken && taken.kustomOrderId !== order.order_id) reservedOrderNumber = null;
+    }
+
+    const [inserted] =
+      reservedOrderNumber !== null
+        ? await tx
+            .insert(schema.orders)
+            .overridingSystemValue()
+            .values({ ...orderValues, orderNumber: reservedOrderNumber })
+            .onConflictDoNothing({ target: schema.orders.kustomOrderId })
+            .returning({ id: schema.orders.id, orderNumber: schema.orders.orderNumber })
+        : await tx
+            .insert(schema.orders)
+            .values(orderValues)
+            .onConflictDoNothing({ target: schema.orders.kustomOrderId })
+            .returning({ id: schema.orders.id, orderNumber: schema.orders.orderNumber });
 
     if (!inserted) {
       // Ordern fanns redan - men Kustom är fortfarande facit (samma

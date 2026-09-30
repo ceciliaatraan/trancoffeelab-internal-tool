@@ -11,6 +11,7 @@ import {
 import { calculateTaxFromGross } from "@/lib/kustom/tax";
 import { getMerchantUrls } from "@/lib/kustom/merchant-urls";
 import { createOrder, extractHtmlSnippet, extractOrderId, KustomApiError } from "@/lib/kustom/client";
+import { reserveOrderNumber } from "@/lib/orders/reserve-order-number";
 
 export async function POST(request: Request) {
   const origin = request.headers.get("origin");
@@ -138,6 +139,10 @@ export async function POST(request: Request) {
         }
       : undefined;
 
+  // Vårt ordernummer reserveras redan nu och skickas till Kustom som
+  // merchant_reference1 - se reserve-order-number.ts och persist-order.ts.
+  const reservedOrderNumber = await reserveOrderNumber();
+
   const payload = buildCreateOrderPayload({
     items,
     shippingOption,
@@ -155,10 +160,23 @@ export async function POST(request: Request) {
         : undefined,
     locale: parsed.data.locale,
     merchantUrls: getMerchantUrls(),
+    merchantReference1: reservedOrderNumber ? String(reservedOrderNumber) : undefined,
   });
 
   try {
-    const order = await createOrder(payload);
+    let order;
+    try {
+      order = await createOrder(payload);
+    } catch (err) {
+      // Försiktighet: skulle Kustom neka merchant_reference1 (400) får det
+      // aldrig stoppa kassan - försök igen utan, då får ordern sitt nummer
+      // när den sparas precis som tidigare.
+      if (!(err instanceof KustomApiError) || err.status !== 400 || !payload.merchant_reference1) {
+        throw err;
+      }
+      console.error("Kustom nekade create-order med merchant_reference1 - försöker utan", err.body);
+      order = await createOrder({ ...payload, merchant_reference1: undefined });
+    }
     return NextResponse.json(
       {
         html_snippet: extractHtmlSnippet(order),
