@@ -22,6 +22,7 @@ import {
   refundFullAction,
   refundPartialAction,
   returnLineComponentAction,
+  sendTestOrderEmailAction,
   swapLineComponentAction,
 } from "../actions";
 import {
@@ -93,6 +94,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const error = typeof search.error === "string" ? search.error : null;
   const saved = "saved" in search;
   const handDelivered = "handDelivered" in search;
+  const testEmailSent = typeof search.testEmailSent === "string" ? search.testEmailSent : null;
 
   const [initialOrder] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
   if (!initialOrder) notFound();
@@ -767,6 +769,39 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
             </form>
           </div>
         ) : null}
+      </section>
+
+      <section id="testmejl" className="flex flex-col gap-3 border border-tran-hairline p-6">
+        <h2 className="tran-label text-xs text-tran-muted">Testa orderbekräftelsen</h2>
+        <p className="text-xs text-tran-muted">
+          Skickar exakt samma orderbekräftelse som kunden fick till en valfri adress - kunden får
+          ingenting. För att se om mejlet riskerar att hamna i skräpposten: gå till
+          mail-tester.com, kopiera adressen de visar, skicka hit och klicka sedan &quot;Then check
+          your score&quot; där.
+        </p>
+        {testEmailSent ? (
+          <p className="text-sm text-tran-muted">Testmejl skickat till {testEmailSent}.</p>
+        ) : null}
+        <form
+          action={sendTestOrderEmailAction.bind(null, order.id)}
+          className="flex flex-wrap items-end gap-3"
+        >
+          <div>
+            <label className="tran-label mb-1 block text-[11px] text-tran-muted">
+              Skicka till
+            </label>
+            <input
+              name="to"
+              type="email"
+              required
+              placeholder="test-xxxx@srv1.mail-tester.com"
+              className="w-72 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
+            />
+          </div>
+          <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
+            Skicka testmejl
+          </SubmitButton>
+        </form>
       </section>
 
       {order.isTest || order.fulfillmentStatus === "cancelled" ? (

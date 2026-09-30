@@ -18,6 +18,8 @@ import {
   refundOrder,
 } from "@/lib/kustom/client";
 import { markOrderShipped } from "@/lib/orders/mark-shipped";
+import { buildOrderConfirmationInputFromDb } from "@/lib/orders/order-confirmation-input";
+import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
 
 function kustomErrorMessage(err: unknown): string {
   if (err instanceof KustomApiError) {
@@ -47,6 +49,38 @@ async function syncOrderFromKustom(orderId: string, kustomOrderId: string) {
       updatedAt: new Date(),
     })
     .where(eq(schema.orders.id, orderId));
+}
+
+/**
+ * Skickar orderbekräftelsen för en befintlig order till valfri adress -
+ * t.ex. adressen mail-tester.com ger, för att få ett spampoäng med exakta
+ * orsaker. Exakt samma mejl (ämne, innehåll, avsändare) som kunden fick,
+ * så resultatet gäller de riktiga mejlen. Kunden får ingenting.
+ */
+export async function sendTestOrderEmailAction(orderId: string, formData: FormData) {
+  await requireCurrentAdmin();
+  const to = formData.get("to")?.toString().trim() ?? "";
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(to)) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent("Ange en giltig e-postadress.")}#testmejl`);
+  }
+
+  let errorMessage: string | null = null;
+  try {
+    const input = await buildOrderConfirmationInputFromDb(orderId, to);
+    if (!input) {
+      errorMessage = "Ordern hittades inte.";
+    } else {
+      await sendOrderConfirmationEmail(input);
+    }
+  } catch (err) {
+    errorMessage = err instanceof Error ? err.message : "Kunde inte skicka testmejlet.";
+  }
+
+  if (errorMessage) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent(errorMessage)}#testmejl`);
+  }
+  redirect(`/orders/${orderId}?testEmailSent=${encodeURIComponent(to)}#testmejl`);
 }
 
 export async function captureOrderAction(orderId: string, formData: FormData) {
