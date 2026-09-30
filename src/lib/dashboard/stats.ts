@@ -55,6 +55,26 @@ export async function getDailySales(days: number): Promise<DailySales[]> {
   });
 }
 
+/**
+ * Total försäljning genom tiderna (orderbelopp inkl. moms och frakt), med
+ * samma urval som getDailySales - utan testordrar och avbrutna/utgångna
+ * ordrar - så den stämmer med "idag/vecka/månad"-rutorna. Återbetalningar
+ * dras inte av, precis som i de andra rutorna.
+ */
+export async function getAllTimeSalesOre(): Promise<number> {
+  const [row] = await db
+    .select({ totalOre: sql<string>`coalesce(sum(${schema.orders.orderAmountOre}), 0)` })
+    .from(schema.orders)
+    .where(
+      and(
+        eq(schema.orders.isTest, false),
+        ne(schema.orders.status, "CANCELLED"),
+        ne(schema.orders.status, "EXPIRED"),
+      ),
+    );
+  return Number(row?.totalOre ?? 0);
+}
+
 export type RecentOrder = {
   id: string;
   orderNumber: number;

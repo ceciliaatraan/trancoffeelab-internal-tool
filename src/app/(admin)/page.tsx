@@ -4,7 +4,13 @@ import { and, desc, eq, inArray, isNotNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatDateTime, formatOre, formatOreWhole } from "@/lib/format";
 import { getInventoryOverview } from "@/lib/inventory/overview";
-import { getDailySales, getRecentOrders, getTopProducts, summarizeDailySales } from "@/lib/dashboard/stats";
+import {
+  getAllTimeSalesOre,
+  getDailySales,
+  getRecentOrders,
+  getTopProducts,
+  summarizeDailySales,
+} from "@/lib/dashboard/stats";
 import { getFraktStatusByOrderId } from "@/lib/orders/frakt-status-for-orders";
 import { SalesBarChart } from "@/components/sales-bar-chart";
 import { TopProductsList } from "@/components/top-products-list";
@@ -21,7 +27,7 @@ export default async function DashboardPage() {
   // sidvisningar, aldrig när sidan förrenderas under bygget.
   await connection();
   scheduleBackgroundSync();
-  const [daily, recentOrders, topProducts, unprocessedOrders, inventoryOverview, webhookErrors] =
+  const [daily, recentOrders, topProducts, unprocessedOrders, inventoryOverview, webhookErrors, allTimeSalesOre] =
     await Promise.all([
       getDailySales(30),
       getRecentOrders(8),
@@ -42,6 +48,7 @@ export default async function DashboardPage() {
         .where(and(eq(schema.webhookEvents.processed, false), isNotNull(schema.webhookEvents.errorMessage)))
         .orderBy(desc(schema.webhookEvents.receivedAt))
         .limit(5),
+      getAllTimeSalesOre(),
     ]);
 
   const summary = summarizeDailySales(daily);
@@ -79,8 +86,8 @@ export default async function DashboardPage() {
           <p className="tran-tabular break-words text-xl">{unprocessedCount}</p>
         </div>
         <div className="min-w-0 border border-tran-hairline p-6">
-          <p className="tran-label text-xs text-tran-muted">Under larmnivå</p>
-          <p className="tran-tabular break-words text-xl">{lowStock.length}</p>
+          <p className="tran-label text-xs text-tran-muted">Genom tiderna</p>
+          <p className="tran-tabular break-words text-xl">{formatOreWhole(allTimeSalesOre)}</p>
         </div>
       </section>
 
