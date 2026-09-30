@@ -12,6 +12,7 @@ import { getFraktStatusByOrderId } from "@/lib/orders/frakt-status-for-orders";
 import { customerDisplayName } from "@/lib/orders/customer-display-name";
 import { scheduleBackgroundSync } from "@/lib/orders/postnord-auto-sync";
 import { refreshUnsettledOrdersFromKustomIfDue } from "@/lib/orders/kustom-refresh";
+import { postnordBookingId } from "@/lib/orders/postnord-matching";
 
 // Ger bakgrundssynken mot Kustom/PostNord (scheduleBackgroundSync) tid att gå igenom
 // alla öppna ordrar vid dygnets fulla genomgång.
@@ -45,6 +46,9 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
       or(
         ilike(schema.orders.customerEmail, `%${query}%`),
         Number.isInteger(orderNumber) ? eq(schema.orders.orderNumber, orderNumber) : sql`false`,
+        // PostNords boknings-ID (se postnordBookingId) - klistra in ID:t från
+        // PostNords portal för att hitta ordern.
+        sql`${schema.orders.rawKustomOrder}->'selected_shipping_option'->>'id' ilike ${query}`,
       ),
     );
   }
@@ -102,7 +106,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
       <form className="flex flex-wrap items-end gap-4">
         <div>
           <label className="tran-label mb-1.5 block text-xs text-tran-muted" htmlFor="q">
-            Sök (ordernummer/e-post)
+            Sök (ordernummer/e-post/PostNord-ID)
           </label>
           <input
             id="q"
@@ -193,6 +197,11 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
                   </td>
                   <td className="py-4 pr-4">
                     <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
+                    {postnordBookingId(order.rawKustomOrder) ? (
+                      <p className="tran-tabular mt-1 text-[11px] text-tran-muted">
+                        {postnordBookingId(order.rawKustomOrder)}
+                      </p>
+                    ) : null}
                   </td>
                   <td className="tran-tabular py-4 pr-4 text-tran-muted">
                     {formatDateTime(order.createdAt)}

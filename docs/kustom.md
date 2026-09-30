@@ -714,6 +714,23 @@ Färdigdebiterade ordrar (CAPTURED) läses bara om när de öppnas - en
 återbetalning gjord i Kustoms portal syns alltså i listan först när ordern
 öppnats en gång.
 
+## PostNord-ID = `selected_shipping_option.id`? 2026-09-30
+
+Kopplingen till PostNord hittade fortfarande inga skickningar. Ny ledtråd:
+det unika ID ägaren ser på skickningen i PostNords portal (t.ex.
+`ECVZHHG5EVRRWFSJ` för Ebba Axlund) har exakt samma format (16 tecken,
+versaler/siffror, börjar på E) som `selected_shipping_option.id` i Kustoms
+orderdata (t.ex. `ESO7XUMRJZT1D89C` i den riktiga order vi har rådata för) -
+ett fält som ALDRIG provats, eftersom det heter `id` och inte ser ut som ett
+spårningsnummer. `postnordBookingId` i `postnord-matching.ts` läser det (bara
+om `carrier` är postnord eller saknas); det provas nu FÖRST mot PostNord
+(både som identifierare och referens), visas som "PostNord-ID" på
+orderdetaljen och under fraktstatusen i orderlistan, och går att söka på i
+orderlistan. **OBEKRÄFTAT:** att det verkligen är samma ID har inte
+jämförts för en och samma order, och inte heller att PostNords Track &
+Trace känner igen det - visningen/sökningen fungerar oavsett, statusen
+uppdateras bara automatiskt om Track & Trace hittar det.
+
 ## Status i koden
 
 | Del | Status |

@@ -32,6 +32,7 @@ import {
 } from "@/lib/postnord/client";
 import { syncPostnordForOrder } from "@/lib/orders/postnord-auto-sync";
 import { refreshOrderFromKustom } from "@/lib/orders/kustom-refresh";
+import { postnordBookingId } from "@/lib/orders/postnord-matching";
 
 type Address = {
   given_name?: string;
@@ -174,6 +175,8 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         }
       }),
   );
+
+  const postnordId = postnordBookingId(order.rawKustomOrder);
 
   const latestShipment = shipmentRows.at(-1) ?? null;
   const latestPostnordStatus = latestShipment
@@ -649,6 +652,11 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           <h2 className="tran-label text-xs text-tran-muted">Frakt</h2>
           <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
         </div>
+        {postnordId ? (
+          <p className="text-sm">
+            PostNord-ID: <span className="tran-tabular">{postnordId}</span>
+          </p>
+        ) : null}
         {shipmentRows.length > 0 ? (
           <ul className="flex flex-col gap-3 text-sm">
             {shipmentRows.map((shipment) => {

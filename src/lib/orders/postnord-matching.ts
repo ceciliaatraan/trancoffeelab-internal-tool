@@ -60,6 +60,25 @@ function stringField(record: Record<string, unknown>, key: string): string | nul
 }
 
 /**
+ * PostNords eget ID för bokningen, som Kustom Shipping Assistant sparar som
+ * `selected_shipping_option.id` (t.ex. "ESO7XUMRJZT1D89C"). Samma format
+ * (16 tecken, versaler/siffror, börjar på E) som det unika ID ägaren ser på
+ * skickningen i PostNords portal (t.ex. "ECVZHHG5EVRRWFSJ") - därav
+ * antagandet att det är samma ID, 2026-09-30. INTE bekräftat genom att
+ * jämföra samma order på båda ställena. Null om fraktbolaget inte är
+ * PostNord eller fältet saknas.
+ */
+export function postnordBookingId(rawKustomOrder: unknown): string | null {
+  if (!rawKustomOrder || typeof rawKustomOrder !== "object") return null;
+  const selected = (rawKustomOrder as Record<string, unknown>).selected_shipping_option;
+  if (!selected || typeof selected !== "object") return null;
+  const record = selected as Record<string, unknown>;
+  const carrier = stringField(record, "carrier");
+  if (carrier && carrier.toLowerCase() !== "postnord") return null;
+  return stringField(record, "id");
+}
+
+/**
  * Alla värden vi har som KAN vara det PostNord känner igen en Kustom
  * Shipping Assistant-bokad skickning på. Vilket av dem PostNord faktiskt
  * indexerar KSA-skickningar under är inte bekräftat (se docs/kustom.md) -
@@ -84,6 +103,9 @@ export function postnordLookupCandidates(order: OrderForLookup): LookupCandidate
   };
 
   add(order.labelTrackingNumber?.trim() || null, "identifier", true);
+  const bookingId = postnordBookingId(raw);
+  add(bookingId, "identifier", true);
+  add(bookingId, "reference", true);
   // Exakt var Kustom lägger PostNords spårningsnummer när Kustom Shipping
   // Assistant bokat frakten är inte bekräftat - leta i alla fraktrelaterade
   // delar av ordern efter fält som ser ut som ett spårnings-/kollinummer.
