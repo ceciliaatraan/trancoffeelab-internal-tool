@@ -11,6 +11,7 @@ import { OrderStatusChip } from "@/components/order-status-chip";
 import { TestOrderChip } from "@/components/test-order-chip";
 import { SubmitButton } from "@/components/submit-button";
 import { ClaimDialog } from "@/components/claim-dialog";
+import { AddressDialog } from "@/components/address-dialog";
 import { getClaimOptions, getClaimsForOrder } from "@/lib/orders/claims";
 import { CLAIM_CAUSES } from "@/lib/orders/claim-causes";
 import { FraktStatusBadge } from "@/components/frakt-status-badge";
@@ -26,6 +27,7 @@ import {
   refundPartialAction,
   returnLineComponentAction,
   registerClaimAction,
+  updateOrderAddressAction,
   sendTestOrderEmailAction,
   swapLineComponentAction,
 } from "../actions";
@@ -46,6 +48,7 @@ type Address = {
   email?: string;
   phone?: string;
   street_address?: string;
+  street_address2?: string;
   postal_code?: string;
   city?: string;
   country?: string;
@@ -74,6 +77,12 @@ function AddressBlock({ address, title }: { address: Address | null; title: stri
         <br />
         {address.street_address}
         <br />
+        {address.street_address2 ? (
+          <>
+            {address.street_address2}
+            <br />
+          </>
+        ) : null}
         {address.postal_code} {address.city}
         <br />
         {address.country?.toUpperCase()}
@@ -102,6 +111,10 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const handDelivered = "handDelivered" in search;
   const testEmailSent = typeof search.testEmailSent === "string" ? search.testEmailSent : null;
   const claimRegistered = "claimRegistered" in search;
+  const addressUpdated =
+    search.addressUpdated === "shipping" || search.addressUpdated === "billing"
+      ? search.addressUpdated
+      : null;
 
   const [initialOrder] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
   if (!initialOrder) notFound();
@@ -341,9 +354,35 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         </div>
       </section>
 
-      <section className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-        <AddressBlock address={order.billingAddress as Address | null} title="Fakturaadress" />
-        <AddressBlock address={order.shippingAddress as Address | null} title="Leveransadress" />
+      <section id="adresser" className="flex flex-col gap-3">
+        {addressUpdated ? (
+          <p className="border border-tran-hairline px-4 py-3 text-sm text-tran-muted">
+            {addressUpdated === "shipping" ? "Leveransadressen" : "Fakturaadressen"} är uppdaterad.
+            {addressUpdated === "shipping" && order.fulfillmentStatus !== "unfulfilled"
+              ? " Om en fraktsedel redan skapats hos PostNord med den gamla adressen behöver den rättas i PostNords portal - den ändras inte härifrån."
+              : ""}
+          </p>
+        ) : null}
+        <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+          <div>
+            <AddressBlock address={order.billingAddress as Address | null} title="Fakturaadress" />
+            <AddressDialog
+              title="Ändra fakturaadress"
+              address={order.billingAddress as Record<string, string> | null}
+              action={updateOrderAddressAction.bind(null, order.id, "billing")}
+              hint="Ändras bara här i adminen - inte hos Kustom/Klarna."
+            />
+          </div>
+          <div>
+            <AddressBlock address={order.shippingAddress as Address | null} title="Leveransadress" />
+            <AddressDialog
+              title="Ändra leveransadress"
+              address={order.shippingAddress as Record<string, string> | null}
+              action={updateOrderAddressAction.bind(null, order.id, "shipping")}
+              hint="Används för plocklista och PostNord-export härifrån. En fraktsedel som redan skapats hos PostNord ändras inte - rätta den i PostNords portal."
+            />
+          </div>
+        </div>
       </section>
 
       {order.isBusinessPurchase ? (

@@ -21,6 +21,7 @@ import { markOrderShipped } from "@/lib/orders/mark-shipped";
 import { captureOrderOnShipment } from "@/lib/orders/capture-on-shipment";
 import { takeFromStock } from "@/lib/inventory/take-from-stock";
 import { CLAIM_CAUSES, CLAIM_NOTE_PREFIX } from "@/lib/orders/claim-causes";
+import { parseAddressForm } from "@/lib/orders/address-form";
 import { buildOrderConfirmationInputFromDb } from "@/lib/orders/order-confirmation-input";
 import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
 
@@ -556,6 +557,52 @@ export async function swapLineComponentAction(
   revalidatePath("/orders");
   revalidatePath("/inventory");
   redirect(`/orders/${orderId}?saved=1`);
+}
+
+/**
+ * Rättar leverans- eller fakturaadressen på en order i VÅR databas - t.ex.
+ * när kunden skrivit fel. Plocklista, PostNord-export och postnummerkollen
+ * i PostNord-synken läser därefter den rättade adressen. Ändrar INTE
+ * adressen hos Kustom eller en fraktsedel som redan skapats hos PostNord
+ * (den får rättas i PostNords portal). Kustom-omläsningen
+ * (persistOrderFromKustom) skriver aldrig över adresserna, så rättelsen
+ * ligger kvar. Gammal och ny adress loggas i audit_log (syns under Loggar).
+ */
+export async function updateOrderAddressAction(
+  orderId: string,
+  kind: "shipping" | "billing",
+  formData: FormData,
+) {
+  const admin = await requireCurrentAdmin();
+  const order = await getOrderOrRedirect(orderId);
+  const before = kind === "shipping" ? order.shippingAddress : order.billingAddress;
+
+  const parsed = parseAddressForm((field) => formData.get(field)?.toString(), before);
+  if (!parsed.ok) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent(parsed.error)}#adresser`);
+  }
+
+  await db
+    .update(schema.orders)
+    .set(
+      kind === "shipping"
+        ? { shippingAddress: parsed.address, updatedAt: new Date() }
+        : { billingAddress: parsed.address, updatedAt: new Date() },
+    )
+    .where(eq(schema.orders.id, orderId));
+
+  await db.insert(schema.auditLog).values({
+    actorEmail: admin.email,
+    actorUserId: admin.userId,
+    action: kind === "shipping" ? "order.shipping_address_updated" : "order.billing_address_updated",
+    targetType: "order",
+    targetId: String(order.orderNumber),
+    metadata: { before, after: parsed.address },
+  });
+
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/orders");
+  redirect(`/orders/${orderId}?addressUpdated=${kind}#adresser`);
 }
 
 /**

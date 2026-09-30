@@ -323,6 +323,17 @@ kopplad till ordern (`orderId`), så den visas på ordern och räknas per kund i
 kundlistan - men inte under "Eget uttag". Påverkar inte betalningen. Skickar
 kunden tillbaka något som går att sälja igen: registrera det som retur.
 
+## Rätta adress på en order
+
+"Ändra" under Fakturaadress/Leveransadress på en order öppnar en modal där
+adressen kan rättas (t.ex. när kunden skrivit fel). Ändras bara i vår databas -
+plocklista, PostNord-export och PostNord-synkens postnummerkoll använder
+därefter den rättade adressen, och Kustom-omläsningen skriver aldrig över den.
+Ändras INTE hos Kustom/Klarna eller på en fraktsedel som redan skapats hos
+PostNord (rätta den i PostNords portal). Gammal och ny adress loggas i
+audit_log (`order.shipping_address_updated`/`order.billing_address_updated`),
+synligt under Loggar.
+
 ## Byggordning
 
 Projektet byggs i faser, med avstämning efter varje fas:
