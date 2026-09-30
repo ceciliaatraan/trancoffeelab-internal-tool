@@ -2,15 +2,16 @@
 
 import { redirect } from "next/navigation";
 import { revalidatePath } from "next/cache";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { requireCurrentAdmin } from "@/lib/current-admin";
-import { getBundleItemsForProduct } from "@/lib/inventory/bundles";
+import { expandLineToInventoryTargets, getBundleItemsForProduct } from "@/lib/inventory/bundles";
 import {
   computeTrueReservedQuantities,
   computeTrueShippedQuantities,
 } from "@/lib/inventory/order-line-totals";
 import { inventoryAdjustSchema } from "@/lib/validation/product";
+import { INTERNAL_USE_PURPOSES } from "@/lib/inventory/internal-use-purposes";
 
 export async function adjustInventory(formData: FormData) {
   const adminUser = await requireCurrentAdmin();
@@ -241,4 +242,111 @@ export async function receiveBatchAction(formData: FormData) {
   revalidatePath("/inventory/batch");
   revalidatePath("/");
   redirect(`/inventory?batchReceived=${linesToApply.length}`);
+}
+
+/**
+ * Slår på/av "Sälj vid slut i lager" (inventory.allow_backorder) för en
+ * lagerrad - se lib/inventory/sellable.ts. Påverkar bara om butiken
+ * blockerar köp när det fria lagret är slut, aldrig själva siffrorna.
+ */
+export async function setAllowBackorderAction(formData: FormData) {
+  await requireCurrentAdmin();
+  const inventoryId = formData.get("inventoryId")?.toString() ?? "";
+  const allow = formData.get("allow") === "1";
+
+  const [updated] = await db
+    .update(schema.inventory)
+    .set({ allowBackorder: allow, updatedAt: new Date() })
+    .where(eq(schema.inventory.id, inventoryId))
+    .returning({ id: schema.inventory.id });
+  if (!updated) {
+    redirect(`/inventory?error=${encodeURIComponent("Lagerraden finns inte.")}`);
+  }
+
+  revalidatePath("/inventory");
+  revalidatePath("/");
+  redirect("/inventory?saved=1");
+}
+
+/**
+ * Registrerar eget uttag ur lagret - varor ni tagit själva (eget bruk,
+ * kaffe till marknadsföring/event m.m.). Minskar "I lager" (quantity) med
+ * antalet och sparar en lagerrörelse med orsak internal_use och syftet i
+ * note, så det syns i historiken. Ett kit dras från sina komponenter
+ * (samma expansion som en order, expandLineToInventoryTargets) - kitet har
+ * inget eget lager.
+ */
+export async function registerInternalUseAction(formData: FormData) {
+  const adminUser = await requireCurrentAdmin();
+  const inventoryId = formData.get("inventoryId")?.toString() ?? "";
+  const quantity = Number(formData.get("quantity"));
+  const purposeKey = formData.get("purpose")?.toString() ?? "";
+  const extraNote = formData.get("note")?.toString().trim() || null;
+
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    redirect(`/inventory?error=${encodeURIComponent("Ange ett antal större än 0.")}#eget-uttag`);
+  }
+  if (!(purposeKey in INTERNAL_USE_PURPOSES)) {
+    redirect(`/inventory?error=${encodeURIComponent("Välj vad varorna användes till.")}#eget-uttag`);
+  }
+  const purpose = INTERNAL_USE_PURPOSES[purposeKey as keyof typeof INTERNAL_USE_PURPOSES];
+  const baseNote = extraNote ? `${purpose}: ${extraNote}` : purpose;
+
+  await db
+    .transaction(async (tx) => {
+      const [row] = await tx
+        .select({
+          productId: schema.inventory.productId,
+          variantId: schema.inventory.variantId,
+          productName: schema.products.nameSv,
+        })
+        .from(schema.inventory)
+        .innerJoin(schema.products, eq(schema.inventory.productId, schema.products.id))
+        .where(eq(schema.inventory.id, inventoryId));
+      if (!row) throw new Error("Lagerraden finns inte.");
+
+      const targets = await expandLineToInventoryTargets(tx, row.productId, row.variantId, quantity);
+      for (const target of targets) {
+        const condition = target.variantId
+          ? and(
+              eq(schema.inventory.productId, target.productId),
+              eq(schema.inventory.variantId, target.variantId),
+            )
+          : and(eq(schema.inventory.productId, target.productId), isNull(schema.inventory.variantId));
+
+        const [targetRow] = await tx
+          .select({ id: schema.inventory.id })
+          .from(schema.inventory)
+          .where(condition)
+          .for("update");
+        if (!targetRow) continue;
+
+        await tx
+          .update(schema.inventory)
+          .set({
+            quantity: sql`${schema.inventory.quantity} - ${target.quantity}`,
+            updatedAt: new Date(),
+          })
+          .where(eq(schema.inventory.id, targetRow.id));
+
+        await tx.insert(schema.inventoryMovements).values({
+          inventoryId: targetRow.id,
+          changeAmount: -target.quantity,
+          reason: "internal_use",
+          note:
+            target.productId === row.productId
+              ? baseNote
+              : `${baseNote} (komponent i "${row.productName}")`,
+          causedByAdminId: adminUser.id,
+        });
+      }
+    })
+    .catch((err) => {
+      const message = err instanceof Error ? err.message : "Något gick fel.";
+      redirect(`/inventory?error=${encodeURIComponent(message)}#eget-uttag`);
+    });
+
+  revalidatePath("/inventory");
+  revalidatePath("/");
+  redirect(`/inventory?internalUse=${quantity}#eget-uttag`);
 }

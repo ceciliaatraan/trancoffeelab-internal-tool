@@ -2,6 +2,7 @@ import "server-only";
 import { and, asc, eq, inArray, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { computeBundleAvailability } from "@/lib/inventory/bundles";
+import { sellableQuantity } from "@/lib/inventory/sellable";
 
 /**
  * Publikt synliga statusar - inte bara "published". "coming_soon" visas
@@ -40,10 +41,6 @@ export type PublicProduct = {
   comingSoon: boolean;
 };
 
-function availableQuantity(quantity: number, reserved: number, shipped: number): number {
-  return Math.max(0, quantity - reserved - shipped);
-}
-
 async function attachVariants(
   productIds: string[],
 ): Promise<Map<string, PublicVariant[]>> {
@@ -62,6 +59,7 @@ async function attachVariants(
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
       shippedQuantity: schema.inventory.shippedQuantity,
+      allowBackorder: schema.inventory.allowBackorder,
     })
     .from(schema.productVariants)
     .leftJoin(
@@ -79,9 +77,7 @@ async function attachVariants(
       name: { sv: row.nameSv, en: row.nameEn },
       price: { amountOre: row.priceOre, currency: "SEK" },
       weightGrams: row.weightGrams,
-      inStock:
-        availableQuantity(row.quantity ?? 0, row.reservedQuantity ?? 0, row.shippedQuantity ?? 0) >
-        0,
+      inStock: sellableQuantity(row) > 0,
       images: row.images,
     });
     byProduct.set(row.productId, list);
@@ -109,6 +105,7 @@ function baseProductQuery() {
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
       shippedQuantity: schema.inventory.shippedQuantity,
+      allowBackorder: schema.inventory.allowBackorder,
     })
     .from(schema.products)
     .leftJoin(
@@ -146,8 +143,7 @@ function toPublicProduct(
         ? bundleAvailable > 0
         : variants.length > 0
           ? variants.some((variant) => variant.inStock)
-          : availableQuantity(row.quantity ?? 0, row.reservedQuantity ?? 0, row.shippedQuantity ?? 0) >
-            0,
+          : sellableQuantity(row) > 0,
     variants: variantsWithImages,
     isPreorder: row.isPreorder,
     expectedShipDate: row.expectedShipDate,

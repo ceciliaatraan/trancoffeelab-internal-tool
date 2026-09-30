@@ -41,13 +41,21 @@ export type InventoryOverviewRow = {
    */
   shippedQuantity: number;
   /**
-   * "Tillgängligt": hur många som är fria att sälja RIGHT NOW.
+   * "Tillgängligt": hur många som är fria att sälja RIGHT NOW. Kan vara
+   * NEGATIVT (minuslager) när "Sälj vid slut i lager" är påslaget och fler
+   * sålts än som finns - fylls på av nästa leverans.
    * För vanliga rader: I lager minus Reserverat minus Skickat. För en
    * kit-rad: det komponent-beräknade antalet (`available` ovan) - kitet
    * har inget eget ursprungslager, så "I lager - reserverat - skickat"
    * gäller inte, men vad som går att BYGGA OCH SÄLJA just nu gör det.
    */
   sellableQuantity: number;
+  /**
+   * "Sälj vid slut i lager" (inventory.allow_backorder, se sellable.ts). För
+   * ett kit: sant bara om ALLA komponenter har det påslaget - annars slutar
+   * kitet säljas när någon komponent tar slut.
+   */
+  allowBackorder: boolean;
   bundleBreakdown: BundleComponentStatus[] | null;
 };
 
@@ -81,6 +89,7 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
       variantId: schema.inventory.variantId,
       quantity: schema.inventory.quantity,
       alarmLevel: schema.inventory.alarmLevel,
+      allowBackorder: schema.inventory.allowBackorder,
       productName: schema.products.nameSv,
       productSku: schema.products.sku,
       variantName: schema.productVariants.nameSv,
@@ -137,7 +146,8 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
           isBundle: false,
           available: row.quantity,
           shippedQuantity,
-          sellableQuantity: Math.max(0, row.quantity - reservedQuantity - shippedQuantity),
+          sellableQuantity: row.quantity - reservedQuantity - shippedQuantity,
+          allowBackorder: row.allowBackorder,
           bundleBreakdown: null,
         },
       ];
@@ -149,12 +159,9 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
       );
       const componentKey = `${item.componentProductId}|${item.componentVariantId ?? ""}`;
       const available = componentRow
-        ? Math.max(
-            0,
-            componentRow.quantity -
-              (trueReserved.expanded.get(componentKey) ?? 0) -
-              (trueShipped.expanded.get(componentKey) ?? 0),
-          )
+        ? componentRow.quantity -
+          (trueReserved.expanded.get(componentKey) ?? 0) -
+          (trueShipped.expanded.get(componentKey) ?? 0)
         : 0;
       const name = componentRow
         ? componentRow.variantName
@@ -164,9 +171,14 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
       return { name, available, quantityPerBundle: item.quantity };
     });
 
-    const available = Math.max(
-      0,
-      Math.min(...breakdown.map((c) => Math.floor(c.available / c.quantityPerBundle))),
+    // Kan bli negativt (minuslager) om en komponent sålts på minus.
+    const available = Math.min(
+      ...breakdown.map((c) => Math.floor(c.available / c.quantityPerBundle)),
+    );
+    const allowBackorder = components.every(
+      (item) =>
+        rowByKey.get(`${item.componentProductId}|${item.componentVariantId ?? ""}`)?.allowBackorder ===
+        true,
     );
 
     // Kitet har inget eget ursprungslager, men VI VET hur många kit som
@@ -189,6 +201,7 @@ export async function getInventoryOverview(): Promise<InventoryOverviewRow[]> {
         available,
         shippedQuantity: trueShipped.direct.get(key) ?? 0,
         sellableQuantity: available,
+        allowBackorder,
         bundleBreakdown: breakdown,
       },
     ];

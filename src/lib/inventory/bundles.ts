@@ -2,6 +2,7 @@ import "server-only";
 import { eq, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { getComponentSwapsForLine } from "@/lib/orders/component-swaps";
+import { sellableQuantity } from "./sellable";
 
 type DbOrTx = typeof db | Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -43,7 +44,8 @@ export async function getBundleItemsForProduct(
 /**
  * Ursprungslager minus reserverat minus skickat, per (produkt, variant),
  * för en uppsättning lagerförda enheter - vad som faktiskt går att sälja
- * just nu. `quantity` ("I lager") ändras ALDRIG automatiskt av
+ * just nu (med "Sälj vid slut i lager" påslaget räknas raden som
+ * obegränsad, se sellable.ts). `quantity` ("I lager") ändras ALDRIG automatiskt av
  * ordersystemet (bara admin sätter den, se schema/catalog.ts), så
  * skickat måste dras ifrån här precis som reserverat.
  */
@@ -62,15 +64,13 @@ export async function getAvailabilityByKey(
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
       shippedQuantity: schema.inventory.shippedQuantity,
+      allowBackorder: schema.inventory.allowBackorder,
     })
     .from(schema.inventory)
     .where(inArray(schema.inventory.productId, productIds));
 
   for (const row of rows) {
-    map.set(
-      `${row.productId}|${row.variantId ?? ""}`,
-      Math.max(0, row.quantity - row.reservedQuantity - row.shippedQuantity),
-    );
+    map.set(`${row.productId}|${row.variantId ?? ""}`, sellableQuantity(row));
   }
   return map;
 }

@@ -294,6 +294,23 @@ CRON_SECRET=<valfri slumpad sträng>                  # bara för den dagliga k�
 Formulären "Markera: fraktsedel skapad"/"Markera som skickad"/"Levererad för
 hand" finns kvar för det som behöver göras för hand.
 
+## Lager: sälj vid slut i lager (minuslager) och eget uttag
+
+**Sälj vid slut i lager** (kolumnen "Sälj vid slut" på /inventory, en knapp
+per lagerrad): när den är "På" blockerar hemsidan aldrig köp av varan, även när
+Tillgängligt är 0. Tillgängligt går då under noll (visas i rött som
+"minuslager") och fylls på när nästa leverans registreras under "Ny leverans".
+Ett kit säljs vidare bara om alla dess komponenter har den påslagen. Styr bara
+kassans lagerkoll (`src/lib/inventory/sellable.ts`), aldrig själva siffrorna.
+
+**Eget uttag** (längst ner på /inventory): varor ni tagit ur lagret själva -
+eget bruk, marknadsföring, event eller annat. Dras från "I lager" och sparas
+som lagerrörelse med orsak `internal_use` och syftet som anteckning; ett kit
+dras från sina komponenter. De senaste 20 uttagen visas under formuläret.
+
+Kräver migration `drizzle/0016_wise_venus.sql` (kolumnen
+`inventory.allow_backorder` och orsaken `internal_use`).
+
 ## Byggordning
 
 Projektet byggs i faser, med avstämning efter varje fas:

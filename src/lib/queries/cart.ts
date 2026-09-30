@@ -2,6 +2,7 @@ import "server-only";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { computeBundleAvailability } from "@/lib/inventory/bundles";
+import { sellableQuantity } from "@/lib/inventory/sellable";
 
 export type ResolvedCartLine = {
   sku: string;
@@ -42,6 +43,7 @@ async function resolveBaseProduct(
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
       shippedQuantity: schema.inventory.shippedQuantity,
+      allowBackorder: schema.inventory.allowBackorder,
     })
     .from(schema.products)
     .leftJoin(
@@ -74,9 +76,7 @@ async function resolveBaseProduct(
     priceOre: row.priceOre,
     taxRate: row.taxRate,
     weightGrams: row.weightGrams,
-    available:
-      bundleAvailable ??
-      Math.max(0, (row.quantity ?? 0) - (row.reservedQuantity ?? 0) - (row.shippedQuantity ?? 0)),
+    available: bundleAvailable ?? sellableQuantity(row),
     productId: row.productId,
     variantId: null,
     isPreorder: row.isPreorder,
@@ -108,6 +108,7 @@ async function resolveVariant(
       quantity: schema.inventory.quantity,
       reservedQuantity: schema.inventory.reservedQuantity,
       shippedQuantity: schema.inventory.shippedQuantity,
+      allowBackorder: schema.inventory.allowBackorder,
     })
     .from(schema.productVariants)
     .innerJoin(schema.products, eq(schema.products.id, schema.productVariants.productId))
@@ -128,10 +129,7 @@ async function resolveVariant(
     priceOre: row.priceOre,
     taxRate: row.taxRate,
     weightGrams: row.weightGrams,
-    available: Math.max(
-      0,
-      (row.quantity ?? 0) - (row.reservedQuantity ?? 0) - (row.shippedQuantity ?? 0),
-    ),
+    available: sellableQuantity(row),
     productId: row.productId,
     variantId: row.variantId,
     isPreorder: row.isPreorder,

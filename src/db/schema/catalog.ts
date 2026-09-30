@@ -120,6 +120,15 @@ export const inventory = pgTable(
     reservedQuantity: integer("reserved_quantity").notNull().default(0),
     shippedQuantity: integer("shipped_quantity").notNull().default(0),
     alarmLevel: integer("alarm_level").notNull().default(0),
+    /**
+     * "Sälj vid slut i lager" (backorder/minuslager), 2026-09-30: true =
+     * butiken fortsätter sälja även när det fria lagret är slut - det fria
+     * lagret går då under noll och fylls på av nästa leverans ("Ny
+     * leverans"). Styr ENDAST kassans/butikens lagerkoll (lib/inventory/
+     * sellable.ts), rör aldrig själva siffrorna. För kit avgörs det av
+     * komponenternas egna rader.
+     */
+    allowBackorder: boolean("allow_backorder").notNull().default(false),
     updatedAt: timestamp("updated_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -130,7 +139,15 @@ inventory.enableRLS();
 
 export const inventoryMovementReasonEnum = pgEnum(
   "inventory_movement_reason",
-  ["manual_adjustment", "order_reserved", "order_released", "order_shipped", "return"],
+  [
+    "manual_adjustment",
+    "order_reserved",
+    "order_released",
+    "order_shipped",
+    "return",
+    /** Eget uttag (eget bruk, marknadsföring, event) - minskar "I lager", syftet står i note. */
+    "internal_use",
+  ],
 );
 
 /** Varje lagerförändring, med orsak och vem/vad som orsakade den. */
