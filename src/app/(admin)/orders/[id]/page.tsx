@@ -201,8 +201,8 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const canMarkLabelCreated = order.fulfillmentStatus === "unfulfilled";
   const canShip =
     order.fulfillmentStatus === "unfulfilled" || order.fulfillmentStatus === "label_created";
-  /** Samma villkor som canShip - en orderrad går att byta så länge paketet inte fysiskt lämnat/avbrutits. */
-  const canEditLines = canShip;
+  /** Även skickade ordrar - ett byte där rättar i efterhand vad som skickades (se moveOrderInventory i actions.ts). */
+  const canEditLines = order.fulfillmentStatus !== "cancelled";
   /** Retur går bara att registrera på nåt som faktiskt skickats. */
   const canReturn = order.fulfillmentStatus === "shipped";
   /** Kit-komponenter får bara bytas mot enskilda varor, inte mot ett annat kit (inga nästlade kit). */
@@ -355,6 +355,9 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
             stället byta en ENSKILD komponent inuti kitet (t.ex. helböna i stället för malet)
             under &quot;Innehåll i kitet&quot; nedan, utan att röra kitets eget pris. Lagret
             uppdateras automatiskt i båda fallen.
+            {order.fulfillmentStatus === "shipped"
+              ? " Ordern är redan skickad - ett byte här rättar i efterhand vad som faktiskt skickades (lagrets \"Skickat\" flyttas från den gamla varan till den nya)."
+              : ""}
           </p>
         ) : null}
         {canReturn ? (

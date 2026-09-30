@@ -258,6 +258,64 @@ export async function cancelOrderAction(orderId: string) {
   redirect(`/orders/${orderId}?saved=1`);
 }
 
+type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+/**
+ * Flyttar en orders lagerpåverkan på EN uppsättning lagerrader - används
+ * när en vara på ordern byts (editOrderLineAction/swapLineComponentAction).
+ * `direction: "out"` = den gamla varan, `"in"` = den nya.
+ *
+ * - Ej skickad order: reserverat flyttas (order_released/order_reserved),
+ *   precis som tidigare.
+ * - Skickad order (rättelse i efterhand, t.ex. en kund som ändrade sig men
+ *   bytet aldrig registrerades innan paketet gick): SKICKAT flyttas i
+ *   stället - den gamla varan har aldrig lämnat lagret, den nya har det.
+ *   Loggas som order_shipped (negativt för den gamla). "I lager"
+ *   (quantity) rörs aldrig, precis som vid vanlig leverans.
+ */
+async function moveOrderInventory(
+  tx: Tx,
+  targets: { productId: string; variantId: string | null; quantity: number }[],
+  direction: "out" | "in",
+  shipped: boolean,
+  orderId: string,
+  noteFor: (target: { productId: string }) => string,
+) {
+  const sign = direction === "out" ? -1 : 1;
+  for (const target of targets) {
+    const condition = target.variantId
+      ? and(
+          eq(schema.inventory.productId, target.productId),
+          eq(schema.inventory.variantId, target.variantId),
+        )
+      : and(eq(schema.inventory.productId, target.productId), isNull(schema.inventory.variantId));
+
+    const [inventoryRow] = await tx
+      .select({ id: schema.inventory.id })
+      .from(schema.inventory)
+      .where(condition);
+    if (!inventoryRow) continue;
+
+    const delta = sign * target.quantity;
+    await tx
+      .update(schema.inventory)
+      .set(
+        shipped
+          ? { shippedQuantity: sql`${schema.inventory.shippedQuantity} + ${delta}`, updatedAt: new Date() }
+          : { reservedQuantity: sql`${schema.inventory.reservedQuantity} + ${delta}`, updatedAt: new Date() },
+      )
+      .where(eq(schema.inventory.id, inventoryRow.id));
+
+    await tx.insert(schema.inventoryMovements).values({
+      inventoryId: inventoryRow.id,
+      changeAmount: delta,
+      reason: shipped ? "order_shipped" : direction === "out" ? "order_released" : "order_reserved",
+      orderId,
+      note: noteFor(target),
+    });
+  }
+}
+
 /**
  * Byter en orderrad mot en annan SKU - t.ex. en kund som ändrat sig och
  * vill ha helböna i stället för malet. Bara mellan SKU:er med EXAKT
@@ -268,17 +326,20 @@ export async function cancelOrderAction(orderId: string) {
  * den nya, med samma expandLineToInventoryTargets-mekanik (kit-
  * expansion m.m.) som resten av lagersystemet - orderraden i sig
  * (kvantitet, pris, moms, totalsumma) ändras aldrig, bara namn/SKU.
- * Bara tillåtet innan ordern fysiskt skickats/avbrutits.
+ * Tillåtet även på en skickad order (rättelse i efterhand) - då flyttas
+ * "skickat" i stället för "reserverat", se moveOrderInventory. Inte på en
+ * avbruten order.
  */
 export async function editOrderLineAction(orderId: string, lineId: string, formData: FormData) {
   await requireCurrentAdmin();
   const order = await getOrderOrRedirect(orderId);
 
-  if (order.fulfillmentStatus !== "unfulfilled" && order.fulfillmentStatus !== "label_created") {
+  if (order.fulfillmentStatus === "cancelled") {
     redirect(
-      `/orders/${orderId}?error=${encodeURIComponent("Ordern är redan skickad eller avbruten - går inte att ändra.")}`,
+      `/orders/${orderId}?error=${encodeURIComponent("Ordern är avbruten - går inte att ändra.")}`,
     );
   }
+  const shipped = order.fulfillmentStatus === "shipped";
 
   const [line] = await db
     .select()
@@ -315,7 +376,9 @@ export async function editOrderLineAction(orderId: string, lineId: string, formD
       )}`,
     );
   }
-  if (newResolved.available < line.quantity) {
+  // Lagerkollen gäller bara innan leverans - för en skickad order har den
+  // nya varan redan fysiskt lämnat lagret, oavsett vad systemet trodde.
+  if (!shipped && newResolved.available < line.quantity) {
     redirect(
       `/orders/${orderId}?error=${encodeURIComponent(
         `Inte tillräckligt i lager av "${newSku}" (${newResolved.available} tillgängligt, behöver ${line.quantity}).`,
@@ -325,6 +388,9 @@ export async function editOrderLineAction(orderId: string, lineId: string, formD
 
   const newName = order.locale === "en-SE" ? newResolved.nameEn : newResolved.nameSv;
 
+  const verbOut = shipped ? "Rättelse efter leverans: skickades inte" : "Reservation släppt";
+  const verbIn = shipped ? "Rättelse efter leverans: skickades" : "Reserverat";
+
   await db.transaction(async (tx) => {
     const releaseTargets = await expandLineToInventoryTargets(
       tx,
@@ -333,42 +399,11 @@ export async function editOrderLineAction(orderId: string, lineId: string, formD
       line.quantity,
       line.id,
     );
-    for (const target of releaseTargets) {
-      const condition = target.variantId
-        ? and(
-            eq(schema.inventory.productId, target.productId),
-            eq(schema.inventory.variantId, target.variantId),
-          )
-        : and(
-            eq(schema.inventory.productId, target.productId),
-            isNull(schema.inventory.variantId),
-          );
-
-      const [inventoryRow] = await tx
-        .select({ id: schema.inventory.id })
-        .from(schema.inventory)
-        .where(condition);
-      if (!inventoryRow) continue;
-
-      await tx
-        .update(schema.inventory)
-        .set({
-          reservedQuantity: sql`${schema.inventory.reservedQuantity} - ${target.quantity}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.inventory.id, inventoryRow.id));
-
-      await tx.insert(schema.inventoryMovements).values({
-        inventoryId: inventoryRow.id,
-        changeAmount: -target.quantity,
-        reason: "order_released",
-        orderId,
-        note:
-          target.productId === oldResolved.productId
-            ? `Reservation släppt: bytt till "${newSku}"`
-            : `Reservation släppt: bytt till "${newSku}" (komponent i "${oldResolved.nameSv}")`,
-      });
-    }
+    await moveOrderInventory(tx, releaseTargets, "out", shipped, orderId, (target) =>
+      target.productId === oldResolved.productId
+        ? `${verbOut}: bytt till "${newSku}"`
+        : `${verbOut}: bytt till "${newSku}" (komponent i "${oldResolved.nameSv}")`,
+    );
 
     const reserveTargets = await expandLineToInventoryTargets(
       tx,
@@ -376,42 +411,11 @@ export async function editOrderLineAction(orderId: string, lineId: string, formD
       newResolved.variantId,
       line.quantity,
     );
-    for (const target of reserveTargets) {
-      const condition = target.variantId
-        ? and(
-            eq(schema.inventory.productId, target.productId),
-            eq(schema.inventory.variantId, target.variantId),
-          )
-        : and(
-            eq(schema.inventory.productId, target.productId),
-            isNull(schema.inventory.variantId),
-          );
-
-      const [inventoryRow] = await tx
-        .select({ id: schema.inventory.id })
-        .from(schema.inventory)
-        .where(condition);
-      if (!inventoryRow) continue;
-
-      await tx
-        .update(schema.inventory)
-        .set({
-          reservedQuantity: sql`${schema.inventory.reservedQuantity} + ${target.quantity}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.inventory.id, inventoryRow.id));
-
-      await tx.insert(schema.inventoryMovements).values({
-        inventoryId: inventoryRow.id,
-        changeAmount: target.quantity,
-        reason: "order_reserved",
-        orderId,
-        note:
-          target.productId === newResolved.productId
-            ? `Reserverat: bytt från "${line.reference}"`
-            : `Reserverat: bytt från "${line.reference}" (komponent i "${newResolved.nameSv}")`,
-      });
-    }
+    await moveOrderInventory(tx, reserveTargets, "in", shipped, orderId, (target) =>
+      target.productId === newResolved.productId
+        ? `${verbIn}: bytt från "${line.reference}"`
+        : `${verbIn}: bytt från "${line.reference}" (komponent i "${newResolved.nameSv}")`,
+    );
 
     await tx
       .update(schema.orderLines)
@@ -440,8 +444,8 @@ export async function editOrderLineAction(orderId: string, lineId: string, formD
  * vilken lagervara som reserveras för just den komponent-"platsen", för
  * den här ordern (sparas i order_line_component_swaps). Inget priskrav:
  * kunden betalade för HELA kitet, inte för den enskilda komponenten.
- * Bara tillåtet innan ordern fysiskt skickats/avbrutits, precis som
- * editOrderLineAction.
+ * Tillåtet även på en skickad order (rättelse i efterhand), precis som
+ * editOrderLineAction - se moveOrderInventory.
  */
 export async function swapLineComponentAction(
   orderId: string,
@@ -451,11 +455,12 @@ export async function swapLineComponentAction(
   await requireCurrentAdmin();
   const order = await getOrderOrRedirect(orderId);
 
-  if (order.fulfillmentStatus !== "unfulfilled" && order.fulfillmentStatus !== "label_created") {
+  if (order.fulfillmentStatus === "cancelled") {
     redirect(
-      `/orders/${orderId}?error=${encodeURIComponent("Ordern är redan skickad eller avbruten - går inte att ändra.")}`,
+      `/orders/${orderId}?error=${encodeURIComponent("Ordern är avbruten - går inte att ändra.")}`,
     );
   }
+  const shipped = order.fulfillmentStatus === "shipped";
 
   const [line] = await db
     .select()
@@ -495,7 +500,7 @@ export async function swapLineComponentAction(
       `/orders/${orderId}?error=${encodeURIComponent("Kan inte byta till ett annat kit som komponent.")}`,
     );
   }
-  if (newResolved.available < current.quantity) {
+  if (!shipped && newResolved.available < current.quantity) {
     redirect(
       `/orders/${orderId}?error=${encodeURIComponent(
         `Inte tillräckligt i lager av "${newSku}" (${newResolved.available} tillgängligt, behöver ${current.quantity}).`,
@@ -503,65 +508,26 @@ export async function swapLineComponentAction(
     );
   }
 
+  const verbOut = shipped ? "Rättelse efter leverans: skickades inte" : "Reservation släppt";
+  const verbIn = shipped ? "Rättelse efter leverans: skickades" : "Reserverat";
+
   await db.transaction(async (tx) => {
-    const releaseCondition = current.variantId
-      ? and(
-          eq(schema.inventory.productId, current.productId),
-          eq(schema.inventory.variantId, current.variantId),
-        )
-      : and(eq(schema.inventory.productId, current.productId), isNull(schema.inventory.variantId));
-
-    const [releaseRow] = await tx
-      .select({ id: schema.inventory.id })
-      .from(schema.inventory)
-      .where(releaseCondition);
-    if (releaseRow) {
-      await tx
-        .update(schema.inventory)
-        .set({
-          reservedQuantity: sql`${schema.inventory.reservedQuantity} - ${current.quantity}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.inventory.id, releaseRow.id));
-      await tx.insert(schema.inventoryMovements).values({
-        inventoryId: releaseRow.id,
-        changeAmount: -current.quantity,
-        reason: "order_released",
-        orderId,
-        note: `Reservation släppt: kit-komponent bytt till "${newSku}" (komponent i "${line.name}")`,
-      });
-    }
-
-    const reserveCondition = newResolved.variantId
-      ? and(
-          eq(schema.inventory.productId, newResolved.productId),
-          eq(schema.inventory.variantId, newResolved.variantId),
-        )
-      : and(
-          eq(schema.inventory.productId, newResolved.productId),
-          isNull(schema.inventory.variantId),
-        );
-
-    const [reserveRow] = await tx
-      .select({ id: schema.inventory.id })
-      .from(schema.inventory)
-      .where(reserveCondition);
-    if (reserveRow) {
-      await tx
-        .update(schema.inventory)
-        .set({
-          reservedQuantity: sql`${schema.inventory.reservedQuantity} + ${current.quantity}`,
-          updatedAt: new Date(),
-        })
-        .where(eq(schema.inventory.id, reserveRow.id));
-      await tx.insert(schema.inventoryMovements).values({
-        inventoryId: reserveRow.id,
-        changeAmount: current.quantity,
-        reason: "order_reserved",
-        orderId,
-        note: `Reserverat: kit-komponent bytt från annan vara (komponent i "${line.name}")`,
-      });
-    }
+    await moveOrderInventory(
+      tx,
+      [{ productId: current.productId, variantId: current.variantId, quantity: current.quantity }],
+      "out",
+      shipped,
+      orderId,
+      () => `${verbOut}: kit-komponent bytt till "${newSku}" (komponent i "${line.name}")`,
+    );
+    await moveOrderInventory(
+      tx,
+      [{ productId: newResolved.productId, variantId: newResolved.variantId, quantity: current.quantity }],
+      "in",
+      shipped,
+      orderId,
+      () => `${verbIn}: kit-komponent bytt från annan vara (komponent i "${line.name}")`,
+    );
 
     await tx
       .insert(schema.orderLineComponentSwaps)
