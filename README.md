@@ -311,6 +311,18 @@ dras från sina komponenter. De senaste 20 uttagen visas under formuläret.
 Kräver migration `drizzle/0016_wise_venus.sql` (kolumnen
 `inventory.allow_backorder` och orsaken `internal_use`).
 
+## Reklamation (ersättningsvara till en kund)
+
+Knappen **"Registrera reklamation"** under "Reklamationer" på en order öppnar en
+modal: välj ersättningsvara (orderns egna varor, inklusive kit-komponenter,
+listas först), antal, orsak (trasig vara, fel vara, saknades i paketet, annat),
+en obligatorisk kommentar och valfritt spårningsnummer för ersättningspaketet.
+Varan dras från "I lager" (`takeFromStock`, samma som eget uttag - ett kit dras
+från sina komponenter) och sparas som lagerrörelse med orsak `internal_use`
+kopplad till ordern (`orderId`), så den visas på ordern och räknas per kund i
+kundlistan - men inte under "Eget uttag". Påverkar inte betalningen. Skickar
+kunden tillbaka något som går att sälja igen: registrera det som retur.
+
 ## Byggordning
 
 Projektet byggs i faser, med avstämning efter varje fas:

@@ -10,6 +10,9 @@ import { oreToKronorInput } from "@/lib/money-input";
 import { OrderStatusChip } from "@/components/order-status-chip";
 import { TestOrderChip } from "@/components/test-order-chip";
 import { SubmitButton } from "@/components/submit-button";
+import { ClaimDialog } from "@/components/claim-dialog";
+import { getClaimOptions, getClaimsForOrder } from "@/lib/orders/claims";
+import { CLAIM_CAUSES } from "@/lib/orders/claim-causes";
 import { FraktStatusBadge } from "@/components/frakt-status-badge";
 import { resolveFraktStatus } from "@/lib/orders/fulfillment-status";
 import {
@@ -22,6 +25,7 @@ import {
   refundFullAction,
   refundPartialAction,
   returnLineComponentAction,
+  registerClaimAction,
   sendTestOrderEmailAction,
   swapLineComponentAction,
 } from "../actions";
@@ -97,6 +101,7 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const saved = "saved" in search;
   const handDelivered = "handDelivered" in search;
   const testEmailSent = typeof search.testEmailSent === "string" ? search.testEmailSent : null;
+  const claimRegistered = "claimRegistered" in search;
 
   const [initialOrder] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
   if (!initialOrder) notFound();
@@ -144,6 +149,18 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   const lineComponentsByLineId = await getOrderLineComponentsByLine(
     lines.map((line) => ({ id: line.id, reference: line.reference, quantity: line.quantity })),
   );
+
+  // Reklamationer: orderns egna varor (inkl. kit-komponenter) listas först
+  // i modalens rullista.
+  const orderItemKeys = new Set(
+    [...lineComponentsByLineId.values()]
+      .flat()
+      .map((component) => `${component.productId}|${component.variantId ?? ""}`),
+  );
+  const [claims, claimOptions] = await Promise.all([
+    getClaimsForOrder(order.id),
+    getClaimOptions(orderItemKeys),
+  ]);
 
   // Fraktstatus hämtas live från PostNords Track & Trace-API för
   // riktiga PostNord-spårningsnummer (inte "(ingen spårning)" för
@@ -779,6 +796,40 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
               </SubmitButton>
             </form>
           </div>
+        ) : null}
+      </section>
+
+      <section id="reklamationer" className="flex flex-col gap-4">
+        <h2 className="tran-label text-xs text-tran-muted">Reklamationer</h2>
+        {claimRegistered ? (
+          <p className="border border-tran-hairline px-4 py-3 text-sm text-tran-muted">
+            Reklamation registrerad - ersättningsvaran är dragen från lagret.
+          </p>
+        ) : null}
+        {claims.length > 0 ? (
+          <ul className="flex flex-col gap-3 text-sm">
+            {claims.map((claim) => (
+              <li key={claim.createdAt.toISOString()} className="border-l-2 border-tran-black pl-3">
+                <p className="tran-tabular text-xs text-tran-muted">
+                  {formatDateTime(claim.createdAt)}
+                </p>
+                <p>
+                  {claim.items.map((item) => `${item.quantity}x ${item.name}`).join(", ")}
+                </p>
+                {claim.note ? <p className="text-xs text-tran-muted">{claim.note}</p> : null}
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="text-sm text-tran-muted">Inga reklamationer.</p>
+        )}
+        {order.fulfillmentStatus !== "cancelled" ? (
+          <ClaimDialog
+            orderNumber={order.orderNumber}
+            action={registerClaimAction.bind(null, order.id)}
+            options={claimOptions}
+            causes={CLAIM_CAUSES}
+          />
         ) : null}
       </section>
 

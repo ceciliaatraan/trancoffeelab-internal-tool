@@ -1,5 +1,5 @@
 import "server-only";
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq, isNull } from "drizzle-orm";
 import { db, schema } from "@/db";
 
 export type InternalUseEntry = {
@@ -12,7 +12,7 @@ export type InternalUseEntry = {
   createdAt: Date;
 };
 
-/** Senaste egna uttagen ur lagret (orsak internal_use), nyast först. */
+/** Senaste egna uttagen ur lagret (orsak internal_use, utan order), nyast först. */
 export async function getRecentInternalUse(limit = 20): Promise<InternalUseEntry[]> {
   const rows = await db
     .select({
@@ -27,7 +27,13 @@ export async function getRecentInternalUse(limit = 20): Promise<InternalUseEntry
     .innerJoin(schema.inventory, eq(schema.inventory.id, schema.inventoryMovements.inventoryId))
     .innerJoin(schema.products, eq(schema.products.id, schema.inventory.productId))
     .leftJoin(schema.productVariants, eq(schema.productVariants.id, schema.inventory.variantId))
-    .where(eq(schema.inventoryMovements.reason, "internal_use"))
+    // Reklamationer (internal_use MED orderId) visas på ordern, inte här.
+    .where(
+      and(
+        eq(schema.inventoryMovements.reason, "internal_use"),
+        isNull(schema.inventoryMovements.orderId),
+      ),
+    )
     .orderBy(desc(schema.inventoryMovements.createdAt))
     .limit(limit);
 

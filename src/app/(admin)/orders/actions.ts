@@ -19,6 +19,8 @@ import {
 } from "@/lib/kustom/client";
 import { markOrderShipped } from "@/lib/orders/mark-shipped";
 import { captureOrderOnShipment } from "@/lib/orders/capture-on-shipment";
+import { takeFromStock } from "@/lib/inventory/take-from-stock";
+import { CLAIM_CAUSES, CLAIM_NOTE_PREFIX } from "@/lib/orders/claim-causes";
 import { buildOrderConfirmationInputFromDb } from "@/lib/orders/order-confirmation-input";
 import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
 
@@ -554,6 +556,54 @@ export async function swapLineComponentAction(
   revalidatePath("/orders");
   revalidatePath("/inventory");
   redirect(`/orders/${orderId}?saved=1`);
+}
+
+/**
+ * Registrerar en reklamation: en ersättningsvara skickad till kunden utan
+ * kostnad (t.ex. ett trasigt phin-filter som ersätts med ett nytt). Drar
+ * varan från "I lager" via takeFromStock (samma som eget uttag, kit dras
+ * från sina komponenter) och kopplar lagerrörelsen till ordern, så den syns
+ * under "Reklamationer" på ordern och räknas på kunden. Orsak + kommentar
+ * (och ev. spårningsnummer för ersättningspaketet) sparas i anteckningen.
+ * Rör inte betalningen - en ev. återbetalning görs separat. Den trasiga
+ * varan läggs INTE tillbaka i lager; skickar kunden tillbaka något som går
+ * att sälja igen, registrera det som retur.
+ */
+export async function registerClaimAction(orderId: string, formData: FormData) {
+  const admin = await requireCurrentAdmin();
+  const order = await getOrderOrRedirect(orderId);
+
+  const inventoryId = formData.get("inventoryId")?.toString() ?? "";
+  const quantity = Number(formData.get("quantity"));
+  const causeKey = formData.get("cause")?.toString() ?? "";
+  const comment = formData.get("comment")?.toString().trim() ?? "";
+  const trackingNumber = formData.get("trackingNumber")?.toString().trim() || null;
+
+  const fail = (message: string) =>
+    redirect(`/orders/${orderId}?error=${encodeURIComponent(message)}#reklamationer`);
+
+  if (!inventoryId) fail("Välj vilken vara som skickas som ersättning.");
+  if (!Number.isInteger(quantity) || quantity <= 0) fail("Ange ett antal större än 0.");
+  if (!(causeKey in CLAIM_CAUSES)) fail("Välj en orsak.");
+  if (!comment) fail("Skriv en kommentar om varför.");
+
+  const cause = CLAIM_CAUSES[causeKey as keyof typeof CLAIM_CAUSES];
+  const note = `${CLAIM_NOTE_PREFIX} (${cause}): ${comment}${
+    trackingNumber ? ` - ersättning skickad, spårning ${trackingNumber}` : ""
+  }`;
+
+  await db
+    .transaction(async (tx) => {
+      await takeFromStock(tx, { inventoryId, quantity, note, adminId: admin.id, orderId: order.id });
+    })
+    .catch((err) => {
+      fail(err instanceof Error ? err.message : "Något gick fel.");
+    });
+
+  revalidatePath(`/orders/${orderId}`);
+  revalidatePath("/inventory");
+  revalidatePath("/customers");
+  redirect(`/orders/${orderId}?claimRegistered=1#reklamationer`);
 }
 
 /**

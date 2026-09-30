@@ -2,6 +2,7 @@ import { desc, eq, ilike, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatOre } from "@/lib/format";
 import { SubmitButton } from "@/components/submit-button";
+import { getClaimCountsByCustomer } from "@/lib/orders/claims";
 
 export default async function CustomersPage({ searchParams }: PageProps<"/customers">) {
   const params = await searchParams;
@@ -23,6 +24,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/custom
     .groupBy(schema.customers.id)
     .orderBy(desc(schema.customers.createdAt))
     .limit(100);
+  const claimCounts = await getClaimCountsByCustomer();
 
   return (
     <div className="flex flex-col gap-8">
@@ -57,6 +59,7 @@ export default async function CustomersPage({ searchParams }: PageProps<"/custom
               <th className="py-3 pr-4 font-medium">E-post</th>
               <th className="py-3 pr-4 font-medium">Ordrar</th>
               <th className="py-3 pr-4 font-medium">Totalt köpt</th>
+              <th className="py-3 pr-4 font-medium">Reklamationer</th>
               <th className="py-3 pr-4 font-medium">Nyhetsbrev</th>
               <th className="py-3 pr-4 font-medium">GDPR</th>
             </tr>
@@ -70,6 +73,11 @@ export default async function CustomersPage({ searchParams }: PageProps<"/custom
                 <td className="py-4 pr-4 text-tran-muted">{customer.email}</td>
                 <td className="tran-tabular py-4 pr-4">{customer.orderCount}</td>
                 <td className="tran-tabular py-4 pr-4">{formatOre(customer.totalSpentOre)}</td>
+                <td
+                  className={`tran-tabular py-4 pr-4 ${claimCounts.get(customer.id) ? "text-tran-red" : "text-tran-muted"}`}
+                >
+                  {claimCounts.get(customer.id) ?? 0}
+                </td>
                 <td className="py-4 pr-4 text-tran-muted">
                   {customer.marketingConsent ? "Ja" : "Nej"}
                 </td>
