@@ -750,6 +750,18 @@ från Kustom och försöks inte igen. Ett misslyckat capture ångrar aldrig
 "skickad"-markeringen; knappen visar felet och uppmanar till manuell
 debitering.
 
+## RÄTTELSE: `selected_shipping_option.id` är INTE ett PostNord-ID, 2026-09-30
+
+Antagandet i avsnittet "PostNord-ID = `selected_shipping_option.id`?" ovan var
+FEL. Orderlistan visade samma värde (`ESO7XUMRJZT1D89C`) på alla ordrar - det
+är ID:t för det valda FRAKTALTERNATIVET ("Hållbar leverans till postlåda/
+dörr"), inte för den enskilda bokningen/skickningen. `postnordBookingId` är
+borttagen: värdet visas inte längre på ordern eller i listan, går inte att
+söka på, och provas inte längre i PostNord-synken. Orderlistans nummer under
+fraktstatusen är nu bara spårningsnummer (skickningens eller fraktsedelns).
+Det finns fortfarande inget bekräftat fält i Kustoms orderdata som pekar ut
+PostNords unika bokning.
+
 ## Status i koden
 
 | Del | Status |

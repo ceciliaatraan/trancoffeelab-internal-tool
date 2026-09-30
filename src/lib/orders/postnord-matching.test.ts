@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   acceptsMatch,
   isHandedOverToPostnord,
-  postnordBookingId,
   postnordLookupCandidates,
 } from "./postnord-matching";
 
@@ -50,8 +49,6 @@ describe("postnordLookupCandidates", () => {
     });
     expect(candidates).toEqual([
       { value: "ECVZHHG5EVRRWFSJ", kind: "identifier", unique: true },
-      { value: "ESO7XUMRJZT1D89C", kind: "identifier", unique: true },
-      { value: "ESO7XUMRJZT1D89C", kind: "reference", unique: true },
       { value: "00370000000000000001", kind: "identifier", unique: true },
       { value: "KS6LPXL50IPPGPB4ZN", kind: "identifier", unique: true },
       { value: "KS6LPXL50IPPGPB4ZN", kind: "reference", unique: true },
@@ -87,25 +84,7 @@ describe("postnordLookupCandidates", () => {
     })
       .filter((c) => c.kind === "identifier")
       .map((c) => c.value);
-    expect(values).toEqual(["x", "SHIP1", "TRACK1"]);
-  });
-});
-
-describe("postnordBookingId", () => {
-  it("läser PostNords boknings-ID ur Kustoms valda fraktalternativ", () => {
-    expect(
-      postnordBookingId({ selected_shipping_option: { id: "ESO7XUMRJZT1D89C", carrier: "postnord" } }),
-    ).toBe("ESO7XUMRJZT1D89C");
-    expect(postnordBookingId({ selected_shipping_option: { id: "ESO7XUMRJZT1D89C" } })).toBe(
-      "ESO7XUMRJZT1D89C",
-    );
-  });
-
-  it("ignorerar andra fraktbolag och saknad data", () => {
-    expect(postnordBookingId({ selected_shipping_option: { id: "X1", carrier: "dhl" } })).toBeNull();
-    expect(postnordBookingId({ selected_shipping_option: { id: "" } })).toBeNull();
-    expect(postnordBookingId({})).toBeNull();
-    expect(postnordBookingId(null)).toBeNull();
+    expect(values).toEqual(["SHIP1", "TRACK1"]);
   });
 });
 

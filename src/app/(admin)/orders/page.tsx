@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { and, asc, desc, eq, ilike, inArray, or, sql } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, or, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { formatOre, formatDateTime } from "@/lib/format";
 import { OrderStatusChip } from "@/components/order-status-chip";
@@ -20,7 +20,7 @@ import {
   parsePageParams,
   visiblePages,
 } from "@/lib/orders/pagination";
-import { postnordBookingId } from "@/lib/orders/postnord-matching";
+import { containsPattern, searchTerms } from "@/lib/orders/order-search";
 import { paymentMethodInfo } from "@/lib/kustom/payment-methods";
 
 // Ger bakgrundssynken mot Kustom/PostNord (scheduleBackgroundSync) tid att gå igenom
@@ -52,21 +52,32 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
     );
   }
   if (query) {
-    const orderNumber = Number(query);
+    // Varje ord ska finnas någonstans i orderns sökbara text: namn (leverans
+    // och faktura), företag, adress, postnummer (även utan mellanslag), ort,
+    // e-post och fraktsedelns spårningsnummer. Ordernummer och skickningars
+    // spårningsnummer matchas på hela söksträngen.
+    const shipping = sql`${schema.orders.shippingAddress}`;
+    const billing = sql`${schema.orders.billingAddress}`;
+    const searchable = sql`concat_ws(' ',
+      ${schema.orders.customerEmail},
+      ${shipping}->>'given_name', ${shipping}->>'family_name', ${shipping}->>'organization_name',
+      ${shipping}->>'street_address', ${shipping}->>'street_address2',
+      ${shipping}->>'postal_code', replace(${shipping}->>'postal_code', ' ', ''), ${shipping}->>'city',
+      ${billing}->>'given_name', ${billing}->>'family_name', ${billing}->>'organization_name',
+      ${schema.orders.labelTrackingNumber})`;
+    const orderNumber = Number(query.replace(/^#/, ""));
     conditions.push(
       or(
-        ilike(schema.orders.customerEmail, `%${query}%`),
         Number.isInteger(orderNumber) ? eq(schema.orders.orderNumber, orderNumber) : sql`false`,
-        // PostNords boknings-ID (se postnordBookingId) - klistra in ID:t från
-        // PostNords portal för att hitta ordern.
-        sql`${schema.orders.rawKustomOrder}->'selected_shipping_option'->>'id' ilike ${query}`,
+        and(...searchTerms(query).map((term) => sql`${searchable} ilike ${containsPattern(term)}`)),
+        sql`exists (select 1 from ${schema.shipments} where ${schema.shipments.orderId} = ${schema.orders.id} and ${schema.shipments.trackingNumber} ilike ${containsPattern(query)})`,
       ),
     );
   }
   const where = conditions.length > 0 ? and(...conditions) : undefined;
 
   // Bara de kolumner listan visar - INTE hela raw_kustom_order (flera kB per
-  // order); betalsätt och PostNord-ID plockas ut direkt i databasen.
+  // order); betalsättet plockas ut direkt i databasen.
   const selectPage = (pageNumber: number) =>
     db
       .select({
@@ -83,8 +94,6 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
         labelTrackingNumber: schema.orders.labelTrackingNumber,
         createdAt: schema.orders.createdAt,
         paymentMethod: sql<unknown>`${schema.orders.rawKustomOrder}->'initial_payment_method'`,
-        shippingOptionId: sql<string | null>`${schema.orders.rawKustomOrder}->'selected_shipping_option'->>'id'`,
-        shippingCarrier: sql<string | null>`${schema.orders.rawKustomOrder}->'selected_shipping_option'->>'carrier'`,
       })
       .from(schema.orders)
       .where(where)
@@ -155,11 +164,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
     itemsByOrderId.set(line.orderId, existing);
   }
 
-  // PostNord-nummer under fraktstatusen: spårningsnumret om ordern har en
-  // skickning (inmatat för hand eller hittat av PostNord-synken), annars
-  // PostNords boknings-ID från Kustom (postnordBookingId) - det finns bara
-  // för ordrar lagda efter att Kustom Shipping Assistant kopplades in
-  // 2026-09-21, äldre ordrar har bara spårningsnumret.
+  // Spårningsnummer under fraktstatusen: från skickningen (inmatat för hand
+  // eller hittat av PostNord-synken), annars fraktsedelns.
   const trackingNumberByOrderId = new Map<string, string>();
   for (const row of shipmentRows) {
     if (row.trackingNumber === "(ingen spårning)") continue;
@@ -187,7 +193,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
         {perPage !== DEFAULT_PER_PAGE ? <input type="hidden" name="perPage" value={perPage} /> : null}
         <div>
           <label className="tran-label mb-1.5 block text-xs text-tran-muted" htmlFor="q">
-            Sök (ordernummer/e-post/PostNord-ID)
+            Sök (ordernr, namn, adress, e-post, spårningsnr)
           </label>
           <input
             id="q"
@@ -249,11 +255,7 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
                 label: order.fulfillmentStatus,
               };
               const postnordNumber =
-                trackingNumberByOrderId.get(order.id) ??
-                order.labelTrackingNumber ??
-                postnordBookingId({
-                  selected_shipping_option: { id: order.shippingOptionId, carrier: order.shippingCarrier },
-                });
+                trackingNumberByOrderId.get(order.id) ?? order.labelTrackingNumber;
 
               return (
                 <TableRowLink
