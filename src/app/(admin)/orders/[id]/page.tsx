@@ -547,18 +547,17 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         ) : null}
         {paymentMethod?.payLater && remainingToCapture > 0 && order.fulfillmentStatus !== "cancelled" ? (
           <p className="text-xs text-tran-muted">
-            Betala senare: kunden betalar ingenting förrän ordern debiteras. När du trycker
-            &quot;Debitera&quot; skickas fakturan till kunden (i Klarnas app) och betalfristen
-            börjar räknas - debitera därför när paketet skickas.
+            Betala senare: kunden betalar ingenting förrän ordern debiteras. Vid debiteringen
+            skickas fakturan till kunden (i Klarnas app) och betalfristen börjar räknas.
           </p>
         ) : null}
         {remainingToCapture > 0 &&
         order.fulfillmentStatus !== "cancelled" &&
         authorizationExpiresAt ? (
           <p className="text-xs text-tran-muted">
-            Inte debiterad än. Reservationen hos Kustom gäller till{" "}
-            {formatDateTime(authorizationExpiresAt)} - debitera innan dess, annars går
-            betalningen förlorad.
+            Inte debiterad än - debiteras automatiskt när ordern markeras som skickad.
+            Reservationen hos Kustom gäller till {formatDateTime(authorizationExpiresAt)} - skickas
+            ordern inte innan dess går betalningen förlorad.
           </p>
         ) : null}
         <div className="flex flex-wrap gap-3">

@@ -18,6 +18,7 @@ import {
   refundOrder,
 } from "@/lib/kustom/client";
 import { markOrderShipped } from "@/lib/orders/mark-shipped";
+import { captureOrderOnShipment } from "@/lib/orders/capture-on-shipment";
 import { buildOrderConfirmationInputFromDb } from "@/lib/orders/order-confirmation-input";
 import { sendOrderConfirmationEmail } from "@/lib/email/order-confirmation";
 
@@ -752,9 +753,22 @@ export async function markShippedAction(orderId: string, formData: FormData) {
     );
   }
 
+  // Debitera det som återstår direkt när ordern skickas (se
+  // capture-on-shipment.ts). Ett fel här ångrar INTE att ordern är skickad
+  // - paketet har ju gått - men visas, och bakgrundssynken försöker igen.
+  let captureError: string | null = null;
+  try {
+    await captureOrderOnShipment(orderId);
+  } catch (err) {
+    captureError = `Ordern är markerad som skickad, men den automatiska debiteringen misslyckades: ${kustomErrorMessage(err)} Tryck "Debitera" under Betalning.`;
+  }
+
   revalidatePath(`/orders/${orderId}`);
   revalidatePath("/orders");
   revalidatePath("/inventory");
+  if (captureError) {
+    redirect(`/orders/${orderId}?error=${encodeURIComponent(captureError)}`);
+  }
   // handDelivered-flaggan låter sidan visa en påminnelse om att avboka
   // fraktsedeln hos PostNord manuellt (om en redan skapats där) - vi
   // skriver aldrig till PostNords system själva, se markLabelCreatedAction.

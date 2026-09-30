@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { syncPostnordForOpenOrders } from "@/lib/orders/postnord-auto-sync";
 import { refreshUnsettledOrdersFromKustom } from "@/lib/orders/kustom-refresh";
+import { captureShippedButUncapturedOrders } from "@/lib/orders/capture-on-shipment";
 
 export const maxDuration = 60;
 
@@ -18,5 +19,6 @@ export async function GET(request: Request) {
 
   const refreshedFromKustom = await refreshUnsettledOrdersFromKustom();
   const counts = await syncPostnordForOpenOrders({ maxAgeDays: null });
-  return NextResponse.json({ refreshedFromKustom, ...counts });
+  const capture = await captureShippedButUncapturedOrders();
+  return NextResponse.json({ refreshedFromKustom, ...counts, capture });
 }

@@ -731,6 +731,25 @@ jämförts för en och samma order, och inte heller att PostNords Track &
 Trace känner igen det - visningen/sökningen fungerar oavsett, statusen
 uppdateras bara automatiskt om Track & Trace hittar det.
 
+## Automatisk debitering när ordern markeras som skickad, 2026-09-30
+
+Ägarens beslut: betala senare-ordrar (Klarna faktura/delbetalning,
+företagsfaktura/Billie) ska debiteras automatiskt när paketet markerats som
+skickat, "så att vi inte behöver tänka på det". `captureOrderOnShipment`
+(`src/lib/orders/capture-on-shipment.ts`) körs efter varje "skickad"-
+markering - knappen "Markera som skickad", "Levererad för hand" och
+PostNord-synken - och debiterar `remaining_authorized_amount` enligt Kustoms
+FÄRSKA läge (bara om status är AUTHORIZED/PART_CAPTURED), med fast
+idempotensnyckel per order+belopp. Kort/Swish/Klarna betala nu och
+förbeställningar är redan debiterade vid ordertillfället, så för dem blir det
+en no-op. `captureShippedButUncapturedOrders` debiterar skickade ordrar som
+fortfarande inte är debiterade (t.ex. skickade innan detta fanns, eller om
+Kustom inte svarade) - i bakgrundssynken högst var 10:e minut och i den
+dagliga cron-körningen. En reservation som hunnit gå ut får status EXPIRED
+från Kustom och försöks inte igen. Ett misslyckat capture ångrar aldrig
+"skickad"-markeringen; knappen visar felet och uppmanar till manuell
+debitering.
+
 ## Status i koden
 
 | Del | Status |

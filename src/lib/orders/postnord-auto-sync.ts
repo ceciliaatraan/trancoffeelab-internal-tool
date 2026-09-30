@@ -10,6 +10,10 @@ import {
 } from "@/lib/postnord/client";
 import { markOrderShipped } from "@/lib/orders/mark-shipped";
 import {
+  captureOrderOnShipment,
+  captureShippedButUncapturedOrders,
+} from "@/lib/orders/capture-on-shipment";
+import {
   forEachConcurrently,
   refreshOrderFromKustom,
   refreshUnsettledOrdersFromKustomIfDue,
@@ -29,6 +33,7 @@ type SyncCounts = Record<PostnordSyncOutcome, number>;
 
 const RECENT_DAYS = 30;
 const THROTTLE_MS = 10 * 60 * 1000;
+const CAPTURE_CATCH_UP_INTERVAL_MS = 10 * 60 * 1000;
 const FULL_RUN_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const CONCURRENCY = 4;
 
@@ -85,7 +90,14 @@ export async function syncPostnordForOrder(order: OpenOrder): Promise<PostnordSy
 
   if (isHandedOverToPostnord(shipment)) {
     const shipped = await markOrderShipped(order.id, "PostNord", shipment.shipmentId);
-    return shipped ? "shipped" : "unchanged";
+    if (!shipped) return "unchanged";
+    try {
+      await captureOrderOnShipment(order.id);
+    } catch (err) {
+      // captureShippedButUncapturedOrders i bakgrundssynken försöker igen.
+      console.error("Automatisk debitering misslyckades för order", order.orderNumber, err);
+    }
+    return "shipped";
   }
 
   if (
@@ -161,6 +173,7 @@ export async function syncPostnordForOpenOrders({
 }
 
 let lastPostnordRun = 0;
+let lastCaptureCatchUpRun = 0;
 let lastFullPostnordRun = 0;
 
 /**
@@ -170,6 +183,8 @@ let lastFullPostnordRun = 0;
  *   annulleringar gjorda i Kustoms portal syns hos oss) - högst varannan
  *   minut, oberoende av PostNord (refreshUnsettledOrdersFromKustomIfDue;
  *   orderlistan har redan väntat in den själv innan den visades).
+ * - Debitering: debiterar skickade ordrar som ännu inte debiterats
+ *   (captureShippedButUncapturedOrders) - högst var 10:e minut.
  * - PostNord: kopplar öppna ordrar till sina skickningar - högst var 10:e
  *   minut, så sidvisningar inte bränner PostNords anropskvot. Vanligtvis de
  *   senaste 30 dagarnas ordrar; högst en gång per dygn (och första gången
@@ -178,6 +193,8 @@ let lastFullPostnordRun = 0;
  */
 export function scheduleBackgroundSync(): void {
   const now = Date.now();
+  const runCaptureCatchUp = now - lastCaptureCatchUpRun >= CAPTURE_CATCH_UP_INTERVAL_MS;
+  if (runCaptureCatchUp) lastCaptureCatchUpRun = now;
   const runPostnord = Boolean(process.env.POSTNORD_API_KEY) && now - lastPostnordRun >= THROTTLE_MS;
   let full = false;
   if (runPostnord) {
@@ -188,6 +205,13 @@ export function scheduleBackgroundSync(): void {
 
   after(async () => {
     await refreshUnsettledOrdersFromKustomIfDue();
+    if (runCaptureCatchUp) {
+      try {
+        await captureShippedButUncapturedOrders();
+      } catch (err) {
+        console.error("Automatisk debitering i bakgrunden misslyckades", err);
+      }
+    }
     if (runPostnord) {
       try {
         await syncPostnordForOpenOrders({ maxAgeDays: full ? null : RECENT_DAYS });
