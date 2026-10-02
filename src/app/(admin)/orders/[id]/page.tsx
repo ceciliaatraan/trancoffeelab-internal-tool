@@ -36,7 +36,11 @@ import {
   trackPostnordShipment,
   type PostnordShipmentTracking,
 } from "@/lib/postnord/client";
-import { syncPostnordForOrder } from "@/lib/orders/postnord-auto-sync";
+import {
+  syncPostnordForOrderWithReport,
+  type PostnordLookupAttempt,
+} from "@/lib/orders/postnord-auto-sync";
+import { kustomShipmentReference } from "@/lib/orders/postnord-matching";
 import { refreshOrderFromKustom } from "@/lib/orders/kustom-refresh";
 import { paymentMethodInfo } from "@/lib/kustom/payment-methods";
 
@@ -128,14 +132,17 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
   // fraktsedel/ett nyss lämnat paket syns utan att vänta på bakgrunds-
   // synken - se postnord-auto-sync.ts. Ett PostNord-fel får aldrig hindra
   // sidan från att visas.
-  const syncOutcome = await syncPostnordForOrder(order).catch((err) => {
-    console.error("PostNord-synk misslyckades för order", order.orderNumber, err);
-    return "unchanged" as const;
-  });
+  const { outcome: syncOutcome, attempts: postnordAttempts } =
+    await syncPostnordForOrderWithReport(order).catch((err) => {
+      console.error("PostNord-synk misslyckades för order", order.orderNumber, err);
+      return { outcome: "unchanged" as const, attempts: null };
+    });
   if (syncOutcome === "label_created" || syncOutcome === "shipped") {
     const [refreshed] = await db.select().from(schema.orders).where(eq(schema.orders.id, id));
     if (refreshed) order = refreshed;
   }
+
+  const kustomShipmentId = kustomShipmentReference(order.rawKustomOrder);
 
   const [lines, events, shipmentRows, swapCandidates] = await Promise.all([
     db
@@ -745,12 +752,22 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
           <p className="text-sm text-tran-muted">Inte skickad än.</p>
         )}
 
+        {kustomShipmentId ? (
+          <p className="text-xs text-tran-muted">
+            Kustoms frakt-ID (tms_reference): <span className="font-mono">{kustomShipmentId}</span>
+          </p>
+        ) : null}
+
         {canShip ? (
           <p className="text-xs text-tran-muted">
             Kopplas automatiskt: när fraktsedeln skapats hos PostNord fylls spårningsnumret i här,
             och när paketet lämnats/hämtats markeras ordern som skickad. Formulären nedan behövs
             bara om något ska fyllas i för hand.
           </p>
+        ) : null}
+
+        {postnordAttempts && postnordAttempts.length > 0 ? (
+          <PostnordAttempts attempts={postnordAttempts} />
         ) : null}
 
         {canMarkLabelCreated ? (
@@ -917,5 +934,35 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         </section>
       ) : null}
     </div>
+  );
+}
+
+const ATTEMPT_RESULT_LABELS: Record<PostnordLookupAttempt["result"], string> = {
+  match: "Träff",
+  no_hit: "Ingen träff",
+  postcode_mismatch: "Träff, men annat postnummer - kopplas inte",
+  error: "Fel",
+};
+
+/**
+ * Vad den automatiska PostNord-kopplingen sökte på för den här ordern och
+ * vad PostNord svarade - så det syns varför en order (inte) kopplats.
+ */
+function PostnordAttempts({ attempts }: { attempts: PostnordLookupAttempt[] }) {
+  return (
+    <details className="text-xs text-tran-muted">
+      <summary className="cursor-pointer">Så letade vi hos PostNord</summary>
+      <ul className="mt-2 flex flex-col gap-1">
+        {attempts.map((attempt) => (
+          <li key={`${attempt.kind}-${attempt.value}`}>
+            {attempt.label}{" "}
+            <span className="font-mono">{attempt.value}</span>{" "}
+            ({attempt.kind === "identifier" ? "som spårnings-ID" : "som referens"}):{" "}
+            {ATTEMPT_RESULT_LABELS[attempt.result]}
+            {attempt.detail ? ` - ${attempt.detail}` : ""}
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }

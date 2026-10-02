@@ -77,7 +77,13 @@ function toShipmentTracking(shipment: RawShipment): PostnordShipmentTracking {
   };
 }
 
-async function getTrackAndTrace(url: string): Promise<RawShipment[]> {
+type TrackAndTraceResult = {
+  shipments: RawShipment[];
+  /** PostNords förklaring när inget hittades (compositeFault), t.ex. "Not found". */
+  fault: string | null;
+};
+
+async function getTrackAndTrace(url: string): Promise<TrackAndTraceResult> {
   let response: Response;
   try {
     response = await fetch(url, {
@@ -102,7 +108,15 @@ async function getTrackAndTrace(url: string): Promise<RawShipment[]> {
   // bekräftades bara med ett 403-exempel (fel auth i PostNords egen
   // dokumentation), aldrig ett lyckat svar, så vi litar inte blint på att
   // svarsformen är identisk med findByIdentifier.
-  return data.TrackingInformationResponse?.shipments ?? [];
+  const faults = data.TrackingInformationResponse?.compositeFault?.faults ?? [];
+  return {
+    shipments: data.TrackingInformationResponse?.shipments ?? [],
+    fault:
+      faults
+        .map((f) => f.explanationText || f.faultCode)
+        .filter(Boolean)
+        .join("; ") || null,
+  };
 }
 
 /**
@@ -120,15 +134,8 @@ export async function trackPostnordShipment(
   trackingId: string,
   locale: "sv" | "en" = "sv",
 ): Promise<PostnordShipmentTracking | null> {
-  const apiKey = process.env.POSTNORD_API_KEY;
-  if (!apiKey) {
-    throw new PostnordApiError("POSTNORD_API_KEY saknas.");
-  }
-
-  const url = `${POSTNORD_HOST}/rest/shipment/v5/trackandtrace/findByIdentifier.json?apikey=${encodeURIComponent(apiKey)}&id=${encodeURIComponent(trackingId)}&locale=${locale}`;
-  const shipments = await getTrackAndTrace(url);
-  const shipment = shipments[0];
-  return shipment ? toShipmentTracking(shipment) : null;
+  const { shipments } = await lookupPostnordShipments("identifier", trackingId, locale);
+  return shipments[0] ?? null;
 }
 
 /**
@@ -148,6 +155,35 @@ export async function findPostnordShipmentsByReference(
   referenceValue: string,
   locale: "sv" | "en" = "sv",
 ): Promise<PostnordShipmentTracking[]> {
+  return (await lookupPostnordShipments("reference", referenceValue, locale)).shipments;
+}
+
+export type PostnordLookupResult = {
+  shipments: PostnordShipmentTracking[];
+  fault: string | null;
+};
+
+/**
+ * Samma uppslag som trackPostnordShipment/findPostnordShipmentsByReference,
+ * men med PostNords egen förklaring när inget hittades - för den
+ * automatiska kopplingen, så orderdetaljen kan visa VAD PostNord svarade
+ * på varje sökning (se postnord-auto-sync.ts).
+ */
+export async function lookupPostnordShipments(
+  kind: "identifier" | "reference",
+  value: string,
+  locale: "sv" | "en" = "sv",
+): Promise<PostnordLookupResult> {
+  if (kind === "identifier") {
+    const apiKey = process.env.POSTNORD_API_KEY;
+    if (!apiKey) {
+      throw new PostnordApiError("POSTNORD_API_KEY saknas.");
+    }
+    const url = `${POSTNORD_HOST}/rest/shipment/v5/trackandtrace/findByIdentifier.json?apikey=${encodeURIComponent(apiKey)}&id=${encodeURIComponent(value)}&locale=${locale}`;
+    const { shipments, fault } = await getTrackAndTrace(url);
+    return { shipments: shipments.slice(0, 1).map(toShipmentTracking), fault };
+  }
+
   const apiKey = process.env.POSTNORD_API_KEY;
   const customerNumber = process.env.POSTNORD_CUSTOMER_NUMBER;
   if (!apiKey) {
@@ -157,9 +193,9 @@ export async function findPostnordShipmentsByReference(
     throw new PostnordApiError("POSTNORD_CUSTOMER_NUMBER saknas.");
   }
 
-  const url = `${POSTNORD_HOST}/rest/shipment/v5/trackandtrace/findByReference.json?apikey=${encodeURIComponent(apiKey)}&customerNumber=${encodeURIComponent(customerNumber)}&referenceValue=${encodeURIComponent(referenceValue)}&locale=${locale}`;
-  const shipments = await getTrackAndTrace(url);
-  return shipments.map(toShipmentTracking);
+  const url = `${POSTNORD_HOST}/rest/shipment/v5/trackandtrace/findByReference.json?apikey=${encodeURIComponent(apiKey)}&customerNumber=${encodeURIComponent(customerNumber)}&referenceValue=${encodeURIComponent(value)}&locale=${locale}`;
+  const { shipments, fault } = await getTrackAndTrace(url);
+  return { shipments: shipments.map(toShipmentTracking), fault };
 }
 
 /**

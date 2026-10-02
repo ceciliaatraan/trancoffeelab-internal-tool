@@ -4,8 +4,7 @@ import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { db, schema } from "@/db";
 import {
   PostnordApiError,
-  findPostnordShipmentsByReference,
-  trackPostnordShipment,
+  lookupPostnordShipments,
   type PostnordShipmentTracking,
 } from "@/lib/postnord/client";
 import { markOrderShipped } from "@/lib/orders/mark-shipped";
@@ -37,23 +36,34 @@ const CAPTURE_CATCH_UP_INTERVAL_MS = 10 * 60 * 1000;
 const FULL_RUN_INTERVAL_MS = 24 * 60 * 60 * 1000;
 const CONCURRENCY = 4;
 
-async function lookup(candidate: LookupCandidate): Promise<PostnordShipmentTracking[]> {
+/** Vad en enskild sökning hos PostNord gav - visas på orderdetaljen. */
+export type PostnordLookupAttempt = {
+  label: string;
+  value: string;
+  kind: LookupCandidate["kind"];
+  result: "match" | "no_hit" | "postcode_mismatch" | "error";
+  /** PostNords förklaring eller felmeddelandet, när det finns. */
+  detail: string | null;
+};
+
+async function lookup(
+  candidate: LookupCandidate,
+): Promise<{ shipments: PostnordShipmentTracking[]; detail: string | null; failed: boolean }> {
   try {
-    if (candidate.kind === "identifier") {
-      const result = await trackPostnordShipment(candidate.value, "sv");
-      return result ? [result] : [];
-    }
-    return await findPostnordShipmentsByReference(candidate.value, "sv");
+    const { shipments, fault } = await lookupPostnordShipments(candidate.kind, candidate.value, "sv");
+    return { shipments, detail: fault, failed: false };
   } catch (err) {
     // Ett enskilt misslyckat uppslag (fel format, saknat kundnummer,
     // PostNord nere, timeout - getTrackAndTrace gör om alla nätverksfel
     // till PostnordApiError) ska aldrig stoppa resten av synken.
-    if (err instanceof PostnordApiError) return [];
+    if (err instanceof PostnordApiError) return { shipments: [], detail: err.message, failed: true };
     throw err;
   }
 }
 
-async function findShipmentForOrder(order: OpenOrder): Promise<PostnordShipmentTracking | null> {
+async function findShipmentForOrder(
+  order: OpenOrder,
+): Promise<{ match: PostnordShipmentTracking | null; attempts: PostnordLookupAttempt[] }> {
   const orderPostCode =
     (order.shippingAddress as { postal_code?: string } | null)?.postal_code ?? null;
   const candidates = postnordLookupCandidates(order);
@@ -62,13 +72,28 @@ async function findShipmentForOrder(order: OpenOrder): Promise<PostnordShipmentT
   // (viktigt när det körs medan orderdetaljen renderas). Kandidaterna är
   // i prioritetsordning - den första med en godkänd träff vinner.
   const results = await Promise.all(candidates.map(lookup));
-  for (const [index, shipments] of results.entries()) {
-    const match = shipments.find((shipment) =>
-      acceptsMatch(candidates[index], shipment.consigneePostCode, orderPostCode),
+  let match: PostnordShipmentTracking | null = null;
+  const attempts = results.map(({ shipments, detail, failed }, index): PostnordLookupAttempt => {
+    const candidate = candidates[index];
+    const accepted = shipments.find((shipment) =>
+      acceptsMatch(candidate, shipment.consigneePostCode, orderPostCode),
     );
-    if (match) return match;
-  }
-  return null;
+    if (accepted && !match) match = accepted;
+    return {
+      label: candidate.label,
+      value: candidate.value,
+      kind: candidate.kind,
+      result: failed
+        ? "error"
+        : accepted
+          ? "match"
+          : shipments.length > 0
+            ? "postcode_mismatch"
+            : "no_hit",
+      detail: accepted ? accepted.shipmentId : detail,
+    };
+  });
+  return { match, attempts };
 }
 
 /**
@@ -80,12 +105,30 @@ async function findShipmentForOrder(order: OpenOrder): Promise<PostnordShipmentT
  * (Kustom pushar inte när KSA/PostNord uppdaterar frakten).
  */
 export async function syncPostnordForOrder(order: OpenOrder): Promise<PostnordSyncOutcome> {
-  if (!process.env.POSTNORD_API_KEY) return "unchanged";
+  return (await syncPostnordForOrderWithReport(order)).outcome;
+}
+
+/**
+ * Som syncPostnordForOrder, men returnerar också vad varje sökning hos
+ * PostNord gav (`attempts`, null om ingen sökning gjordes) - orderdetaljen
+ * visar det, så det syns VARFÖR en order inte kopplats.
+ */
+export async function syncPostnordForOrderWithReport(
+  order: OpenOrder,
+): Promise<{ outcome: PostnordSyncOutcome; attempts: PostnordLookupAttempt[] | null }> {
+  if (!process.env.POSTNORD_API_KEY) return { outcome: "unchanged", attempts: null };
   if (order.fulfillmentStatus !== "unfulfilled" && order.fulfillmentStatus !== "label_created") {
-    return "unchanged";
+    return { outcome: "unchanged", attempts: null };
   }
 
-  const shipment = await findShipmentForOrder(order);
+  const { match: shipment, attempts } = await findShipmentForOrder(order);
+  return { outcome: await applyShipment(order, shipment), attempts };
+}
+
+async function applyShipment(
+  order: OpenOrder,
+  shipment: PostnordShipmentTracking | null,
+): Promise<PostnordSyncOutcome> {
   if (!shipment) return "not_found";
 
   if (isHandedOverToPostnord(shipment)) {

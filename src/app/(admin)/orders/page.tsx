@@ -54,7 +54,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
   if (query) {
     // Varje ord ska finnas någonstans i orderns sökbara text: namn (leverans
     // och faktura), företag, adress, postnummer (även utan mellanslag), ort,
-    // e-post och fraktsedelns spårningsnummer. Ordernummer och skickningars
+    // e-post, fraktsedelns spårningsnummer och Kustoms frakt-ID
+    // (tms_reference). Ordernummer och skickningars
     // spårningsnummer matchas på hela söksträngen.
     const shipping = sql`${schema.orders.shippingAddress}`;
     const billing = sql`${schema.orders.billingAddress}`;
@@ -64,7 +65,8 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
       ${shipping}->>'street_address', ${shipping}->>'street_address2',
       ${shipping}->>'postal_code', replace(${shipping}->>'postal_code', ' ', ''), ${shipping}->>'city',
       ${billing}->>'given_name', ${billing}->>'family_name', ${billing}->>'organization_name',
-      ${schema.orders.labelTrackingNumber})`;
+      ${schema.orders.labelTrackingNumber},
+      ${schema.orders.rawKustomOrder}->'selected_shipping_option'->>'tms_reference')`;
     const orderNumber = Number(query.replace(/^#/, ""));
     conditions.push(
       or(

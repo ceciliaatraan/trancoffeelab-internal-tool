@@ -786,6 +786,32 @@ OBEKRÄFTAT: om KSA för över `merchant_reference1` till PostNord-bokningen
 `findByReference` på ordernumret (`postnord-matching.ts` provar redan
 `merchant_reference1`, `TRAN #n` och `n`, med postnummerkontroll).
 
+## Kustom: tms_reference identifierar skickningen, 2026-10-02
+
+Kustoms besked till ägaren: skickningen som Kustom Shipping Assistant bokar
+hos PostNord identifieras med `selected_shipping_option.tms_reference`
+("the shipment_id provided by the TMS", t.ex. `KS6LPXL50IPPGPB4ZN`) - inte
+med `selected_shipping_option.id` (fraktalternativet, samma på alla ordrar).
+PostNords egna ID i Skicka Direkt Business (t.ex. `ECXDFJEBJ5FLIOPG`) finns
+inte i Kustoms orderdata.
+
+PostNord-synken provade redan tms_reference (som spårnings-ID via
+findByIdentifier och som referens via findByReference), men alla fel och
+"hittades inte"-svar svaldes tyst, så det gick inte att se varför ingen order
+kopplades. Nu:
+- `lookupPostnordShipments` (postnord/client.ts) returnerar PostNords
+  förklaring (`compositeFault`) när inget hittas.
+- `syncPostnordForOrderWithReport` (postnord-auto-sync.ts) returnerar vad
+  varje sökning gav; orderdetaljen visar det under "Så letade vi hos
+  PostNord" (träff / ingen träff / annat postnummer / fel, t.ex.
+  "POSTNORD_CUSTOMER_NUMBER saknas.").
+- Orderdetaljen visar Kustoms frakt-ID, och orderlistans sökning hittar
+  ordern på det.
+
+findByReference kräver `POSTNORD_CUSTOMER_NUMBER` - saknas den i Vercel provas
+tms_reference bara som spårnings-ID. OBEKRÄFTAT: att PostNords Track & Trace
+hittar KSA-skickningen på tms_reference.
+
 ## Status i koden
 
 | Del | Status |

@@ -45,6 +45,8 @@ export type LookupCandidate = {
    * värden som ordernumret kräver att postnumret faktiskt matchar.
    */
   unique: boolean;
+  /** Vad värdet är, för orderdetaljens "Så letade vi hos PostNord". */
+  label: string;
 };
 
 type OrderForLookup = {
@@ -60,6 +62,18 @@ function stringField(record: Record<string, unknown>, key: string): string | nul
 }
 
 /**
+ * Kustoms ID för skickningen som Kustom Shipping Assistant bokade
+ * (`selected_shipping_option.tms_reference`, "the shipment_id provided by
+ * the TMS") - enligt Kustom det som identifierar skickningen.
+ */
+export function kustomShipmentReference(rawKustomOrder: unknown): string | null {
+  if (!rawKustomOrder || typeof rawKustomOrder !== "object") return null;
+  const selected = (rawKustomOrder as Record<string, unknown>).selected_shipping_option;
+  if (!selected || typeof selected !== "object") return null;
+  return stringField(selected as Record<string, unknown>, "tms_reference");
+}
+
+/**
  * Alla värden vi har som KAN vara det PostNord känner igen en Kustom
  * Shipping Assistant-bokad skickning på. Vilket av dem PostNord faktiskt
  * indexerar KSA-skickningar under är inte bekräftat (se docs/kustom.md) -
@@ -71,19 +85,19 @@ export function postnordLookupCandidates(order: OrderForLookup): LookupCandidate
     order.rawKustomOrder && typeof order.rawKustomOrder === "object"
       ? (order.rawKustomOrder as Record<string, unknown>)
       : {};
-  const selected =
-    raw.selected_shipping_option && typeof raw.selected_shipping_option === "object"
-      ? (raw.selected_shipping_option as Record<string, unknown>)
-      : {};
-
   const candidates: LookupCandidate[] = [];
-  const add = (value: string | null, kind: LookupCandidate["kind"], unique: boolean) => {
+  const add = (
+    value: string | null,
+    kind: LookupCandidate["kind"],
+    unique: boolean,
+    label: string,
+  ) => {
     if (!value) return;
     if (candidates.some((c) => c.value === value && c.kind === kind)) return;
-    candidates.push({ value, kind, unique });
+    candidates.push({ value, kind, unique, label });
   };
 
-  add(order.labelTrackingNumber?.trim() || null, "identifier", true);
+  add(order.labelTrackingNumber?.trim() || null, "identifier", true, "Sparat spårningsnummer");
   // Exakt var Kustom lägger PostNords spårningsnummer när Kustom Shipping
   // Assistant bokat frakten är inte bekräftat - leta i alla fraktrelaterade
   // delar av ordern efter fält som ser ut som ett spårnings-/kollinummer.
@@ -92,18 +106,20 @@ export function postnordLookupCandidates(order: OrderForLookup): LookupCandidate
     raw.selected_shipping_option,
     raw.captures,
   ])) {
-    add(value, "identifier", true);
+    add(value, "identifier", true, "Spårningsnummer från Kustom");
   }
 
-  const tmsReference = stringField(selected, "tms_reference");
-  add(tmsReference, "identifier", true);
-  add(tmsReference, "reference", true);
-  add(order.kustomOrderId, "reference", true);
-  add(stringField(raw, "klarna_reference"), "reference", true);
-  add(stringField(raw, "merchant_reference1"), "reference", false);
-  add(stringField(raw, "merchant_reference2"), "reference", false);
-  add(`TRAN #${order.orderNumber}`, "reference", false);
-  add(String(order.orderNumber), "reference", false);
+  // Kustoms besked: tms_reference är det som identifierar skickningen som
+  // Kustom Shipping Assistant bokade hos PostNord.
+  const tmsReference = kustomShipmentReference(order.rawKustomOrder);
+  add(tmsReference, "identifier", true, "Kustoms frakt-ID (tms_reference)");
+  add(tmsReference, "reference", true, "Kustoms frakt-ID (tms_reference)");
+  add(order.kustomOrderId, "reference", true, "Kustoms order-ID");
+  add(stringField(raw, "klarna_reference"), "reference", true, "Kustoms referens");
+  add(stringField(raw, "merchant_reference1"), "reference", false, "Vårt ordernummer hos Kustom");
+  add(stringField(raw, "merchant_reference2"), "reference", false, "merchant_reference2");
+  add(`TRAN #${order.orderNumber}`, "reference", false, "Ordernummer (TRAN #)");
+  add(String(order.orderNumber), "reference", false, "Ordernummer");
 
   return candidates;
 }

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   acceptsMatch,
   isHandedOverToPostnord,
+  kustomShipmentReference,
   postnordLookupCandidates,
 } from "./postnord-matching";
 
@@ -48,14 +49,14 @@ describe("postnordLookupCandidates", () => {
       },
     });
     expect(candidates).toEqual([
-      { value: "ECVZHHG5EVRRWFSJ", kind: "identifier", unique: true },
-      { value: "00370000000000000001", kind: "identifier", unique: true },
-      { value: "KS6LPXL50IPPGPB4ZN", kind: "identifier", unique: true },
-      { value: "KS6LPXL50IPPGPB4ZN", kind: "reference", unique: true },
-      { value: "a3e97543-f8c8-259d-8e9d-fbcdcc0ddc51", kind: "reference", unique: true },
-      { value: "ABC123", kind: "reference", unique: true },
-      { value: "TRAN #1064", kind: "reference", unique: false },
-      { value: "1064", kind: "reference", unique: false },
+      { value: "ECVZHHG5EVRRWFSJ", kind: "identifier", unique: true, label: "Sparat spårningsnummer" },
+      { value: "00370000000000000001", kind: "identifier", unique: true, label: "Spårningsnummer från Kustom" },
+      { value: "KS6LPXL50IPPGPB4ZN", kind: "identifier", unique: true, label: "Kustoms frakt-ID (tms_reference)" },
+      { value: "KS6LPXL50IPPGPB4ZN", kind: "reference", unique: true, label: "Kustoms frakt-ID (tms_reference)" },
+      { value: "a3e97543-f8c8-259d-8e9d-fbcdcc0ddc51", kind: "reference", unique: true, label: "Kustoms order-ID" },
+      { value: "ABC123", kind: "reference", unique: true, label: "Kustoms referens" },
+      { value: "TRAN #1064", kind: "reference", unique: false, label: "Ordernummer (TRAN #)" },
+      { value: "1064", kind: "reference", unique: false, label: "Ordernummer" },
     ]);
   });
 
@@ -88,9 +89,19 @@ describe("postnordLookupCandidates", () => {
   });
 });
 
+describe("kustomShipmentReference", () => {
+  it("läser tms_reference ur Kustoms valda fraktalternativ", () => {
+    expect(
+      kustomShipmentReference({ selected_shipping_option: { id: "ESO7XUMRJZT1D89C", tms_reference: "KS6LPXL50IPPGPB4ZN" } }),
+    ).toBe("KS6LPXL50IPPGPB4ZN");
+    expect(kustomShipmentReference({ selected_shipping_option: { id: "x" } })).toBeNull();
+    expect(kustomShipmentReference(null)).toBeNull();
+  });
+});
+
 describe("acceptsMatch", () => {
-  const unique = { value: "x", kind: "reference" as const, unique: true };
-  const weak = { value: "1064", kind: "reference" as const, unique: false };
+  const unique = { value: "x", kind: "reference" as const, unique: true, label: "x" };
+  const weak = { value: "1064", kind: "reference" as const, unique: false, label: "Ordernummer" };
 
   it("kräver samma postnummer när båda finns", () => {
     expect(acceptsMatch(unique, "113 51", "11351")).toBe(true);
