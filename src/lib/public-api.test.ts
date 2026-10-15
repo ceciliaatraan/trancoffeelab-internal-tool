@@ -25,6 +25,18 @@ describe("resolveAllowedOrigin", () => {
     expect(resolveAllowedOrigin("https://evil.example.com")).toBeNull();
   });
 
+  it("tillåter en underdomän via *-post, men inte domänen själv eller djupare/andra domäner", () => {
+    process.env.PUBLIC_API_ALLOWED_ORIGINS = "https://trancoffeelab.com,https://*.lovable.app";
+    expect(resolveAllowedOrigin("https://id-preview--abc123.lovable.app")).toBe(
+      "https://id-preview--abc123.lovable.app",
+    );
+    expect(resolveAllowedOrigin("https://lovable.app")).toBeNull();
+    expect(resolveAllowedOrigin("https://a.b.lovable.app")).toBeNull();
+    expect(resolveAllowedOrigin("http://x.lovable.app")).toBeNull();
+    expect(resolveAllowedOrigin("https://x.lovable.app.evil.com")).toBeNull();
+    expect(resolveAllowedOrigin("https://xlovable.app")).toBeNull();
+  });
+
   it("tillåter localhost med valfri port i dev", () => {
     Object.defineProperty(process.env, "NODE_ENV", {
       value: "development",

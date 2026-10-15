@@ -3,6 +3,9 @@ import "server-only";
 /**
  * Tillåter https://trancoffeelab.com (från PUBLIC_API_ALLOWED_ORIGINS) och
  * http://localhost:* i dev, enligt spec. Origin utan matchning nekas.
+ * En post i listan får ha `*` som första del av domännamnet, t.ex.
+ * `https://*.lovable.app` - matchar exakt EN underdomän (Lovables
+ * förhandsvisning ligger på t.ex. https://id-preview--<id>.lovable.app).
  */
 export function resolveAllowedOrigin(originHeader: string | null): string | null {
   if (!originHeader) return null;
@@ -19,7 +22,18 @@ export function resolveAllowedOrigin(originHeader: string | null): string | null
     .map((origin) => origin.trim())
     .filter(Boolean);
 
-  return allowed.includes(originHeader) ? originHeader : null;
+  return allowed.some((entry) => originMatches(entry, originHeader)) ? originHeader : null;
+}
+
+function originMatches(entry: string, origin: string): boolean {
+  if (entry === origin) return true;
+  const wildcard = /^(https?):\/\/\*\.([a-z0-9.-]+)$/i.exec(entry);
+  if (!wildcard) return false;
+  const [, scheme, domain] = wildcard;
+  return new RegExp(
+    `^${scheme}://[a-z0-9-]+\\.${domain.replace(/[.-]/g, "\\$&")}$`,
+    "i",
+  ).test(origin);
 }
 
 export function corsHeaders(originHeader: string | null): HeadersInit {
