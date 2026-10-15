@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { formatOre } from "@/lib/format";
 import { SubmitButton } from "@/components/submit-button";
 import { getClaimCountsByCustomer } from "@/lib/orders/claims";
+import { TableScroll } from "@/components/table-scroll";
 
 export default async function CustomersPage({ searchParams }: PageProps<"/customers">) {
   const params = await searchParams;
@@ -52,47 +53,49 @@ export default async function CustomersPage({ searchParams }: PageProps<"/custom
           Inga kunder än.
         </div>
       ) : (
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
-              <th className="py-3 pr-4 font-medium">Namn</th>
-              <th className="py-3 pr-4 font-medium">E-post</th>
-              <th className="py-3 pr-4 font-medium">Ordrar</th>
-              <th className="py-3 pr-4 font-medium">Totalt köpt</th>
-              <th className="py-3 pr-4 font-medium">Reklamationer</th>
-              <th className="py-3 pr-4 font-medium">Nyhetsbrev</th>
-              <th className="py-3 pr-4 font-medium">GDPR</th>
-            </tr>
-          </thead>
-          <tbody>
-            {customers.map((customer) => (
-              <tr key={customer.id} className="border-b border-tran-hairline">
-                <td className="py-4 pr-4">
-                  {customer.firstName} {customer.lastName}
-                </td>
-                <td className="py-4 pr-4 text-tran-muted">{customer.email}</td>
-                <td className="tran-tabular py-4 pr-4">{customer.orderCount}</td>
-                <td className="tran-tabular py-4 pr-4">{formatOre(customer.totalSpentOre)}</td>
-                <td
-                  className={`tran-tabular py-4 pr-4 ${claimCounts.get(customer.id) ? "text-tran-red" : "text-tran-muted"}`}
-                >
-                  {claimCounts.get(customer.id) ?? 0}
-                </td>
-                <td className="py-4 pr-4 text-tran-muted">
-                  {customer.marketingConsent ? "Ja" : "Nej"}
-                </td>
-                <td className="py-4 pr-4">
-                  <a
-                    href={`/api/customers/${customer.id}/export`}
-                    className="tran-label text-[11px] text-tran-muted hover:text-tran-red"
-                  >
-                    Exportera
-                  </a>
-                </td>
+        <TableScroll>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
+                <th className="py-3 pr-4 font-medium">Namn</th>
+                <th className="py-3 pr-4 font-medium">E-post</th>
+                <th className="py-3 pr-4 font-medium">Ordrar</th>
+                <th className="py-3 pr-4 font-medium">Totalt köpt</th>
+                <th className="py-3 pr-4 font-medium">Reklamationer</th>
+                <th className="py-3 pr-4 font-medium">Nyhetsbrev</th>
+                <th className="py-3 pr-4 font-medium">GDPR</th>
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {customers.map((customer) => (
+                <tr key={customer.id} className="border-b border-tran-hairline">
+                  <td className="py-4 pr-4">
+                    {customer.firstName} {customer.lastName}
+                  </td>
+                  <td className="py-4 pr-4 text-tran-muted">{customer.email}</td>
+                  <td className="tran-tabular py-4 pr-4">{customer.orderCount}</td>
+                  <td className="tran-tabular py-4 pr-4">{formatOre(customer.totalSpentOre)}</td>
+                  <td
+                    className={`tran-tabular py-4 pr-4 ${claimCounts.get(customer.id) ? "text-tran-red" : "text-tran-muted"}`}
+                  >
+                    {claimCounts.get(customer.id) ?? 0}
+                  </td>
+                  <td className="py-4 pr-4 text-tran-muted">
+                    {customer.marketingConsent ? "Ja" : "Nej"}
+                  </td>
+                  <td className="py-4 pr-4">
+                    <a
+                      href={`/api/customers/${customer.id}/export`}
+                      className="tran-label text-[11px] text-tran-muted hover:text-tran-red"
+                    >
+                      Exportera
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </TableScroll>
       )}
     </div>
   );

@@ -115,12 +115,12 @@ export default async function EditProductPage({
         </Link>
       </div>
 
-      <div className="flex items-center justify-between gap-4">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-4">
           <h1 className="text-4xl font-bold uppercase tracking-tight">{product.nameSv}</h1>
           <StatusChip status={product.status} />
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {(["draft", "published", "coming_soon", "archived"] as const)
             .filter((status) => status !== product.status)
             .map((status) => (
@@ -176,9 +176,9 @@ export default async function EditProductPage({
         )}
         <form
           action={addProductImage.bind(null, id)}
-          className="flex items-center gap-3"
+          className="flex flex-wrap items-center gap-3"
         >
-          <input type="file" name="image" accept="image/*" required className="text-sm" />
+          <input type="file" name="image" accept="image/*" required className="min-w-0 max-w-full text-sm" />
           <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
             Ladda upp
           </SubmitButton>
@@ -284,9 +284,9 @@ export default async function EditProductPage({
                   ) : null}
                   <form
                     action={addVariantImage.bind(null, id, variant.id)}
-                    className="flex items-center gap-3"
+                    className="flex flex-wrap items-center gap-3"
                   >
-                    <input type="file" name="image" accept="image/*" required className="text-sm" />
+                    <input type="file" name="image" accept="image/*" required className="min-w-0 max-w-full text-sm" />
                     <SubmitButton className="tran-label border border-tran-black px-3 py-1.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
                       Ladda upp
                     </SubmitButton>

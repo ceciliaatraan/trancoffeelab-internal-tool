@@ -22,6 +22,7 @@ import {
 } from "@/lib/orders/pagination";
 import { containsPattern, searchTerms } from "@/lib/orders/order-search";
 import { paymentMethodInfo } from "@/lib/kustom/payment-methods";
+import { TableScroll } from "@/components/table-scroll";
 
 // Ger bakgrundssynken mot Kustom/PostNord (scheduleBackgroundSync) tid att gå igenom
 // alla öppna ordrar vid dygnets fulla genomgång.
@@ -237,75 +238,123 @@ export default async function OrdersPage({ searchParams }: PageProps<"/orders">)
           {total > 0 ? "Inga ordrar på den här sidan." : query || statusFilter ? "Inga ordrar matchar." : "Inga ordrar än."}
         </div>
       ) : (
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
-              <th className="py-3 pr-4 font-medium">Order</th>
-              <th className="py-3 pr-4 font-medium">Kund</th>
-              <th className="py-3 pr-4 font-medium">Belopp</th>
-              <th className="py-3 pr-4 font-medium">Status</th>
-              <th className="py-3 pr-4 font-medium">Betalsätt</th>
-              <th className="py-3 pr-4 font-medium">Frakt</th>
-              <th className="py-3 pr-4 font-medium">Datum</th>
-            </tr>
-          </thead>
-          <tbody>
+        <>
+          {/* Mobil: ett kort per order i stället för den breda tabellen. */}
+          <ul className="-mx-4 divide-y divide-tran-hairline border-y border-tran-hairline md:hidden">
             {orders.map((order) => {
-              const items = itemsByOrderId.get(order.id);
               const fraktStatus = fraktStatusByOrderId.get(order.id) ?? {
                 kind: "ej_skickad" as const,
                 label: order.fulfillmentStatus,
               };
               const postnordNumber =
                 trackingNumberByOrderId.get(order.id) ?? order.labelTrackingNumber;
-
+              const payment = paymentMethodInfo({ initial_payment_method: order.paymentMethod })?.label;
               return (
-                <TableRowLink
-                  key={order.id}
-                  href={`/orders/${order.id}`}
-                  className="border-b border-tran-hairline hover:bg-tran-hairline/20"
-                >
-                  <td className="py-4 pr-4">
-                    <Link
-                      href={`/orders/${order.id}`}
-                      className="tran-tabular hover:text-tran-red"
-                    >
-                      #{order.orderNumber}
-                    </Link>
-                  </td>
-                  <td className="py-4 pr-4 text-tran-muted">{customerDisplayName(order)}</td>
-                  <td
-                    className="tran-tabular py-4 pr-4"
-                    title={items && items.length > 0 ? items.join("\n") : undefined}
+                <li key={order.id}>
+                  <Link
+                    href={`/orders/${order.id}`}
+                    className="flex flex-col gap-2 px-4 py-4 active:bg-tran-hairline/20"
                   >
-                    {formatOre(order.orderAmountOre)}
-                  </td>
-                  <td className="py-4 pr-4">
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="tran-tabular font-bold">#{order.orderNumber}</span>
+                      <span className="tran-tabular text-xs text-tran-muted">
+                        {formatDateTime(order.createdAt)}
+                      </span>
+                    </div>
+                    <div className="flex items-baseline justify-between gap-3">
+                      <span className="min-w-0 truncate text-sm">{customerDisplayName(order)}</span>
+                      <span className="tran-tabular shrink-0 text-sm">{formatOre(order.orderAmountOre)}</span>
+                    </div>
                     <div className="flex flex-wrap items-center gap-1.5">
                       <OrderStatusChip status={order.status} />
+                      <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
                       {order.containsPreorder && <PreorderChip />}
                       {order.isTest && <TestOrderChip />}
                     </div>
-                  </td>
-                  <td className="py-4 pr-4 text-xs text-tran-muted">
-                    {paymentMethodInfo({ initial_payment_method: order.paymentMethod })?.label ?? "-"}
-                  </td>
-                  <td className="py-4 pr-4">
-                    <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
-                    {postnordNumber ? (
-                      <p className="tran-tabular mt-1 text-[11px] text-tran-muted">
-                        {postnordNumber}
+                    {payment || postnordNumber ? (
+                      <p className="tran-tabular text-[11px] text-tran-muted">
+                        {[payment, postnordNumber].filter(Boolean).join(" · ")}
                       </p>
                     ) : null}
-                  </td>
-                  <td className="tran-tabular py-4 pr-4 text-tran-muted">
-                    {formatDateTime(order.createdAt)}
-                  </td>
-                </TableRowLink>
+                  </Link>
+                </li>
               );
             })}
-          </tbody>
-        </table>
+          </ul>
+          <div className="hidden md:block">
+            <TableScroll>
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
+                    <th className="py-3 pr-4 font-medium">Order</th>
+                    <th className="py-3 pr-4 font-medium">Kund</th>
+                    <th className="py-3 pr-4 font-medium">Belopp</th>
+                    <th className="py-3 pr-4 font-medium">Status</th>
+                    <th className="py-3 pr-4 font-medium">Betalsätt</th>
+                    <th className="py-3 pr-4 font-medium">Frakt</th>
+                    <th className="py-3 pr-4 font-medium">Datum</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {orders.map((order) => {
+                    const items = itemsByOrderId.get(order.id);
+                    const fraktStatus = fraktStatusByOrderId.get(order.id) ?? {
+                      kind: "ej_skickad" as const,
+                      label: order.fulfillmentStatus,
+                    };
+                    const postnordNumber =
+                      trackingNumberByOrderId.get(order.id) ?? order.labelTrackingNumber;
+
+                    return (
+                      <TableRowLink
+                        key={order.id}
+                        href={`/orders/${order.id}`}
+                        className="border-b border-tran-hairline hover:bg-tran-hairline/20"
+                      >
+                        <td className="py-4 pr-4">
+                          <Link
+                            href={`/orders/${order.id}`}
+                            className="tran-tabular hover:text-tran-red"
+                          >
+                            #{order.orderNumber}
+                          </Link>
+                        </td>
+                        <td className="py-4 pr-4 text-tran-muted">{customerDisplayName(order)}</td>
+                        <td
+                          className="tran-tabular py-4 pr-4"
+                          title={items && items.length > 0 ? items.join("\n") : undefined}
+                        >
+                          {formatOre(order.orderAmountOre)}
+                        </td>
+                        <td className="py-4 pr-4">
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            <OrderStatusChip status={order.status} />
+                            {order.containsPreorder && <PreorderChip />}
+                            {order.isTest && <TestOrderChip />}
+                          </div>
+                        </td>
+                        <td className="py-4 pr-4 text-xs text-tran-muted">
+                          {paymentMethodInfo({ initial_payment_method: order.paymentMethod })?.label ?? "-"}
+                        </td>
+                        <td className="py-4 pr-4">
+                          <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
+                          {postnordNumber ? (
+                            <p className="tran-tabular mt-1 text-[11px] text-tran-muted">
+                              {postnordNumber}
+                            </p>
+                          ) : null}
+                        </td>
+                        <td className="tran-tabular py-4 pr-4 text-tran-muted">
+                          {formatDateTime(order.createdAt)}
+                        </td>
+                      </TableRowLink>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </TableScroll>
+          </div>
+        </>
       )}
 
       <nav

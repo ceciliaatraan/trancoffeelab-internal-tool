@@ -6,6 +6,7 @@ import { formatDateTime, formatOre } from "@/lib/format";
 import { POS_STATUS_LABELS, locationLabel } from "@/lib/kassa/options";
 import type { RecentPosSale } from "@/lib/kassa/sales";
 import { cancelSaleAction, refundSaleAction } from "@/app/(kassa)/kassa/actions";
+import { TableScroll } from "@/components/table-scroll";
 
 /** De senaste kassaförsäljningarna, med Ångra (betald) och Avbryt (väntar). */
 export function KassaSalesList({ sales }: { sales: RecentPosSale[] }) {
@@ -41,7 +42,7 @@ export function KassaSalesList({ sales }: { sales: RecentPosSale[] }) {
       {sales.length === 0 ? (
         <p className="text-sm text-tran-muted">Inga försäljningar än.</p>
       ) : (
-        <div className="overflow-x-auto">
+        <TableScroll>
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
@@ -97,7 +98,7 @@ export function KassaSalesList({ sales }: { sales: RecentPosSale[] }) {
               ))}
             </tbody>
           </table>
-        </div>
+        </TableScroll>
       )}
     </section>
   );

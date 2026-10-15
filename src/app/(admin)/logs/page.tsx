@@ -3,6 +3,7 @@ import { db, schema } from "@/db";
 import { formatDateTime } from "@/lib/format";
 import { SubmitButton } from "@/components/submit-button";
 import { reprocessWebhookEventAction } from "./actions";
+import { TableScroll } from "@/components/table-scroll";
 
 export default async function LogsPage({ searchParams }: PageProps<"/logs">) {
   const search = await searchParams;
@@ -37,76 +38,78 @@ export default async function LogsPage({ searchParams }: PageProps<"/logs">) {
         {webhookEvents.length === 0 ? (
           <p className="text-sm text-tran-muted">Inga anrop än.</p>
         ) : (
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
-                <th className="py-2 pr-4 font-medium">Källa</th>
-                <th className="py-2 pr-4 font-medium">Order-id</th>
-                <th className="py-2 pr-4 font-medium">Bearbetad</th>
-                <th className="py-2 pr-4 font-medium">Fel</th>
-                <th className="py-2 pr-4 font-medium">Mottaget</th>
-                <th className="py-2 pr-4 font-medium">Klar</th>
-                <th className="py-2 pr-4 font-medium">Tid</th>
-                <th className="py-2 pr-4 font-medium">Åtgärd</th>
-              </tr>
-            </thead>
-            <tbody>
-              {webhookEvents.map((event) => {
-                const processingMs = event.processedAt
-                  ? event.processedAt.getTime() - event.receivedAt.getTime()
-                  : null;
-                return (
-                  <tr key={event.id} className="border-b border-tran-hairline">
-                    <td className="py-2 pr-4">{event.source}</td>
-                    <td className="tran-tabular py-2 pr-4 text-tran-muted">
-                      {event.kustomOrderId ?? "-"}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {event.processed ? (
-                        "Ja"
-                      ) : (
-                        <span className="text-tran-red">Nej</span>
-                      )}
-                    </td>
-                    <td className="max-w-xs py-2 pr-4 text-tran-red">
-                      {event.errorMessage ? (
-                        <details>
-                          <summary className="block cursor-pointer truncate list-none marker:hidden [&::-webkit-details-marker]:hidden">
-                            {event.errorMessage}
-                          </summary>
-                          <p className="mt-2 break-all whitespace-pre-wrap text-xs">
-                            {event.errorMessage}
-                          </p>
-                        </details>
-                      ) : null}
-                    </td>
-                    <td className="tran-tabular py-2 pr-4 text-tran-muted">
-                      {formatDateTime(event.receivedAt)}
-                    </td>
-                    <td className="tran-tabular py-2 pr-4 text-tran-muted">
-                      {event.processedAt ? formatDateTime(event.processedAt) : "-"}
-                    </td>
-                    <td className="tran-tabular py-2 pr-4 text-tran-muted">
-                      {processingMs === null
-                        ? "-"
-                        : processingMs < 1000
-                          ? `${processingMs} ms`
-                          : `${(processingMs / 1000).toFixed(1)} s`}
-                    </td>
-                    <td className="py-2 pr-4">
-                      {!event.processed && event.kustomOrderId ? (
-                        <form action={reprocessWebhookEventAction.bind(null, event.id)}>
-                          <SubmitButton className="tran-label border border-tran-black px-2 py-1 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red">
-                            Bearbeta om
-                          </SubmitButton>
-                        </form>
-                      ) : null}
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+          <TableScroll>
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
+                  <th className="py-2 pr-4 font-medium">Källa</th>
+                  <th className="py-2 pr-4 font-medium">Order-id</th>
+                  <th className="py-2 pr-4 font-medium">Bearbetad</th>
+                  <th className="py-2 pr-4 font-medium">Fel</th>
+                  <th className="py-2 pr-4 font-medium">Mottaget</th>
+                  <th className="py-2 pr-4 font-medium">Klar</th>
+                  <th className="py-2 pr-4 font-medium">Tid</th>
+                  <th className="py-2 pr-4 font-medium">Åtgärd</th>
+                </tr>
+              </thead>
+              <tbody>
+                {webhookEvents.map((event) => {
+                  const processingMs = event.processedAt
+                    ? event.processedAt.getTime() - event.receivedAt.getTime()
+                    : null;
+                  return (
+                    <tr key={event.id} className="border-b border-tran-hairline">
+                      <td className="py-2 pr-4">{event.source}</td>
+                      <td className="tran-tabular py-2 pr-4 text-tran-muted">
+                        {event.kustomOrderId ?? "-"}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {event.processed ? (
+                          "Ja"
+                        ) : (
+                          <span className="text-tran-red">Nej</span>
+                        )}
+                      </td>
+                      <td className="max-w-xs py-2 pr-4 text-tran-red">
+                        {event.errorMessage ? (
+                          <details>
+                            <summary className="block cursor-pointer truncate list-none marker:hidden [&::-webkit-details-marker]:hidden">
+                              {event.errorMessage}
+                            </summary>
+                            <p className="mt-2 break-all whitespace-pre-wrap text-xs">
+                              {event.errorMessage}
+                            </p>
+                          </details>
+                        ) : null}
+                      </td>
+                      <td className="tran-tabular py-2 pr-4 text-tran-muted">
+                        {formatDateTime(event.receivedAt)}
+                      </td>
+                      <td className="tran-tabular py-2 pr-4 text-tran-muted">
+                        {event.processedAt ? formatDateTime(event.processedAt) : "-"}
+                      </td>
+                      <td className="tran-tabular py-2 pr-4 text-tran-muted">
+                        {processingMs === null
+                          ? "-"
+                          : processingMs < 1000
+                            ? `${processingMs} ms`
+                            : `${(processingMs / 1000).toFixed(1)} s`}
+                      </td>
+                      <td className="py-2 pr-4">
+                        {!event.processed && event.kustomOrderId ? (
+                          <form action={reprocessWebhookEventAction.bind(null, event.id)}>
+                            <SubmitButton className="tran-label border border-tran-black px-2 py-1 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red">
+                              Bearbeta om
+                            </SubmitButton>
+                          </form>
+                        ) : null}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </TableScroll>
         )}
       </section>
 
@@ -115,30 +118,32 @@ export default async function LogsPage({ searchParams }: PageProps<"/logs">) {
         {auditLogEntries.length === 0 ? (
           <p className="text-sm text-tran-muted">Inga händelser än.</p>
         ) : (
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
-                <th className="py-2 pr-4 font-medium">Åtgärd</th>
-                <th className="py-2 pr-4 font-medium">Vem</th>
-                <th className="py-2 pr-4 font-medium">Resultat</th>
-                <th className="py-2 pr-4 font-medium">Datum</th>
-              </tr>
-            </thead>
-            <tbody>
-              {auditLogEntries.map((entry) => (
-                <tr key={entry.id} className="border-b border-tran-hairline">
-                  <td className="py-2 pr-4">{entry.action}</td>
-                  <td className="py-2 pr-4 text-tran-muted">{entry.actorEmail ?? "-"}</td>
-                  <td className="py-2 pr-4">
-                    {entry.success ? "OK" : <span className="text-tran-red">Nekad</span>}
-                  </td>
-                  <td className="tran-tabular py-2 pr-4 text-tran-muted">
-                    {formatDateTime(entry.createdAt)}
-                  </td>
+          <TableScroll>
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
+                  <th className="py-2 pr-4 font-medium">Åtgärd</th>
+                  <th className="py-2 pr-4 font-medium">Vem</th>
+                  <th className="py-2 pr-4 font-medium">Resultat</th>
+                  <th className="py-2 pr-4 font-medium">Datum</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {auditLogEntries.map((entry) => (
+                  <tr key={entry.id} className="border-b border-tran-hairline">
+                    <td className="py-2 pr-4">{entry.action}</td>
+                    <td className="py-2 pr-4 text-tran-muted">{entry.actorEmail ?? "-"}</td>
+                    <td className="py-2 pr-4">
+                      {entry.success ? "OK" : <span className="text-tran-red">Nekad</span>}
+                    </td>
+                    <td className="tran-tabular py-2 pr-4 text-tran-muted">
+                      {formatDateTime(entry.createdAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
         )}
       </section>
     </div>

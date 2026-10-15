@@ -43,6 +43,7 @@ import {
 import { kustomShipmentReference } from "@/lib/orders/postnord-matching";
 import { refreshOrderFromKustom } from "@/lib/orders/kustom-refresh";
 import { paymentMethodInfo } from "@/lib/kustom/payment-methods";
+import { TableScroll } from "@/components/table-scroll";
 
 type Address = {
   given_name?: string;
@@ -427,175 +428,177 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
             betalningen - hantera en ev. återbetalning separat via Betalning nedan.
           </p>
         ) : null}
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
-              <th className="py-2 pr-4 font-medium">Namn</th>
-              <th className="py-2 pr-4 font-medium">SKU</th>
-              <th className="py-2 pr-4 font-medium">Antal</th>
-              <th className="py-2 pr-4 font-medium">À-pris</th>
-              <th className="py-2 pr-4 font-medium">Summa</th>
-              {canEditLines ? <th className="py-2 pr-4 font-medium">Byt</th> : null}
-            </tr>
-          </thead>
-          <tbody>
-            {lines.map((line) => {
-              const options =
-                canEditLines && line.type === "physical"
-                  ? swapCandidates.filter(
-                      (candidate) =>
-                        candidate.sku !== line.reference &&
-                        candidate.priceOre === line.unitPriceOre &&
-                        candidate.taxRate === line.taxRate,
-                    )
-                  : [];
+        <TableScroll>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
+                <th className="py-2 pr-4 font-medium">Namn</th>
+                <th className="hidden py-2 pr-4 font-medium sm:table-cell">SKU</th>
+                <th className="py-2 pr-4 font-medium">Antal</th>
+                <th className="hidden py-2 pr-4 font-medium sm:table-cell">À-pris</th>
+                <th className="py-2 pr-4 font-medium">Summa</th>
+                {canEditLines ? <th className="py-2 pr-4 font-medium">Byt</th> : null}
+              </tr>
+            </thead>
+            <tbody>
+              {lines.map((line) => {
+                const options =
+                  canEditLines && line.type === "physical"
+                    ? swapCandidates.filter(
+                        (candidate) =>
+                          candidate.sku !== line.reference &&
+                          candidate.priceOre === line.unitPriceOre &&
+                          candidate.taxRate === line.taxRate,
+                      )
+                    : [];
 
-              const components = lineComponentsByLineId.get(line.id) ?? [];
-              const isBundleLine =
-                components.length > 0 &&
-                !(components.length === 1 && components[0].originalComponentProductId === line.productId);
-              const showBreakdown = line.type === "physical" && (canReturn || (canEditLines && isBundleLine));
+                const components = lineComponentsByLineId.get(line.id) ?? [];
+                const isBundleLine =
+                  components.length > 0 &&
+                  !(components.length === 1 && components[0].originalComponentProductId === line.productId);
+                const showBreakdown = line.type === "physical" && (canReturn || (canEditLines && isBundleLine));
 
-              return (
-                <Fragment key={line.id}>
-                  <tr className="border-b border-tran-hairline">
-                    <td className="py-3 pr-4">{line.name}</td>
-                    <td className="tran-tabular py-3 pr-4 text-tran-muted">{line.reference}</td>
-                    <td className="tran-tabular py-3 pr-4">{line.quantity}</td>
-                    <td className="tran-tabular py-3 pr-4 text-tran-muted">
-                      {formatOre(line.unitPriceOre)}
-                    </td>
-                    <td className="tran-tabular py-3 pr-4">{formatOre(line.totalAmountOre)}</td>
-                    {canEditLines ? (
-                      <td className="py-3 pr-4">
-                        {line.type !== "physical" ? null : options.length === 0 ? (
-                          <span className="text-xs text-tran-muted">
-                            Ingen annan SKU till samma pris
-                          </span>
-                        ) : (
-                          <form
-                            action={editOrderLineAction.bind(null, order.id, line.id)}
-                            className="flex items-center gap-2"
-                          >
-                            <select
-                              name="newSku"
-                              required
-                              defaultValue=""
-                              className="border border-tran-hairline bg-tran-white px-2 py-1 text-xs focus:border-tran-black focus:outline-none"
+                return (
+                  <Fragment key={line.id}>
+                    <tr className="border-b border-tran-hairline">
+                      <td className="py-3 pr-4">{line.name}</td>
+                      <td className="tran-tabular hidden py-3 pr-4 text-tran-muted sm:table-cell">{line.reference}</td>
+                      <td className="tran-tabular py-3 pr-4">{line.quantity}</td>
+                      <td className="tran-tabular hidden py-3 pr-4 text-tran-muted sm:table-cell">
+                        {formatOre(line.unitPriceOre)}
+                      </td>
+                      <td className="tran-tabular py-3 pr-4">{formatOre(line.totalAmountOre)}</td>
+                      {canEditLines ? (
+                        <td className="py-3 pr-4">
+                          {line.type !== "physical" ? null : options.length === 0 ? (
+                            <span className="text-xs text-tran-muted">
+                              Ingen annan SKU till samma pris
+                            </span>
+                          ) : (
+                            <form
+                              action={editOrderLineAction.bind(null, order.id, line.id)}
+                              className="flex items-center gap-2"
                             >
-                              <option value="" disabled>
-                                Välj ny SKU…
-                              </option>
-                              {options.map((option) => (
-                                <option key={option.sku} value={option.sku}>
-                                  {option.label} ({option.sku})
-                                </option>
-                              ))}
-                            </select>
-                            <SubmitButton className="tran-label border border-tran-black px-2 py-1 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red">
-                              Byt
-                            </SubmitButton>
-                          </form>
-                        )}
-                      </td>
-                    ) : null}
-                  </tr>
-                  {showBreakdown ? (
-                    <tr key={`${line.id}-components`} className="border-b border-tran-hairline bg-tran-hairline/5">
-                      <td colSpan={canEditLines ? 6 : 5} className="py-3 pr-4 pl-8">
-                        <p className="tran-label mb-2 text-[11px] text-tran-muted">
-                          {isBundleLine ? "Innehåll i kitet" : "Komponent"}
-                        </p>
-                        <ul className="flex flex-col gap-2">
-                          {components.map((component) => {
-                            const key = `${component.productId}|${component.variantId ?? ""}`;
-                            const alreadyReturned = alreadyReturnedByComponentKey.get(key) ?? 0;
-                            const remainingReturnable = component.quantity - alreadyReturned;
-
-                            return (
-                              <li
-                                key={component.originalComponentProductId}
-                                className="flex flex-wrap items-center gap-3 text-xs"
+                              <select
+                                name="newSku"
+                                required
+                                defaultValue=""
+                                className="border border-tran-hairline bg-tran-white px-2 py-1 text-xs focus:border-tran-black focus:outline-none"
                               >
-                                <span className="tran-tabular">{component.quantity}x</span>
-                                <span>
-                                  {component.name}
-                                  {component.isSwapped ? (
-                                    <span className="ml-1 text-tran-blue">(bytt)</span>
-                                  ) : null}
-                                </span>
-
-                                {canEditLines && isBundleLine ? (
-                                  <form
-                                    action={swapLineComponentAction.bind(null, order.id, line.id)}
-                                    className="flex items-center gap-1.5"
-                                  >
-                                    <input
-                                      type="hidden"
-                                      name="originalComponentProductId"
-                                      value={component.originalComponentProductId}
-                                    />
-                                    <select
-                                      name="newSku"
-                                      required
-                                      defaultValue=""
-                                      className="border border-tran-hairline bg-tran-white px-1.5 py-1 text-[11px] focus:border-tran-black focus:outline-none"
-                                    >
-                                      <option value="" disabled>
-                                        Byt mot…
-                                      </option>
-                                      {componentSwapCandidates.map((option) => (
-                                        <option key={option.sku} value={option.sku}>
-                                          {option.label} ({option.sku})
-                                        </option>
-                                      ))}
-                                    </select>
-                                    <SubmitButton className="tran-label border border-tran-black px-1.5 py-1 text-[10px] transition-colors hover:border-tran-red hover:text-tran-red">
-                                      Byt
-                                    </SubmitButton>
-                                  </form>
-                                ) : null}
-
-                                {canReturn && remainingReturnable > 0 ? (
-                                  <form
-                                    action={returnLineComponentAction.bind(null, order.id, line.id)}
-                                    className="flex items-center gap-1.5"
-                                  >
-                                    <input
-                                      type="hidden"
-                                      name="originalComponentProductId"
-                                      value={component.originalComponentProductId}
-                                    />
-                                    <input
-                                      type="number"
-                                      name="quantity"
-                                      min={1}
-                                      max={remainingReturnable}
-                                      defaultValue={remainingReturnable}
-                                      required
-                                      className="w-14 border border-tran-hairline bg-tran-white px-1.5 py-1 text-[11px] focus:border-tran-black focus:outline-none"
-                                    />
-                                    <SubmitButton className="tran-label border border-tran-black px-1.5 py-1 text-[10px] transition-colors hover:border-tran-red hover:text-tran-red">
-                                      Retur
-                                    </SubmitButton>
-                                  </form>
-                                ) : canReturn && alreadyReturned > 0 ? (
-                                  <span className="text-tran-muted">
-                                    Allt returnerat ({alreadyReturned} st)
-                                  </span>
-                                ) : null}
-                              </li>
-                            );
-                          })}
-                        </ul>
-                      </td>
+                                <option value="" disabled>
+                                  Välj ny SKU…
+                                </option>
+                                {options.map((option) => (
+                                  <option key={option.sku} value={option.sku}>
+                                    {option.label} ({option.sku})
+                                  </option>
+                                ))}
+                              </select>
+                              <SubmitButton className="tran-label border border-tran-black px-2 py-1 text-[11px] transition-colors hover:border-tran-red hover:text-tran-red">
+                                Byt
+                              </SubmitButton>
+                            </form>
+                          )}
+                        </td>
+                      ) : null}
                     </tr>
-                  ) : null}
-                </Fragment>
-              );
-            })}
-          </tbody>
-        </table>
+                    {showBreakdown ? (
+                      <tr key={`${line.id}-components`} className="border-b border-tran-hairline bg-tran-hairline/5">
+                        <td colSpan={canEditLines ? 6 : 5} className="py-3 pr-4 pl-8">
+                          <p className="tran-label mb-2 text-[11px] text-tran-muted">
+                            {isBundleLine ? "Innehåll i kitet" : "Komponent"}
+                          </p>
+                          <ul className="flex flex-col gap-2">
+                            {components.map((component) => {
+                              const key = `${component.productId}|${component.variantId ?? ""}`;
+                              const alreadyReturned = alreadyReturnedByComponentKey.get(key) ?? 0;
+                              const remainingReturnable = component.quantity - alreadyReturned;
+
+                              return (
+                                <li
+                                  key={component.originalComponentProductId}
+                                  className="flex flex-wrap items-center gap-3 text-xs"
+                                >
+                                  <span className="tran-tabular">{component.quantity}x</span>
+                                  <span>
+                                    {component.name}
+                                    {component.isSwapped ? (
+                                      <span className="ml-1 text-tran-blue">(bytt)</span>
+                                    ) : null}
+                                  </span>
+
+                                  {canEditLines && isBundleLine ? (
+                                    <form
+                                      action={swapLineComponentAction.bind(null, order.id, line.id)}
+                                      className="flex items-center gap-1.5"
+                                    >
+                                      <input
+                                        type="hidden"
+                                        name="originalComponentProductId"
+                                        value={component.originalComponentProductId}
+                                      />
+                                      <select
+                                        name="newSku"
+                                        required
+                                        defaultValue=""
+                                        className="border border-tran-hairline bg-tran-white px-1.5 py-1 text-[11px] focus:border-tran-black focus:outline-none"
+                                      >
+                                        <option value="" disabled>
+                                          Byt mot…
+                                        </option>
+                                        {componentSwapCandidates.map((option) => (
+                                          <option key={option.sku} value={option.sku}>
+                                            {option.label} ({option.sku})
+                                          </option>
+                                        ))}
+                                      </select>
+                                      <SubmitButton className="tran-label border border-tran-black px-1.5 py-1 text-[10px] transition-colors hover:border-tran-red hover:text-tran-red">
+                                        Byt
+                                      </SubmitButton>
+                                    </form>
+                                  ) : null}
+
+                                  {canReturn && remainingReturnable > 0 ? (
+                                    <form
+                                      action={returnLineComponentAction.bind(null, order.id, line.id)}
+                                      className="flex items-center gap-1.5"
+                                    >
+                                      <input
+                                        type="hidden"
+                                        name="originalComponentProductId"
+                                        value={component.originalComponentProductId}
+                                      />
+                                      <input
+                                        type="number"
+                                        name="quantity"
+                                        min={1}
+                                        max={remainingReturnable}
+                                        defaultValue={remainingReturnable}
+                                        required
+                                        className="w-14 border border-tran-hairline bg-tran-white px-1.5 py-1 text-[11px] focus:border-tran-black focus:outline-none"
+                                      />
+                                      <SubmitButton className="tran-label border border-tran-black px-1.5 py-1 text-[10px] transition-colors hover:border-tran-red hover:text-tran-red">
+                                        Retur
+                                      </SubmitButton>
+                                    </form>
+                                  ) : canReturn && alreadyReturned > 0 ? (
+                                    <span className="text-tran-muted">
+                                      Allt returnerat ({alreadyReturned} st)
+                                    </span>
+                                  ) : null}
+                                </li>
+                              );
+                            })}
+                          </ul>
+                        </td>
+                      </tr>
+                    ) : null}
+                  </Fragment>
+                );
+              })}
+            </tbody>
+          </table>
+        </TableScroll>
       </section>
 
       <section className="flex flex-col gap-4">
@@ -686,28 +689,30 @@ export default async function OrderDetailPage({ params, searchParams }: PageProp
         </div>
 
         {events.length > 0 ? (
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
-                <th className="py-2 pr-4 font-medium">Händelse</th>
-                <th className="py-2 pr-4 font-medium">Belopp</th>
-                <th className="py-2 pr-4 font-medium">Datum</th>
-              </tr>
-            </thead>
-            <tbody>
-              {events.map((event) => (
-                <tr key={event.id} className="border-b border-tran-hairline">
-                  <td className="py-2 pr-4">{EVENT_LABELS[event.type] ?? event.type}</td>
-                  <td className="tran-tabular py-2 pr-4">
-                    {event.amountOre !== null ? formatOre(event.amountOre) : "-"}
-                  </td>
-                  <td className="tran-tabular py-2 pr-4 text-tran-muted">
-                    {formatDateTime(event.createdAt)}
-                  </td>
+          <TableScroll>
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
+                  <th className="py-2 pr-4 font-medium">Händelse</th>
+                  <th className="py-2 pr-4 font-medium">Belopp</th>
+                  <th className="py-2 pr-4 font-medium">Datum</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {events.map((event) => (
+                  <tr key={event.id} className="border-b border-tran-hairline">
+                    <td className="py-2 pr-4">{EVENT_LABELS[event.type] ?? event.type}</td>
+                    <td className="tran-tabular py-2 pr-4">
+                      {event.amountOre !== null ? formatOre(event.amountOre) : "-"}
+                    </td>
+                    <td className="tran-tabular py-2 pr-4 text-tran-muted">
+                      {formatDateTime(event.createdAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
         ) : null}
       </section>
 

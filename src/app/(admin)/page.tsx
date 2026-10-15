@@ -19,6 +19,7 @@ import { customerDisplayName } from "@/lib/orders/customer-display-name";
 import { scheduleBackgroundSync } from "@/lib/orders/postnord-auto-sync";
 import { getPaidTotalsByLocation } from "@/lib/kassa/sales";
 import { POS_LOCATIONS } from "@/lib/kassa/options";
+import { TableScroll } from "@/components/table-scroll";
 
 // Ger bakgrundssynken mot Kustom/PostNord (scheduleBackgroundSync) tid att gå igenom
 // alla öppna ordrar vid dygnets fulla genomgång.
@@ -147,44 +148,46 @@ export default async function DashboardPage() {
           {recentOrders.length === 0 ? (
             <p className="text-sm text-tran-muted">Inga ordrar än.</p>
           ) : (
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
-                  <th className="py-2 pr-4 font-medium">Order</th>
-                  <th className="py-2 pr-4 font-medium">Kund</th>
-                  <th className="py-2 pr-4 font-medium">Belopp</th>
-                  <th className="py-2 pr-4 font-medium">Frakt</th>
-                  <th className="py-2 pr-4 font-medium">Datum</th>
-                </tr>
-              </thead>
-              <tbody>
-                {recentOrders.map((order) => {
-                  const fraktStatus = fraktStatusByOrderId.get(order.id) ?? {
-                    kind: "ej_skickad" as const,
-                    label: order.fulfillmentStatus,
-                  };
-                  return (
-                    <tr key={order.id} className="border-b border-tran-hairline">
-                      <td className="py-3 pr-4">
-                        <Link href={`/orders/${order.id}`} className="tran-tabular hover:text-tran-red">
-                          #{order.orderNumber}
-                        </Link>
-                      </td>
-                      <td className="max-w-[160px] truncate py-3 pr-4 text-tran-muted">
-                        {customerDisplayName(order)}
-                      </td>
-                      <td className="tran-tabular py-3 pr-4">{formatOre(order.orderAmountOre)}</td>
-                      <td className="py-3 pr-4">
-                        <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
-                      </td>
-                      <td className="tran-tabular py-3 pr-4 text-tran-muted">
-                        {formatDateTime(order.createdAt)}
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+            <TableScroll>
+              <table className="w-full border-collapse text-sm">
+                <thead>
+                  <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
+                    <th className="py-2 pr-4 font-medium">Order</th>
+                    <th className="py-2 pr-4 font-medium">Kund</th>
+                    <th className="py-2 pr-4 font-medium">Belopp</th>
+                    <th className="py-2 pr-4 font-medium">Frakt</th>
+                    <th className="py-2 pr-4 font-medium">Datum</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {recentOrders.map((order) => {
+                    const fraktStatus = fraktStatusByOrderId.get(order.id) ?? {
+                      kind: "ej_skickad" as const,
+                      label: order.fulfillmentStatus,
+                    };
+                    return (
+                      <tr key={order.id} className="border-b border-tran-hairline">
+                        <td className="py-3 pr-4">
+                          <Link href={`/orders/${order.id}`} className="tran-tabular hover:text-tran-red">
+                            #{order.orderNumber}
+                          </Link>
+                        </td>
+                        <td className="max-w-[160px] truncate py-3 pr-4 text-tran-muted">
+                          {customerDisplayName(order)}
+                        </td>
+                        <td className="tran-tabular py-3 pr-4">{formatOre(order.orderAmountOre)}</td>
+                        <td className="py-3 pr-4">
+                          <FraktStatusBadge kind={fraktStatus.kind} label={fraktStatus.label} />
+                        </td>
+                        <td className="tran-tabular py-3 pr-4 text-tran-muted">
+                          {formatDateTime(order.createdAt)}
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </TableScroll>
           )}
         </section>
 

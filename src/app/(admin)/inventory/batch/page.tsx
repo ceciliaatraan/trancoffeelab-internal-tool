@@ -4,6 +4,7 @@ import { getRecentStockBatches } from "@/lib/inventory/recent-receipts";
 import { formatDateTime } from "@/lib/format";
 import { receiveBatchAction } from "../actions";
 import { SubmitButton } from "@/components/submit-button";
+import { TableScroll } from "@/components/table-scroll";
 
 export default async function NewBatchPage({
   searchParams,
@@ -60,39 +61,41 @@ export default async function NewBatchPage({
             />
           </div>
 
-          <table className="w-full max-w-2xl border-collapse text-sm">
-            <thead>
-              <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
-                <th className="py-3 pr-4 font-medium">Produkt</th>
-                <th className="py-3 pr-4 font-medium">SKU</th>
-                <th className="py-3 pr-4 font-medium">Tillgängligt just nu</th>
-                <th className="py-3 pr-4 font-medium">Antal som kom in</th>
-              </tr>
-            </thead>
-            <tbody>
-              {sellableRows.map((row) => (
-                <tr key={row.inventoryId} className="border-b border-tran-hairline">
-                  <td className="py-3 pr-4 align-top">
-                    {row.productName}
-                    {row.variantName ? ` - ${row.variantName}` : ""}
-                  </td>
-                  <td className="tran-tabular py-3 pr-4 align-top text-tran-muted">{row.sku}</td>
-                  <td className="tran-tabular py-3 pr-4 align-top text-tran-muted">
-                    {row.sellableQuantity}
-                  </td>
-                  <td className="py-3 pr-4 align-top">
-                    <input
-                      type="number"
-                      name={`qty_${row.inventoryId}`}
-                      min={0}
-                      defaultValue={0}
-                      className="w-24 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
-                    />
-                  </td>
+          <TableScroll>
+            <table className="w-full max-w-2xl border-collapse text-sm">
+              <thead>
+                <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
+                  <th className="py-3 pr-4 font-medium">Produkt</th>
+                  <th className="py-3 pr-4 font-medium">SKU</th>
+                  <th className="py-3 pr-4 font-medium">Tillgängligt just nu</th>
+                  <th className="py-3 pr-4 font-medium">Antal som kom in</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {sellableRows.map((row) => (
+                  <tr key={row.inventoryId} className="border-b border-tran-hairline">
+                    <td className="py-3 pr-4 align-top">
+                      {row.productName}
+                      {row.variantName ? ` - ${row.variantName}` : ""}
+                    </td>
+                    <td className="tran-tabular py-3 pr-4 align-top text-tran-muted">{row.sku}</td>
+                    <td className="tran-tabular py-3 pr-4 align-top text-tran-muted">
+                      {row.sellableQuantity}
+                    </td>
+                    <td className="py-3 pr-4 align-top">
+                      <input
+                        type="number"
+                        name={`qty_${row.inventoryId}`}
+                        min={0}
+                        defaultValue={0}
+                        className="w-24 border border-tran-hairline bg-tran-white px-2 py-1.5 text-sm focus:border-tran-black focus:outline-none"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </TableScroll>
 
           <div>
             <SubmitButton className="tran-label border border-tran-black px-4 py-2.5 text-xs transition-colors hover:border-tran-red hover:text-tran-red">
@@ -120,36 +123,38 @@ export default async function NewBatchPage({
                   {formatDateTime(batch.createdAt)}
                 </p>
               </div>
-              <table className="w-full max-w-2xl border-collapse text-sm">
-                <thead>
-                  <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
-                    <th className="py-2 pr-4 font-medium">Produkt</th>
-                    <th className="py-2 pr-4 font-medium">Kom in</th>
-                    <th className="py-2 pr-4 font-medium">I lager nu</th>
-                    <th className="py-2 pr-4 font-medium">Tillgängligt nu</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {batch.lines.map((line) => {
-                    const current = rowByInventoryId.get(line.inventoryId);
-                    return (
-                      <tr key={line.inventoryId} className="border-b border-tran-hairline last:border-0">
-                        <td className="py-2 pr-4 text-tran-muted">
-                          {line.productName}
-                          {line.variantName ? ` - ${line.variantName}` : ""}
-                        </td>
-                        <td className="tran-tabular py-2 pr-4">+{line.receivedQuantity}</td>
-                        <td className="tran-tabular py-2 pr-4 text-tran-muted">
-                          {current ? current.available : "-"}
-                        </td>
-                        <td className="tran-tabular py-2 pr-4 text-tran-muted">
-                          {current?.sellableQuantity ?? "-"}
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
+              <TableScroll>
+                <table className="w-full max-w-2xl border-collapse text-sm">
+                  <thead>
+                    <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
+                      <th className="py-2 pr-4 font-medium">Produkt</th>
+                      <th className="py-2 pr-4 font-medium">Kom in</th>
+                      <th className="py-2 pr-4 font-medium">I lager nu</th>
+                      <th className="py-2 pr-4 font-medium">Tillgängligt nu</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {batch.lines.map((line) => {
+                      const current = rowByInventoryId.get(line.inventoryId);
+                      return (
+                        <tr key={line.inventoryId} className="border-b border-tran-hairline last:border-0">
+                          <td className="py-2 pr-4 text-tran-muted">
+                            {line.productName}
+                            {line.variantName ? ` - ${line.variantName}` : ""}
+                          </td>
+                          <td className="tran-tabular py-2 pr-4">+{line.receivedQuantity}</td>
+                          <td className="tran-tabular py-2 pr-4 text-tran-muted">
+                            {current ? current.available : "-"}
+                          </td>
+                          <td className="tran-tabular py-2 pr-4 text-tran-muted">
+                            {current?.sellableQuantity ?? "-"}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </TableScroll>
             </div>
           ))}
         </div>

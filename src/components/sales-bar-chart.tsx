@@ -102,7 +102,7 @@ export function SalesBarChart({ data }: { data: DailySales[] }) {
         {data.map((day, index) => (
           <div
             key={day.dayKey}
-            className="tran-tabular flex-1 text-center"
+            className="tran-tabular min-w-0 flex-1 overflow-visible whitespace-nowrap text-center"
             style={{ visibility: shouldShowLabel(index, data.length) ? "visible" : "hidden" }}
           >
             {day.label}
@@ -113,9 +113,12 @@ export function SalesBarChart({ data }: { data: DailySales[] }) {
   );
 }
 
-/** Visar bara var N:e datumetikett när det är många staplar, annars blir det för trångt. */
+/**
+ * Visar bara var N:e datumetikett när det är många staplar, annars blir det
+ * för trångt - högst ~6 etiketter, så de får plats även på en telefon.
+ */
 function shouldShowLabel(index: number, total: number): boolean {
-  if (total <= 14) return true;
-  const step = Math.ceil(total / 10);
+  if (total <= 7) return true;
+  const step = Math.ceil(total / 6);
   return index % step === 0 || index === total - 1;
 }
