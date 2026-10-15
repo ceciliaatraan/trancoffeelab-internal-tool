@@ -99,6 +99,8 @@ export type PosSaleForSlack = {
   note: string | null;
   paymentMethod: string;
   soldByEmail: string | null;
+  /** Kundens namn, om kassabiträdet skrev in det. */
+  customerName?: string | null;
   lines: { name: string; quantity: number }[];
 };
 
@@ -106,10 +108,11 @@ export type PosSaleForSlack = {
 export function formatPosSaleSlackText(sale: PosSaleForSlack): string {
   const place = sale.note ? `${sale.location} - ${sale.note}` : sale.location;
   const items = sale.lines.map((line) => `${line.quantity} × ${line.name}`).join("\n");
-  const seller = sale.soldByEmail ? `\n🧑‍🍳 ${sale.soldByEmail}` : "";
+  const customer = sale.customerName ? `\n👤 ${sale.customerName}` : "";
+  const seller = sale.soldByEmail ? `\n🧑‍🍳 Såld av ${sale.soldByEmail}` : "";
   return `🧾 *Kassa #${sale.saleNumber}* - ${formatOre(sale.totalOre)} (${paymentMethodLabel(
     sale.paymentMethod,
-  )})\n📍 ${place}${seller}\n${items}`;
+  )})${customer}\n📍 ${place}${seller}\n${items}`;
 }
 
 /**

@@ -1,4 +1,4 @@
-import { pgTable, text, timestamp, uuid, integer, index } from "drizzle-orm/pg-core";
+import { pgTable, text, timestamp, uuid, integer, index, boolean } from "drizzle-orm/pg-core";
 import { adminUsers } from "./admin";
 import { products, productVariants } from "./catalog";
 
@@ -64,6 +64,14 @@ export const posSales = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    /**
+     * Kundens namn, om kassabiträdet skrev in det (valfritt) - Swish Företag
+     * skickar ingen uppgift om betalaren till oss, så den kan inte hämtas
+     * automatiskt.
+     */
+    customerName: text("customer_name"),
+    /** Om kunden ville ha kvitto: true = ja (skickat), false = nej tack, null = inte frågat. */
+    receiptRequested: boolean("receipt_requested"),
     /** Dit kvittot skickades, om kunden ville ha ett (se lib/email/pos-receipt.ts). */
     receiptEmail: text("receipt_email"),
     receiptSentAt: timestamp("receipt_sent_at", { withTimezone: true }),

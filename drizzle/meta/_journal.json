@@ -134,6 +134,13 @@
       "when": 1792089664002,
       "tag": "0018_gifted_lenny_balinger",
       "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "7",
+      "when": 1792090243546,
+      "tag": "0019_jittery_bloodstrike",
+      "breakpoints": true
     }
   ]
 }

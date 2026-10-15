@@ -14,6 +14,7 @@ import {
 import {
   cancelPendingSale,
   createPendingSale,
+  declineSaleReceipt,
   markSalePaid,
   refundSale,
   sendSaleReceipt,
@@ -81,11 +82,14 @@ export async function startSaleAction(input: {
   }
 }
 
-export async function markSalePaidAction(saleId: string): Promise<{ ok: boolean; error?: string }> {
+export async function markSalePaidAction(
+  saleId: string,
+  customerName = "",
+): Promise<{ ok: boolean; error?: string }> {
   try {
     const seller = await requireKassaUser();
     await assertSaleAccessible(seller.email, saleId);
-    const updated = await markSalePaid(saleId, { id: seller.id, email: seller.email });
+    const updated = await markSalePaid(saleId, { id: seller.id, email: seller.email }, customerName);
     revalidatePath("/kassa");
     revalidatePath("/");
     return updated ? { ok: true } : { ok: false, error: "Försäljningen väntar inte längre på betalning." };
@@ -148,6 +152,19 @@ export async function sendReceiptAction(
     const result = await sendSaleReceipt(saleId, email);
     revalidatePath("/kassa");
     return { ok: true, email: result.email };
+  } catch (err) {
+    return { ok: false, error: describeError(err) };
+  }
+}
+
+/** Kunden ville inte ha kvitto - sparas för kolumnen Kvitto i listan. */
+export async function declineReceiptAction(saleId: string): Promise<{ ok: boolean; error?: string }> {
+  try {
+    const seller = await requireKassaUser();
+    await assertSaleAccessible(seller.email, saleId);
+    await declineSaleReceipt(saleId);
+    revalidatePath("/kassa");
+    return { ok: true };
   } catch (err) {
     return { ok: false, error: describeError(err) };
   }

@@ -9,6 +9,7 @@ import { KASSA_PLACE_COOKIE } from "@/lib/kassa/options";
 import {
   addLocationAction,
   cancelSaleAction,
+  declineReceiptAction,
   markSalePaidAction,
   sendReceiptAction,
   startSaleAction,
@@ -54,6 +55,7 @@ export function KassaRegister({
   const [note, setNote] = useState(initialPlace.note);
   const [newLocationName, setNewLocationName] = useState<string | null>(null);
   const [activeSale, setActiveSale] = useState<ActiveSale | null>(null);
+  const [customerName, setCustomerName] = useState("");
   const [paidSale, setPaidSale] = useState<PaidSale | null>(null);
   const [receiptEmail, setReceiptEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +121,7 @@ export function KassaRegister({
         setError(result.error);
         return;
       }
+      setCustomerName("");
       setActiveSale(result);
     });
   };
@@ -127,7 +130,7 @@ export function KassaRegister({
     if (!activeSale) return;
     setError(null);
     startTransition(async () => {
-      const result = await markSalePaidAction(activeSale.sale.id);
+      const result = await markSalePaidAction(activeSale.sale.id, customerName);
       if (!result.ok) {
         setError(result.error ?? "Kunde inte registrera betalningen.");
         return;
@@ -190,8 +193,15 @@ export function KassaRegister({
               </button>
               <button
                 type="button"
-                onClick={() => finishPaid(`Kassa #${paidSale.saleNumber} klar - ${formatOre(paidSale.totalOre)}.`)}
-                className="tran-label h-11 w-full border border-tran-black text-xs"
+                disabled={pending}
+                onClick={() =>
+                  startTransition(async () => {
+                    await declineReceiptAction(paidSale.id);
+                    finishPaid(`Kassa #${paidSale.saleNumber} klar - ${formatOre(paidSale.totalOre)}.`);
+                    router.refresh();
+                  })
+                }
+                className="tran-label h-11 w-full border border-tran-black text-xs disabled:opacity-50"
               >
                 Nej tack
               </button>
@@ -268,6 +278,21 @@ export function KassaRegister({
         <p className="text-xs text-tran-muted">
           Tryck på Betald när kunden visat att betalningen gått igenom i sin Swish-app.
         </p>
+
+        <div className="flex w-full flex-col gap-1 text-left">
+          <label className="tran-label text-xs text-tran-muted" htmlFor="customer-name">
+            Kundens namn (valfritt)
+          </label>
+          <input
+            id="customer-name"
+            value={customerName}
+            onChange={(event) => setCustomerName(event.target.value)}
+            maxLength={100}
+            autoComplete="off"
+            placeholder="Står i er Swish-app när betalningen kommit in"
+            className="h-11 border border-tran-black px-3 text-sm"
+          />
+        </div>
 
         {error ? <p className="text-sm text-tran-red">{error}</p> : null}
 

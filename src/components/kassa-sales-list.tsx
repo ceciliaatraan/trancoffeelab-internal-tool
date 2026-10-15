@@ -68,8 +68,10 @@ export function KassaSalesList({ sales }: { sales: RecentPosSale[] }) {
                 <th className="py-2 pr-4 font-medium">Tid</th>
                 <th className="py-2 pr-4 font-medium">Varor</th>
                 <th className="py-2 pr-4 font-medium">Plats</th>
+                <th className="py-2 pr-4 font-medium">Kund</th>
                 <th className="py-2 pr-4 text-right font-medium">Belopp</th>
                 <th className="py-2 pr-4 font-medium">Status</th>
+                <th className="py-2 pr-4 font-medium">Kvitto</th>
                 <th className="py-2 font-medium" />
               </tr>
             </thead>
@@ -87,14 +89,24 @@ export function KassaSalesList({ sales }: { sales: RecentPosSale[] }) {
                     {sale.location}
                     {sale.note ? <span className="text-tran-muted"> - {sale.note}</span> : null}
                   </td>
+                  <td className="py-2 pr-4">{sale.customerName ?? <span className="text-tran-muted">-</span>}</td>
                   <td className={`tran-tabular py-2 pr-4 text-right ${sale.status === "refunded" ? "line-through text-tran-muted" : ""}`}>
                     {formatOre(sale.totalOre)}
                   </td>
+                  <td className="py-2 pr-4">{POS_STATUS_LABELS[sale.status] ?? sale.status}</td>
                   <td className="py-2 pr-4">
-                    {POS_STATUS_LABELS[sale.status] ?? sale.status}
-                    {sale.receiptEmail ? (
-                      <span className="block text-xs text-tran-muted">Kvitto: {sale.receiptEmail}</span>
-                    ) : null}
+                    {sale.receiptRequested === true ? (
+                      <>
+                        Ja
+                        {sale.receiptEmail ? (
+                          <span className="block break-all text-xs text-tran-muted">{sale.receiptEmail}</span>
+                        ) : null}
+                      </>
+                    ) : sale.receiptRequested === false ? (
+                      "Nej"
+                    ) : (
+                      <span className="text-tran-muted">-</span>
+                    )}
                   </td>
                   <td className="py-2 text-right">
                     {sale.status === "paid" ? (

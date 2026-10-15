@@ -163,11 +163,17 @@ async function removeLineFromStock(
  * dubbeltryck aldrig drar lagret två gånger. Returnerar false om
  * försäljningen inte längre väntar.
  */
-export async function markSalePaid(saleId: string, seller: Seller): Promise<boolean> {
+export async function markSalePaid(
+  saleId: string,
+  seller: Seller,
+  /** Valfritt, inskrivet av kassabiträdet - Swish Företag ger oss inte betalarens namn. */
+  customerName: string | null = null,
+): Promise<boolean> {
+  const name = customerName?.replace(/\s+/g, " ").trim().slice(0, 100) || null;
   const result = await db.transaction(async (tx) => {
     const [sale] = await tx
       .update(schema.posSales)
-      .set({ status: "paid", paidAt: new Date() })
+      .set({ status: "paid", paidAt: new Date(), customerName: name })
       .where(and(eq(schema.posSales.id, saleId), eq(schema.posSales.status, "pending")))
       .returning();
     if (!sale) return null;
@@ -187,9 +193,18 @@ export async function markSalePaid(saleId: string, seller: Seller): Promise<bool
     note: result.sale.note,
     paymentMethod: result.sale.paymentMethod,
     soldByEmail: result.sale.soldByEmail,
+    customerName: result.sale.customerName,
     lines: result.lines.map((line) => ({ name: line.name, quantity: line.quantity })),
   });
   return true;
+}
+
+/** Kunden ville inte ha kvitto - sparas så det syns i listan (ändras om ett kvitto skickas senare). */
+export async function declineSaleReceipt(saleId: string): Promise<void> {
+  await db
+    .update(schema.posSales)
+    .set({ receiptRequested: false })
+    .where(and(eq(schema.posSales.id, saleId), isNull(schema.posSales.receiptSentAt)));
 }
 
 /** Avbryter en försäljning som inte betalats (kunden ångrade sig vid QR-koden). */
@@ -250,6 +265,9 @@ export type RecentPosSale = {
   paymentMethod: string;
   totalOre: number;
   soldByEmail: string | null;
+  customerName: string | null;
+  /** true = kvitto skickat, false = kunden ville inte ha kvitto, null = inte frågat. */
+  receiptRequested: boolean | null;
   receiptEmail: string | null;
   createdAt: Date;
   lines: { name: string; quantity: number }[];
@@ -291,6 +309,8 @@ export async function getRecentSales(limit: number, locationId?: string): Promis
     paymentMethod: sale.paymentMethod,
     totalOre: sale.totalOre,
     soldByEmail: sale.soldByEmail,
+    customerName: sale.customerName,
+    receiptRequested: sale.receiptRequested,
     receiptEmail: sale.receiptSentAt ? sale.receiptEmail : null,
     createdAt: sale.createdAt,
     lines: lines.filter((line) => line.saleId === sale.id),
@@ -347,7 +367,7 @@ export async function sendSaleReceipt(saleId: string, rawEmail: string): Promise
 
   await db
     .update(schema.posSales)
-    .set({ receiptEmail: email, receiptSentAt: new Date() })
+    .set({ receiptEmail: email, receiptSentAt: new Date(), receiptRequested: true })
     .where(eq(schema.posSales.id, saleId));
   return { email };
 }
