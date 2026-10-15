@@ -89,11 +89,8 @@ export function KassaSalesList({ sales }: { sales: RecentPosSale[] }) {
                     {sale.location}
                     {sale.note ? <span className="text-tran-muted"> - {sale.note}</span> : null}
                   </td>
-                  <td className="py-2 pr-4">
-                    {sale.customerName ?? (sale.customerEmail ? null : <span className="text-tran-muted">-</span>)}
-                    {sale.customerEmail ? (
-                      <span className="block break-all text-xs text-tran-muted">{sale.customerEmail}</span>
-                    ) : null}
+                  <td className="break-all py-2 pr-4">
+                    {sale.customerEmail ?? <span className="text-tran-muted">-</span>}
                   </td>
                   <td className={`tran-tabular py-2 pr-4 text-right ${sale.status === "refunded" ? "line-through text-tran-muted" : ""}`}>
                     {formatOre(sale.totalOre)}

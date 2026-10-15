@@ -169,7 +169,6 @@ describe("formatPosSaleSlackText", () => {
       note: "Kaffefestivalen",
       paymentMethod: "swish",
       soldByEmail: "mamma@example.com",
-      customerName: "Anna Svensson",
       customerEmail: "anna@example.com",
       lines: [
         { name: "Komplett kit", quantity: 1 },
@@ -180,7 +179,7 @@ describe("formatPosSaleSlackText", () => {
     expect(text).toContain("398,00");
     expect(text).toContain("(Swish)");
     expect(text).toContain("Event - Kaffefestivalen");
-    expect(text).toContain("👤 Anna Svensson · anna@example.com");
+    expect(text).toContain("👤 anna@example.com");
     expect(text).toContain("Såld av mamma@example.com");
     expect(text).toContain("1 × Komplett kit\n1 × Kondenserad mjölk");
   });

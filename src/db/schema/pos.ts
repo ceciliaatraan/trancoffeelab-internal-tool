@@ -64,11 +64,7 @@ export const posSales = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
-    /**
-     * Kundens namn, om kassabiträdet skrev in det (valfritt) - Swish Företag
-     * skickar ingen uppgift om betalaren till oss, så den kan inte hämtas
-     * automatiskt.
-     */
+    /** Används inte längre (namnfältet togs bort 2026-10-15) - kolumnen finns kvar i databasen. */
     customerName: text("customer_name"),
     /** Kundens e-post - krävs innan Swish-koden visas (ägarens beslut 2026-10-15). Kvittot skickas hit om kunden vill. */
     customerEmail: text("customer_email"),

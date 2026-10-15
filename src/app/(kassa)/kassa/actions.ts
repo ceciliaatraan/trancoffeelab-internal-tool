@@ -84,14 +84,11 @@ export async function startSaleAction(input: {
   }
 }
 
-export async function markSalePaidAction(
-  saleId: string,
-  customerName = "",
-): Promise<{ ok: boolean; error?: string }> {
+export async function markSalePaidAction(saleId: string): Promise<{ ok: boolean; error?: string }> {
   try {
     const seller = await requireKassaUser();
     await assertSaleAccessible(seller.email, saleId);
-    const updated = await markSalePaid(saleId, { id: seller.id, email: seller.email }, customerName);
+    const updated = await markSalePaid(saleId, { id: seller.id, email: seller.email });
     revalidatePath("/kassa");
     revalidatePath("/");
     return updated ? { ok: true } : { ok: false, error: "Försäljningen väntar inte längre på betalning." };

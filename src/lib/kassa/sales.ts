@@ -176,17 +176,11 @@ async function removeLineFromStock(
  * dubbeltryck aldrig drar lagret två gånger. Returnerar false om
  * försäljningen inte längre väntar.
  */
-export async function markSalePaid(
-  saleId: string,
-  seller: Seller,
-  /** Valfritt, inskrivet av kassabiträdet - Swish Företag ger oss inte betalarens namn. */
-  customerName: string | null = null,
-): Promise<boolean> {
-  const name = customerName?.replace(/\s+/g, " ").trim().slice(0, 100) || null;
+export async function markSalePaid(saleId: string, seller: Seller): Promise<boolean> {
   const result = await db.transaction(async (tx) => {
     const [sale] = await tx
       .update(schema.posSales)
-      .set({ status: "paid", paidAt: new Date(), customerName: name })
+      .set({ status: "paid", paidAt: new Date() })
       .where(and(eq(schema.posSales.id, saleId), eq(schema.posSales.status, "pending")))
       .returning();
     if (!sale) return null;
@@ -206,7 +200,6 @@ export async function markSalePaid(
     note: result.sale.note,
     paymentMethod: result.sale.paymentMethod,
     soldByEmail: result.sale.soldByEmail,
-    customerName: result.sale.customerName,
     customerEmail: result.sale.customerEmail,
     lines: result.lines.map((line) => ({ name: line.name, quantity: line.quantity })),
   });
@@ -279,7 +272,6 @@ export type RecentPosSale = {
   paymentMethod: string;
   totalOre: number;
   soldByEmail: string | null;
-  customerName: string | null;
   customerEmail: string | null;
   /** true = kvitto skickat, false = kunden ville inte ha kvitto, null = inte frågat. */
   receiptRequested: boolean | null;
@@ -324,7 +316,6 @@ export async function getRecentSales(limit: number, locationId?: string): Promis
     paymentMethod: sale.paymentMethod,
     totalOre: sale.totalOre,
     soldByEmail: sale.soldByEmail,
-    customerName: sale.customerName,
     customerEmail: sale.customerEmail,
     receiptRequested: sale.receiptRequested,
     receiptEmail: sale.receiptSentAt ? sale.receiptEmail : null,

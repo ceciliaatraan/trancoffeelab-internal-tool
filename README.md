@@ -368,10 +368,6 @@ nummerserie "Kassa #n"). Den delar bara lagret och Slack med resten:
   (om) från listan med "Kvitto". Adressen sparas bara på försäljningen -
   kunden läggs inte i kundregistret. Kolumnen Kvitto i listan visar
   Ja (med adressen) / Nej / - (inte frågat).
-- **Kundens namn** (valfritt) skrivs in på betalskärmen och följer med i
-  Slack-notisen och listan. Swish Företag skickar ingen uppgift om
-  betalaren till oss (det finns inget API), så namnet kan inte hämtas
-  automatiskt - det syns i er egen Swish-app.
 
 **Kassabiträden:** adresser i `ALLOWED_CASHIER_EMAILS` får logga in med
 Google men ser bara kassan - alla andra sidor skickas till `/kassa`
