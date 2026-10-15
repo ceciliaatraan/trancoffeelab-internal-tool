@@ -1,4 +1,5 @@
 import { calculateTaxFromGross } from "./tax";
+import { MARKETING_CHECKBOX_TEXT } from "./marketing-consent";
 
 export type Locale = "sv-SE" | "en-SE";
 
@@ -188,6 +189,8 @@ export type KustomCreateOrderPayload = {
     allowed_customer_types: ["person", "organization"];
     /** Visar ett extra, valfritt momsregistreringsnummer-fält i adressformuläret - bara relevant för B2B-ordrar. */
     show_vat_registration_number_field: true;
+    /** Nyhetsbrevsrutan i kassan, aldrig förikryssad - se marketing-consent.ts. */
+    additional_checkbox?: { text: string; checked: false; required: false };
   };
   /**
    * Statisk fallback KSA visar om TMS/Shipping API-anropet till PostNord
@@ -242,6 +245,11 @@ export function buildCreateOrderPayload({
       allow_separate_shipping_address: true,
       allowed_customer_types: ["person", "organization"],
       show_vat_registration_number_field: true,
+      additional_checkbox: {
+        text: MARKETING_CHECKBOX_TEXT[locale],
+        checked: false,
+        required: false,
+      },
     },
     shipping_options: [shippingOption],
     ...(merchantReference1 ? { merchant_reference1: merchantReference1 } : {}),

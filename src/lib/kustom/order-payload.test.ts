@@ -256,11 +256,27 @@ describe("buildCreateOrderPayload", () => {
       merchantUrls,
     });
 
-    expect(payload.options).toEqual({
+    expect(payload.options).toMatchObject({
       allow_separate_shipping_address: true,
       allowed_customer_types: ["person", "organization"],
       show_vat_registration_number_field: true,
     });
+  });
+
+  it("visar nyhetsbrevsrutan i kassan, aldrig förikryssad eller obligatorisk, på kundens språk", () => {
+    const base = {
+      items: [],
+      shippingOption: standardShippingOption,
+      merchantUrls,
+    };
+    expect(buildCreateOrderPayload({ ...base, locale: "sv-SE" }).options.additional_checkbox).toEqual({
+      text: "Ja tack, skicka nyheter och erbjudanden från TRAN Coffee Lab till min e-post.",
+      checked: false,
+      required: false,
+    });
+    expect(buildCreateOrderPayload({ ...base, locale: "en-SE" }).options.additional_checkbox?.text).toBe(
+      "Yes please, send me news and offers from TRAN Coffee Lab by email.",
+    );
   });
 
   it("skickar med det angivna shipping_option som KSA:s fallback, alltid exakt en post", () => {

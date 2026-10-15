@@ -168,14 +168,21 @@ export async function POST(request: Request) {
     try {
       order = await createOrder(payload);
     } catch (err) {
-      // Försiktighet: skulle Kustom neka merchant_reference1 (400) får det
-      // aldrig stoppa kassan - försök igen utan, då får ordern sitt nummer
-      // när den sparas precis som tidigare.
-      if (!(err instanceof KustomApiError) || err.status !== 400 || !payload.merchant_reference1) {
+      // Försiktighet: skulle Kustom neka något av de valfria fälten
+      // (merchant_reference1, nyhetsbrevsrutan) med 400 får det aldrig
+      // stoppa kassan - försök igen utan dem. Ordern får då sitt nummer
+      // när den sparas, precis som tidigare, och ingen nyhetsbrevsruta.
+      const hasOptionalFields =
+        Boolean(payload.merchant_reference1) || Boolean(payload.options.additional_checkbox);
+      if (!(err instanceof KustomApiError) || err.status !== 400 || !hasOptionalFields) {
         throw err;
       }
-      console.error("Kustom nekade create-order med merchant_reference1 - försöker utan", err.body);
-      order = await createOrder({ ...payload, merchant_reference1: undefined });
+      console.error("Kustom nekade create-order med valfria fält - försöker utan", err.body);
+      order = await createOrder({
+        ...payload,
+        merchant_reference1: undefined,
+        options: { ...payload.options, additional_checkbox: undefined },
+      });
     }
     return NextResponse.json(
       {

@@ -1,5 +1,13 @@
 import "server-only";
-import { acknowledgeOrder, getOrderManagementOrder, updateMerchantReferences } from "@/lib/kustom/client";
+import { eq } from "drizzle-orm";
+import { db, schema } from "@/db";
+import {
+  acknowledgeOrder,
+  getOrderManagementOrder,
+  readOrder,
+  updateMerchantReferences,
+} from "@/lib/kustom/client";
+import { hasMarketingConsent } from "@/lib/kustom/marketing-consent";
 import { persistOrderFromKustom, type PersistedOrder } from "@/lib/orders/persist-order";
 import { captureOrderAtCheckout } from "@/lib/orders/capture-at-checkout";
 import { isPayNowMethod } from "@/lib/kustom/payment-methods";
@@ -35,6 +43,8 @@ export async function processKustomOrder(orderId: string): Promise<PersistedOrde
         console.error("Kunde inte sätta ordernummer som merchant_reference1 hos Kustom", persisted.orderNumber, err);
       }
     }
+
+    await saveMarketingConsent(orderId, order);
 
     // Förbeställningar (alla betalsätt) och "betala nu"-sätt (kort, Swish
     // m.m.) debiteras direkt - se capture-at-checkout.ts. Klarnas betala-
@@ -85,4 +95,31 @@ export async function processKustomOrder(orderId: string): Promise<PersistedOrde
   }
 
   return persisted;
+}
+
+/**
+ * Kryssade kunden i nyhetsbrevsrutan i Kustoms kassa (se
+ * marketing-consent.ts) sparas det som customers.marketing_consent.
+ * Svaret (merchant_requested) finns i Klarna Checkout-modellens
+ * Checkout-order, som Kustom bygger på - inte bekräftat för Kustom. Vi
+ * kollar Order Management-ordern först och läser Checkout-ordern bara om
+ * svaret inte fanns där. Ett tomt/nej-svar tar aldrig bort ett tidigare
+ * samtycke, och ett fel här får aldrig stoppa resten av orderflödet.
+ */
+async function saveMarketingConsent(
+  orderId: string,
+  order: Awaited<ReturnType<typeof getOrderManagementOrder>>,
+): Promise<void> {
+  const email = order.billing_address?.email;
+  if (!email) return;
+  try {
+    const consent = hasMarketingConsent(order) || hasMarketingConsent(await readOrder(orderId));
+    if (!consent) return;
+    await db
+      .update(schema.customers)
+      .set({ marketingConsent: true, updatedAt: new Date() })
+      .where(eq(schema.customers.email, email));
+  } catch (err) {
+    console.error("Kunde inte läsa/spara nyhetsbrevssamtycket för order", orderId, err);
+  }
 }

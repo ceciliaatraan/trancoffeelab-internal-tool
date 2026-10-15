@@ -812,6 +812,25 @@ findByReference kräver `POSTNORD_CUSTOMER_NUMBER` - saknas den i Vercel provas
 tms_reference bara som spårnings-ID. OBEKRÄFTAT: att PostNords Track & Trace
 hittar KSA-skickningen på tms_reference.
 
+## Nyhetsbrevsruta i Kustoms kassa, 2026-10-15
+
+Butikens egen kontaktruta (e-post, telefon, köpvillkor, nyhetsbrev) är
+borttagen - den skickades aldrig vidare, och nyhetsbrevsrutan sparade
+ingenting. I stället:
+- create-order skickar `options.additional_checkbox` (text på kundens språk,
+  `checked: false`, `required: false`) - se `kustom/marketing-consent.ts`.
+- När ordern tas emot (`process-kustom-order.ts`) läses svaret ur
+  `merchant_requested.additional_checkbox` (eller `additional_checkboxes`)
+  - först på Order Management-ordern, annars på Checkout-ordern
+  (`readOrder`). Ikryssad = `customers.marketing_consent = true` (syns i
+  kolumnen Marknadsföring under Kunder). Ett nej tar aldrig bort ett
+  tidigare samtycke. Ingen schemaändring - kolumnen fanns redan.
+- Nekar Kustom create-order med 400 försöker kassan igen utan
+  nyhetsbrevsrutan och merchant_reference1.
+
+OBEKRÄFTAT: att Kustom stöder `additional_checkbox` och var svaret kommer
+tillbaka - fältnamnen följer Klarna Checkout v3, som Kustom bygger på.
+
 ## Status i koden
 
 | Del | Status |
