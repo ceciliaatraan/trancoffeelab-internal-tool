@@ -344,8 +344,10 @@ nummerserie "Kassa #n"). Den delar bara lagret och Slack med resten:
   (`pos_locations` - "Restaurang TRAN", "Event" och de event ni lägger
   till, direkt i kassan med "+ Nytt ställe" eller under
   `/kassa/installningar`). Startsidan och inställningssidan visar
-  försäljningen per ställe (idag, denna månad, totalt). Ett ställe
-  arkiveras i stället för att tas bort.
+  försäljningen per ställe (idag, denna månad, totalt). Ordningen
+  ställena visas i väljs med rullgardinen (#) på `/kassa/installningar`
+  (`pos_locations.sort_order`). Ett ställe arkiveras i stället för att
+  tas bort.
 - **Fast ställe per person** (`pos_location_users`, ställs in på
   `/kassa/installningar`): den personen säljer alltid där, kan inte välja
   eller lägga till ställen och ser bara det ställets försäljning

@@ -5,8 +5,10 @@ import { getFixedLocations, getLocationStats } from "@/lib/kassa/locations";
 import { formatOreWhole } from "@/lib/format";
 import { SubmitButton } from "@/components/submit-button";
 import { TableScroll } from "@/components/table-scroll";
+import { PositionSelect } from "@/components/position-select";
 import {
   createLocationFormAction,
+  moveLocationAction,
   removeFixedLocationAction,
   setFixedLocationFormAction,
   setLocationArchivedAction,
@@ -47,13 +49,15 @@ export default async function KassaSettingsPage({ searchParams }: PageProps<"/ka
       <section className="flex flex-col gap-4">
         <p className="text-sm text-tran-muted">
           Varje kassaköp sparas med sitt försäljningsställe, så det syns var försäljningen kommer
-          ifrån. Lägg till ett ställe per event. Ett arkiverat ställe går inte att välja i kassan,
-          men dess försäljning finns kvar.
+          ifrån. Lägg till ett ställe per event. Ordningen (#) bestämmer i vilken ordning ställena
+          visas i kassan. Ett arkiverat ställe går inte att välja i kassan, men dess försäljning
+          finns kvar.
         </p>
         <TableScroll>
           <table className="w-full border-collapse text-sm">
             <thead>
               <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
+                <th className="py-2 pr-4 font-medium">#</th>
                 <th className="py-2 pr-4 font-medium">Ställe</th>
                 <th className="py-2 pr-4 text-right font-medium">Idag</th>
                 <th className="py-2 pr-4 text-right font-medium">Denna månad</th>
@@ -63,8 +67,17 @@ export default async function KassaSettingsPage({ searchParams }: PageProps<"/ka
               </tr>
             </thead>
             <tbody>
-              {stats.map((location) => (
+              {stats.map((location, index) => (
                 <tr key={location.id} className="border-b border-tran-hairline">
+                  <td className="py-2 pr-4">
+                    <PositionSelect
+                      key={`${location.id}-${index}-${stats.length}`}
+                      action={moveLocationAction.bind(null, location.id)}
+                      current={index + 1}
+                      total={stats.length}
+                      label={`Position för ${location.name}`}
+                    />
+                  </td>
                   <td className={`py-3 pr-4 ${location.archived ? "text-tran-muted" : ""}`}>
                     {location.name}
                     {location.archived ? " (arkiverat)" : ""}

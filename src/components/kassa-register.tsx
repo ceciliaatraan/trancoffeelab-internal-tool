@@ -99,7 +99,7 @@ export function KassaRegister({
       setLocations((current) =>
         current.some((option) => option.id === result.location.id)
           ? current
-          : [...current, result.location].sort((a, b) => a.name.localeCompare(b.name, "sv")),
+          : [...current, result.location],
       );
       setLocationId(result.location.id);
       setNewLocationName(null);

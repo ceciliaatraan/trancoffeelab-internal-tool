@@ -6,13 +6,13 @@ export type PosLocation = { id: string; name: string };
 
 export const MAX_LOCATION_NAME = 60;
 
-/** Försäljningsställen som går att välja i kassan (inte arkiverade), i bokstavsordning. */
+/** Försäljningsställen som går att välja i kassan (inte arkiverade), i den ordning ni valt. */
 export async function getActiveLocations(): Promise<PosLocation[]> {
   return db
     .select({ id: schema.posLocations.id, name: schema.posLocations.name })
     .from(schema.posLocations)
     .where(isNull(schema.posLocations.archivedAt))
-    .orderBy(asc(schema.posLocations.name));
+    .orderBy(asc(schema.posLocations.sortOrder), asc(schema.posLocations.name));
 }
 
 /** Personens fasta försäljningsställe (pos_location_users), eller null om hen får välja själv. */
@@ -50,11 +50,46 @@ export async function createLocation(rawName: string, createdByEmail: string): P
     return existing;
   }
 
+  // Ett nytt ställe hamnar sist - ordningen ändras på /kassa/installningar.
+  const [{ maxOrder }] = await db
+    .select({ maxOrder: sql<number>`coalesce(max(${schema.posLocations.sortOrder}), 0)::int` })
+    .from(schema.posLocations);
   const [created] = await db
     .insert(schema.posLocations)
-    .values({ name, createdByEmail })
+    .values({ name, createdByEmail, sortOrder: Number(maxOrder) + 1 })
     .returning({ id: schema.posLocations.id, name: schema.posLocations.name });
   return created;
+}
+
+/**
+ * Ny ordning när ett ställe flyttas till `position` (1 = först): stället
+ * tas ur listan och sätts in på den platsen, de andra behåller sin inbördes
+ * ordning. Ren funktion - se moveLocation.
+ */
+export function reorderIds(ids: string[], id: string, position: number): string[] {
+  if (!ids.includes(id)) return ids;
+  const rest = ids.filter((other) => other !== id);
+  const index = Math.min(Math.max(Math.trunc(position) - 1, 0), rest.length);
+  return [...rest.slice(0, index), id, ...rest.slice(index)];
+}
+
+/** Flyttar ett försäljningsställe till en ny position och numrerar om alla (1, 2, 3 …). */
+export async function moveLocation(locationId: string, position: number): Promise<void> {
+  await db.transaction(async (tx) => {
+    const rows = await tx
+      .select({ id: schema.posLocations.id })
+      .from(schema.posLocations)
+      .orderBy(asc(schema.posLocations.sortOrder), asc(schema.posLocations.name))
+      .for("update");
+    const ordered = reorderIds(
+      rows.map((row) => row.id),
+      locationId,
+      position,
+    );
+    for (const [index, id] of ordered.entries()) {
+      await tx.update(schema.posLocations).set({ sortOrder: index + 1 }).where(eq(schema.posLocations.id, id));
+    }
+  });
 }
 
 export async function setLocationArchived(locationId: string, archived: boolean): Promise<void> {
@@ -118,7 +153,7 @@ export async function getLocationStats(): Promise<LocationStats[]> {
     .from(schema.posLocations)
     .leftJoin(schema.posSales, paid)
     .groupBy(schema.posLocations.id)
-    .orderBy(asc(schema.posLocations.name));
+    .orderBy(asc(schema.posLocations.sortOrder), asc(schema.posLocations.name));
   return rows.map((row) => ({
     id: row.id,
     name: row.name,

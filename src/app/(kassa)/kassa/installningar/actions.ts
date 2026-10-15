@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireCurrentAdmin } from "@/lib/current-admin";
 import { describeError } from "@/lib/describe-error";
-import { createLocation, setFixedLocation, setLocationArchived } from "@/lib/kassa/locations";
+import { createLocation, moveLocation, setFixedLocation, setLocationArchived } from "@/lib/kassa/locations";
 
 const PAGE = "/kassa/installningar";
 
@@ -50,5 +50,15 @@ export async function setFixedLocationFormAction(formData: FormData) {
 export async function removeFixedLocationAction(email: string) {
   await requireCurrentAdmin();
   await setFixedLocation(email, null);
+  done();
+}
+
+/** Flyttar ett försäljningsställe till vald position i ordningen (rullgardinen på sidan). */
+export async function moveLocationAction(locationId: string, formData: FormData) {
+  await requireCurrentAdmin();
+  const position = Number(formData.get("position"));
+  if (Number.isInteger(position) && position >= 1) {
+    await moveLocation(locationId, position);
+  }
   done();
 }

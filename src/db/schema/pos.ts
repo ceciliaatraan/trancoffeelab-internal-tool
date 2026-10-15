@@ -23,6 +23,8 @@ import { products, productVariants } from "./catalog";
 export const posLocations = pgTable("pos_locations", {
   id: uuid("id").primaryKey().defaultRandom(),
   name: text("name").notNull().unique(),
+  /** Ordningen ställena visas i (kassan, inställningssidan) - lägst först. Sätts på /kassa/installningar. */
+  sortOrder: integer("sort_order").notNull().default(0),
   archivedAt: timestamp("archived_at", { withTimezone: true }),
   createdByEmail: text("created_by_email"),
   createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
