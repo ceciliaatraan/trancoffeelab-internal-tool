@@ -75,67 +75,31 @@ export default async function DashboardPage() {
     <div className="flex flex-col gap-10">
       <h1 className="text-4xl font-bold uppercase tracking-tight">Dashboard</h1>
 
-      <section className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-6">
-        <div className="min-w-0 border border-tran-hairline p-6">
+      <section className="grid grid-cols-2 gap-6 sm:grid-cols-3 2xl:grid-cols-6">
+        <div className="min-w-0 border border-tran-hairline p-4 xl:p-6">
           <p className="tran-label text-xs text-tran-muted">Försäljning idag</p>
-          <p className="tran-tabular break-words text-xl">{formatOreWhole(summary.todayOre)}</p>
+          <p className="tran-tabular whitespace-nowrap text-lg xl:text-xl">{formatOreWhole(summary.todayOre)}</p>
         </div>
-        <div className="min-w-0 border border-tran-hairline p-6">
+        <div className="min-w-0 border border-tran-hairline p-4 xl:p-6">
           <p className="tran-label text-xs text-tran-muted">Denna vecka</p>
-          <p className="tran-tabular break-words text-xl">{formatOreWhole(summary.weekOre)}</p>
+          <p className="tran-tabular whitespace-nowrap text-lg xl:text-xl">{formatOreWhole(summary.weekOre)}</p>
         </div>
-        <div className="min-w-0 border border-tran-hairline p-6">
+        <div className="min-w-0 border border-tran-hairline p-4 xl:p-6">
           <p className="tran-label text-xs text-tran-muted">Denna månad</p>
-          <p className="tran-tabular break-words text-xl">{formatOreWhole(summary.monthOre)}</p>
+          <p className="tran-tabular whitespace-nowrap text-lg xl:text-xl">{formatOreWhole(summary.monthOre)}</p>
         </div>
-        <div className="min-w-0 border border-tran-hairline p-6">
+        <div className="min-w-0 border border-tran-hairline p-4 xl:p-6">
           <p className="tran-label text-xs text-tran-muted">Snittorder (månad)</p>
-          <p className="tran-tabular break-words text-xl">{formatOreWhole(summary.monthAvgOrderOre)}</p>
+          <p className="tran-tabular whitespace-nowrap text-lg xl:text-xl">{formatOreWhole(summary.monthAvgOrderOre)}</p>
         </div>
-        <div className="min-w-0 border border-tran-hairline p-6">
+        <div className="min-w-0 border border-tran-hairline p-4 xl:p-6">
           <p className="tran-label text-xs text-tran-muted">Obehandlade ordrar</p>
-          <p className="tran-tabular break-words text-xl">{unprocessedCount}</p>
+          <p className="tran-tabular whitespace-nowrap text-lg xl:text-xl">{unprocessedCount}</p>
         </div>
-        <div className="min-w-0 border border-tran-hairline p-6">
+        <div className="min-w-0 border border-tran-hairline p-4 xl:p-6">
           <p className="tran-label text-xs text-tran-muted">Genom tiderna</p>
-          <p className="tran-tabular break-words text-xl">{formatOreWhole(allTimeSalesOre)}</p>
+          <p className="tran-tabular whitespace-nowrap text-lg xl:text-xl">{formatOreWhole(allTimeSalesOre)}</p>
         </div>
-      </section>
-
-      <section className="flex flex-col gap-4">
-        <div className="flex items-baseline justify-between">
-          <h2 className="tran-label text-xs text-tran-muted">Kassa på plats (ingår inte i siffrorna ovan)</h2>
-          <Link href="/kassa" className="text-sm text-tran-muted hover:text-tran-red">
-            Öppna kassan →
-          </Link>
-        </div>
-        <TableScroll>
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
-                <th className="py-2 pr-4 font-medium">Försäljningsställe</th>
-                <th className="py-2 pr-4 text-right font-medium">Idag</th>
-                <th className="py-2 pr-4 text-right font-medium">Denna månad</th>
-                <th className="py-2 text-right font-medium">Totalt</th>
-              </tr>
-            </thead>
-            <tbody>
-              {kassaStats
-                .filter((location) => !location.archived || location.allTimeOre > 0)
-                .map((location) => (
-                  <tr key={location.id} className="border-b border-tran-hairline">
-                    <td className="py-3 pr-4">
-                      {location.name}
-                      {location.archived ? <span className="text-tran-muted"> (arkiverat)</span> : null}
-                    </td>
-                    <td className="tran-tabular py-3 pr-4 text-right">{formatOreWhole(location.todayOre)}</td>
-                    <td className="tran-tabular py-3 pr-4 text-right">{formatOreWhole(location.monthOre)}</td>
-                    <td className="tran-tabular py-3 text-right">{formatOreWhole(location.allTimeOre)}</td>
-                  </tr>
-                ))}
-            </tbody>
-          </table>
-        </TableScroll>
       </section>
 
       <section className="flex flex-col gap-4 border border-tran-hairline p-6">
@@ -251,6 +215,42 @@ export default async function DashboardPage() {
         <Link href="/logs" className="text-sm text-tran-muted hover:text-tran-red">
           Gå till loggar →
         </Link>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <div className="flex items-baseline justify-between">
+          <h2 className="tran-label text-xs text-tran-muted">Kassa på plats (ingår inte i siffrorna ovan)</h2>
+          <Link href="/kassa" className="text-sm text-tran-muted hover:text-tran-red">
+            Öppna kassan →
+          </Link>
+        </div>
+        <TableScroll>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
+                <th className="py-2 pr-4 font-medium">Försäljningsställe</th>
+                <th className="py-2 pr-4 text-right font-medium">Idag</th>
+                <th className="py-2 pr-4 text-right font-medium">Denna månad</th>
+                <th className="py-2 text-right font-medium">Totalt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {kassaStats
+                .filter((location) => !location.archived || location.allTimeOre > 0)
+                .map((location) => (
+                  <tr key={location.id} className="border-b border-tran-hairline">
+                    <td className="py-3 pr-4">
+                      {location.name}
+                      {location.archived ? <span className="text-tran-muted"> (arkiverat)</span> : null}
+                    </td>
+                    <td className="tran-tabular py-3 pr-4 text-right">{formatOreWhole(location.todayOre)}</td>
+                    <td className="tran-tabular py-3 pr-4 text-right">{formatOreWhole(location.monthOre)}</td>
+                    <td className="tran-tabular py-3 text-right">{formatOreWhole(location.allTimeOre)}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </TableScroll>
       </section>
     </div>
   );
