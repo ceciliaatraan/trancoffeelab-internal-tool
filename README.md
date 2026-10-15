@@ -345,7 +345,7 @@ nummerserie "Kassa #n"). Den delar bara lagret och Slack med resten:
   till, direkt i kassan med "+ Nytt ställe" eller under
   `/kassa/installningar`). Startsidan och inställningssidan visar
   försäljningen per ställe (idag, denna månad, totalt). Ordningen
-  ställena visas i väljs med rullgardinen (#) på `/kassa/installningar`
+  ställena visas i ändras med dra och släpp (⋮⋮) på `/kassa/installningar`
   (`pos_locations.sort_order`). Ett ställe arkiveras i stället för att
   tas bort.
 - **Fast ställe per person** (`pos_location_users`, ställs in på

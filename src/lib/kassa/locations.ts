@@ -62,29 +62,29 @@ export async function createLocation(rawName: string, createdByEmail: string): P
 }
 
 /**
- * Ny ordning när ett ställe flyttas till `position` (1 = först): stället
- * tas ur listan och sätts in på den platsen, de andra behåller sin inbördes
- * ordning. Ren funktion - se moveLocation.
+ * Den ordning som ska sparas: `requested` (från dra och släpp) i den ordning
+ * den kom, men bara id:n som finns - och ställen som inte var med (t.ex.
+ * nyss tillagda i en annan flik) läggs sist i sin nuvarande ordning. Ren
+ * funktion - se saveLocationOrder.
  */
-export function reorderIds(ids: string[], id: string, position: number): string[] {
-  if (!ids.includes(id)) return ids;
-  const rest = ids.filter((other) => other !== id);
-  const index = Math.min(Math.max(Math.trunc(position) - 1, 0), rest.length);
-  return [...rest.slice(0, index), id, ...rest.slice(index)];
+export function mergeLocationOrder(current: string[], requested: string[]): string[] {
+  const known = new Set(current);
+  const ordered = [...new Set(requested)].filter((id) => known.has(id));
+  const placed = new Set(ordered);
+  return [...ordered, ...current.filter((id) => !placed.has(id))];
 }
 
-/** Flyttar ett försäljningsställe till en ny position och numrerar om alla (1, 2, 3 …). */
-export async function moveLocation(locationId: string, position: number): Promise<void> {
+/** Sparar ordningen ställena dragits i (1, 2, 3 …). */
+export async function saveLocationOrder(requested: string[]): Promise<void> {
   await db.transaction(async (tx) => {
     const rows = await tx
       .select({ id: schema.posLocations.id })
       .from(schema.posLocations)
       .orderBy(asc(schema.posLocations.sortOrder), asc(schema.posLocations.name))
       .for("update");
-    const ordered = reorderIds(
+    const ordered = mergeLocationOrder(
       rows.map((row) => row.id),
-      locationId,
-      position,
+      requested,
     );
     for (const [index, id] of ordered.entries()) {
       await tx.update(schema.posLocations).set({ sortOrder: index + 1 }).where(eq(schema.posLocations.id, id));

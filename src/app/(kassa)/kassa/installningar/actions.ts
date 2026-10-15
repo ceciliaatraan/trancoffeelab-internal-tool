@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 import { requireCurrentAdmin } from "@/lib/current-admin";
 import { describeError } from "@/lib/describe-error";
-import { createLocation, moveLocation, setFixedLocation, setLocationArchived } from "@/lib/kassa/locations";
+import { createLocation, saveLocationOrder, setFixedLocation, setLocationArchived } from "@/lib/kassa/locations";
 
 const PAGE = "/kassa/installningar";
 
@@ -53,12 +53,18 @@ export async function removeFixedLocationAction(email: string) {
   done();
 }
 
-/** Flyttar ett försäljningsställe till vald position i ordningen (rullgardinen på sidan). */
-export async function moveLocationAction(locationId: string, formData: FormData) {
-  await requireCurrentAdmin();
-  const position = Number(formData.get("position"));
-  if (Number.isInteger(position) && position >= 1) {
-    await moveLocation(locationId, position);
+/** Sparar ordningen efter dra och släpp - anropas direkt från listan, ingen omdirigering. */
+export async function saveLocationOrderAction(orderedIds: string[]): Promise<{ ok: boolean; error?: string }> {
+  try {
+    await requireCurrentAdmin();
+    if (!Array.isArray(orderedIds) || orderedIds.some((id) => typeof id !== "string")) {
+      return { ok: false, error: "Ogiltig ordning." };
+    }
+    await saveLocationOrder(orderedIds);
+    revalidatePath("/kassa");
+    revalidatePath(PAGE);
+    return { ok: true };
+  } catch (err) {
+    return { ok: false, error: describeError(err) };
   }
-  done();
 }

@@ -2,16 +2,12 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireKassaUser } from "@/lib/current-admin";
 import { getFixedLocations, getLocationStats } from "@/lib/kassa/locations";
-import { formatOreWhole } from "@/lib/format";
 import { SubmitButton } from "@/components/submit-button";
-import { TableScroll } from "@/components/table-scroll";
-import { PositionSelect } from "@/components/position-select";
+import { LocationOrderList } from "@/components/location-order-list";
 import {
   createLocationFormAction,
-  moveLocationAction,
   removeFixedLocationAction,
   setFixedLocationFormAction,
-  setLocationArchivedAction,
 } from "./actions";
 
 const inputClass =
@@ -40,7 +36,7 @@ export default async function KassaSettingsPage({ searchParams }: PageProps<"/ka
         <Link href="/kassa" className="text-sm text-tran-muted hover:text-tran-red">
           ← Kassan
         </Link>
-        <h1 className="text-4xl font-bold uppercase tracking-tight">Försäljningsställen</h1>
+        <h1 className="text-2xl font-bold uppercase tracking-tight sm:text-4xl">Försäljningsställen</h1>
       </div>
 
       {error ? <p className="border border-tran-red px-4 py-3 text-sm text-tran-red">{error}</p> : null}
@@ -49,55 +45,15 @@ export default async function KassaSettingsPage({ searchParams }: PageProps<"/ka
       <section className="flex flex-col gap-4">
         <p className="text-sm text-tran-muted">
           Varje kassaköp sparas med sitt försäljningsställe, så det syns var försäljningen kommer
-          ifrån. Lägg till ett ställe per event. Ordningen (#) bestämmer i vilken ordning ställena
+          ifrån. Lägg till ett ställe per event. Dra i ⋮⋮ för att ändra i vilken ordning ställena
           visas i kassan. Ett arkiverat ställe går inte att välja i kassan, men dess försäljning
           finns kvar.
         </p>
-        <TableScroll>
-          <table className="w-full border-collapse text-sm">
-            <thead>
-              <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
-                <th className="py-2 pr-4 font-medium">#</th>
-                <th className="py-2 pr-4 font-medium">Ställe</th>
-                <th className="py-2 pr-4 text-right font-medium">Idag</th>
-                <th className="py-2 pr-4 text-right font-medium">Denna månad</th>
-                <th className="py-2 pr-4 text-right font-medium">Totalt</th>
-                <th className="py-2 pr-4 text-right font-medium">Köp</th>
-                <th className="py-2 font-medium" />
-              </tr>
-            </thead>
-            <tbody>
-              {stats.map((location, index) => (
-                <tr key={location.id} className="border-b border-tran-hairline">
-                  <td className="py-2 pr-4">
-                    <PositionSelect
-                      key={`${location.id}-${index}-${stats.length}`}
-                      action={moveLocationAction.bind(null, location.id)}
-                      current={index + 1}
-                      total={stats.length}
-                      label={`Position för ${location.name}`}
-                    />
-                  </td>
-                  <td className={`py-3 pr-4 ${location.archived ? "text-tran-muted" : ""}`}>
-                    {location.name}
-                    {location.archived ? " (arkiverat)" : ""}
-                  </td>
-                  <td className="tran-tabular py-3 pr-4 text-right">{formatOreWhole(location.todayOre)}</td>
-                  <td className="tran-tabular py-3 pr-4 text-right">{formatOreWhole(location.monthOre)}</td>
-                  <td className="tran-tabular py-3 pr-4 text-right">{formatOreWhole(location.allTimeOre)}</td>
-                  <td className="tran-tabular py-3 pr-4 text-right">{location.saleCount}</td>
-                  <td className="py-3 text-right">
-                    <form action={setLocationArchivedAction.bind(null, location.id, !location.archived)}>
-                      <SubmitButton className="tran-label text-xs underline hover:text-tran-red">
-                        {location.archived ? "Återställ" : "Arkivera"}
-                      </SubmitButton>
-                    </form>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </TableScroll>
+        <LocationOrderList
+          // Ny lista (och ny ordning från servern) när ställen läggs till, arkiveras eller säljer.
+          key={stats.map((location) => `${location.id}:${location.archived}:${location.allTimeOre}`).join("|")}
+          locations={stats}
+        />
         <form action={createLocationFormAction} className="flex flex-wrap gap-2">
           <input
             name="name"
