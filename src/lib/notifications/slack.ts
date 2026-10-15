@@ -1,6 +1,6 @@
 import "server-only";
 import { formatOre } from "@/lib/format";
-import { locationLabel, paymentMethodLabel } from "@/lib/kassa/options";
+import { paymentMethodLabel } from "@/lib/kassa/options";
 import type { PersistedOrder } from "@/lib/orders/persist-order";
 
 /**
@@ -94,6 +94,7 @@ export async function notifyNewOrderInSlack(
 export type PosSaleForSlack = {
   saleNumber: number;
   totalOre: number;
+  /** Försäljningsställets namn. */
   location: string;
   note: string | null;
   paymentMethod: string;
@@ -103,7 +104,7 @@ export type PosSaleForSlack = {
 
 /** Notistexten för en betald kassaförsäljning - ren funktion, testas för sig. */
 export function formatPosSaleSlackText(sale: PosSaleForSlack): string {
-  const place = sale.note ? `${locationLabel(sale.location)} - ${sale.note}` : locationLabel(sale.location);
+  const place = sale.note ? `${sale.location} - ${sale.note}` : sale.location;
   const items = sale.lines.map((line) => `${line.quantity} × ${line.name}`).join("\n");
   const seller = sale.soldByEmail ? `\n🧑‍🍳 ${sale.soldByEmail}` : "";
   return `🧾 *Kassa #${sale.saleNumber}* - ${formatOre(sale.totalOre)} (${paymentMethodLabel(

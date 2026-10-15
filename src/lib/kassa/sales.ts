@@ -3,8 +3,10 @@ import { and, asc, desc, eq, inArray, isNull, sql } from "drizzle-orm";
 import { db, schema } from "@/db";
 import { expandLineToInventoryTargets } from "@/lib/inventory/bundles";
 import { notifyPosSaleInSlack } from "@/lib/notifications/slack";
+import { sendReceiptEmail } from "@/lib/email/pos-receipt";
 import { buildSaleLines, type KassaItem } from "./sale-lines";
-import type { PosLocation, PosPaymentMethod } from "./options";
+import type { PosPaymentMethod } from "./options";
+import type { PosLocation } from "./locations";
 
 type Tx = Parameters<Parameters<typeof db.transaction>[0]>[0];
 
@@ -83,7 +85,8 @@ export async function createPendingSale(input: {
       .insert(schema.posSales)
       .values({
         status: "pending",
-        location: input.location,
+        locationId: input.location.id,
+        location: input.location.name,
         note: input.note,
         paymentMethod: input.paymentMethod,
         totalOre: sale.totalOre,
@@ -247,16 +250,25 @@ export type RecentPosSale = {
   paymentMethod: string;
   totalOre: number;
   soldByEmail: string | null;
+  receiptEmail: string | null;
   createdAt: Date;
   lines: { name: string; quantity: number }[];
 };
 
-/** De senaste försäljningarna (inte avbrutna), nyast först. */
-export async function getRecentSales(limit: number): Promise<RecentPosSale[]> {
+/**
+ * De senaste försäljningarna (inte avbrutna), nyast först - bara ett ställes
+ * om `locationId` anges (den som har ett fast ställe ser bara sina egna).
+ */
+export async function getRecentSales(limit: number, locationId?: string): Promise<RecentPosSale[]> {
   const sales = await db
     .select()
     .from(schema.posSales)
-    .where(inArray(schema.posSales.status, ["paid", "refunded", "pending"]))
+    .where(
+      and(
+        inArray(schema.posSales.status, ["paid", "refunded", "pending"]),
+        locationId ? eq(schema.posSales.locationId, locationId) : undefined,
+      ),
+    )
     .orderBy(desc(schema.posSales.createdAt))
     .limit(limit);
   if (sales.length === 0) return [];
@@ -279,30 +291,63 @@ export async function getRecentSales(limit: number): Promise<RecentPosSale[]> {
     paymentMethod: sale.paymentMethod,
     totalOre: sale.totalOre,
     soldByEmail: sale.soldByEmail,
+    receiptEmail: sale.receiptSentAt ? sale.receiptEmail : null,
     createdAt: sale.createdAt,
     lines: lines.filter((line) => line.saleId === sale.id),
   }));
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 /**
- * Betald kassaförsäljning per plats (i öre) för innevarande dag eller
- * månad i svensk tid - gränsen räknas i databasen, oberoende av serverns
- * tidszon.
+ * Skickar kvittot för en betald försäljning till kundens e-post och sparar
+ * vart det skickades. Kan göras om (t.ex. fel adress första gången). Adressen
+ * sparas bara på försäljningen - kunden läggs inte till i kundregistret
+ * eller på någon utskickslista.
  */
-export async function getPaidTotalsByLocation(period: "day" | "month"): Promise<Map<string, number>> {
-  const unit = sql.raw(period === "day" ? "'day'" : "'month'");
-  const rows = await db
+export async function sendSaleReceipt(saleId: string, rawEmail: string): Promise<{ email: string }> {
+  const email = rawEmail.trim();
+  if (!EMAIL_RE.test(email)) throw new Error("Skriv en giltig e-postadress.");
+
+  const [sale] = await db.select().from(schema.posSales).where(eq(schema.posSales.id, saleId));
+  if (!sale || sale.status !== "paid" || !sale.paidAt) {
+    throw new Error("Kvitto kan bara skickas för betalda försäljningar.");
+  }
+
+  const lines = await db
     .select({
-      location: schema.posSales.location,
-      totalOre: sql<number>`coalesce(sum(${schema.posSales.totalOre}), 0)::int`,
+      name: schema.posSaleLines.name,
+      quantity: schema.posSaleLines.quantity,
+      lineTotalOre: schema.posSaleLines.totalOre,
+      taxRate: schema.posSaleLines.taxRate,
+      slug: schema.products.slug,
+      productImages: schema.products.images,
+      variantImages: schema.productVariants.images,
     })
-    .from(schema.posSales)
-    .where(
-      and(
-        eq(schema.posSales.status, "paid"),
-        sql`date_trunc(${unit}, ${schema.posSales.paidAt} at time zone 'Europe/Stockholm') = date_trunc(${unit}, now() at time zone 'Europe/Stockholm')`,
-      ),
-    )
-    .groupBy(schema.posSales.location);
-  return new Map(rows.map((row) => [row.location, Number(row.totalOre)]));
+    .from(schema.posSaleLines)
+    .leftJoin(schema.products, eq(schema.posSaleLines.productId, schema.products.id))
+    .leftJoin(schema.productVariants, eq(schema.posSaleLines.variantId, schema.productVariants.id))
+    .where(eq(schema.posSaleLines.saleId, saleId));
+
+  await sendReceiptEmail({
+    to: email,
+    saleNumber: sale.saleNumber,
+    paidAt: sale.paidAt,
+    location: sale.location,
+    totalOre: sale.totalOre,
+    lines: lines.map((line) => ({
+      name: line.name,
+      quantity: line.quantity,
+      lineTotalOre: line.lineTotalOre,
+      taxRate: line.taxRate,
+      slug: line.slug,
+      imageUrl: line.variantImages?.[0] ?? line.productImages?.[0] ?? null,
+    })),
+  });
+
+  await db
+    .update(schema.posSales)
+    .set({ receiptEmail: email, receiptSentAt: new Date() })
+    .where(eq(schema.posSales.id, saleId));
+  return { email };
 }

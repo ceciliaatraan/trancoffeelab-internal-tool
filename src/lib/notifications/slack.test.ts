@@ -165,7 +165,7 @@ describe("formatPosSaleSlackText", () => {
     const text = formatPosSaleSlackText({
       saleNumber: 12,
       totalOre: 39800,
-      location: "event",
+      location: "Event",
       note: "Kaffefestivalen",
       paymentMethod: "swish",
       soldByEmail: "mamma@example.com",
@@ -186,12 +186,12 @@ describe("formatPosSaleSlackText", () => {
     const text = formatPosSaleSlackText({
       saleNumber: 1,
       totalOre: 4900,
-      location: "restaurang_boras",
+      location: "Restaurang TRAN",
       note: null,
       paymentMethod: "swish",
       soldByEmail: null,
       lines: [{ name: "Kondenserad mjölk", quantity: 1 }],
     });
-    expect(text).toContain("📍 Restaurangen i Borås\n");
+    expect(text).toContain("📍 Restaurang TRAN\n");
   });
 });

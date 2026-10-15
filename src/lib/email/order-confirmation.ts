@@ -38,14 +38,14 @@ function formatShipPeriod(expectedShipDate: string | null | undefined, isEnglish
   }).format(date);
 }
 
-function formatPrice(ore: number, isEnglish: boolean): string {
+export function formatPrice(ore: number, isEnglish: boolean): string {
   return (ore / 100).toLocaleString(isEnglish ? "en-US" : "sv-SE", {
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
   });
 }
 
-function escapeHtml(value: string): string {
+export function escapeHtml(value: string): string {
   return value
     .replace(/&/g, "&amp;")
     .replace(/</g, "&lt;")

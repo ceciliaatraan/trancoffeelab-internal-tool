@@ -17,8 +17,7 @@ import { TopProductsList } from "@/components/top-products-list";
 import { FraktStatusBadge } from "@/components/frakt-status-badge";
 import { customerDisplayName } from "@/lib/orders/customer-display-name";
 import { scheduleBackgroundSync } from "@/lib/orders/postnord-auto-sync";
-import { getPaidTotalsByLocation } from "@/lib/kassa/sales";
-import { POS_LOCATIONS } from "@/lib/kassa/options";
+import { getLocationStats } from "@/lib/kassa/locations";
 import { TableScroll } from "@/components/table-scroll";
 
 // Ger bakgrundssynken mot Kustom/PostNord (scheduleBackgroundSync) tid att gå igenom
@@ -38,8 +37,7 @@ export default async function DashboardPage() {
     inventoryOverview,
     webhookErrors,
     allTimeSalesOre,
-    kassaToday,
-    kassaMonth,
+    kassaStats,
   ] = await Promise.all([
       getDailySales(30),
       getRecentOrders(8),
@@ -61,8 +59,7 @@ export default async function DashboardPage() {
         .orderBy(desc(schema.webhookEvents.receivedAt))
         .limit(5),
       getAllTimeSalesOre(),
-      getPaidTotalsByLocation("day"),
-      getPaidTotalsByLocation("month"),
+      getLocationStats(),
     ]);
 
   const summary = summarizeDailySales(daily);
@@ -112,24 +109,33 @@ export default async function DashboardPage() {
             Öppna kassan →
           </Link>
         </div>
-        <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
-          {POS_LOCATIONS.map((location) => (
-            <div key={location.id} className="contents">
-              <div className="min-w-0 border border-tran-hairline p-6">
-                <p className="tran-label text-xs text-tran-muted">{location.label} idag</p>
-                <p className="tran-tabular break-words text-xl">
-                  {formatOreWhole(kassaToday.get(location.id) ?? 0)}
-                </p>
-              </div>
-              <div className="min-w-0 border border-tran-hairline p-6">
-                <p className="tran-label text-xs text-tran-muted">{location.label} denna månad</p>
-                <p className="tran-tabular break-words text-xl">
-                  {formatOreWhole(kassaMonth.get(location.id) ?? 0)}
-                </p>
-              </div>
-            </div>
-          ))}
-        </div>
+        <TableScroll>
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className="tran-label border-b border-tran-hairline text-left text-xs text-tran-muted">
+                <th className="py-2 pr-4 font-medium">Försäljningsställe</th>
+                <th className="py-2 pr-4 text-right font-medium">Idag</th>
+                <th className="py-2 pr-4 text-right font-medium">Denna månad</th>
+                <th className="py-2 text-right font-medium">Totalt</th>
+              </tr>
+            </thead>
+            <tbody>
+              {kassaStats
+                .filter((location) => !location.archived || location.allTimeOre > 0)
+                .map((location) => (
+                  <tr key={location.id} className="border-b border-tran-hairline">
+                    <td className="py-3 pr-4">
+                      {location.name}
+                      {location.archived ? <span className="text-tran-muted"> (arkiverat)</span> : null}
+                    </td>
+                    <td className="tran-tabular py-3 pr-4 text-right">{formatOreWhole(location.todayOre)}</td>
+                    <td className="tran-tabular py-3 pr-4 text-right">{formatOreWhole(location.monthOre)}</td>
+                    <td className="tran-tabular py-3 text-right">{formatOreWhole(location.allTimeOre)}</td>
+                  </tr>
+                ))}
+            </tbody>
+          </table>
+        </TableScroll>
       </section>
 
       <section className="flex flex-col gap-4 border border-tran-hairline p-6">

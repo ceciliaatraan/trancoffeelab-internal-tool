@@ -62,22 +62,20 @@ describe("Swish-QR", () => {
 });
 
 describe("parseKassaPlace", () => {
-  it("läser sparad plats och anteckning, och faller tillbaka vid skräp", () => {
-    const raw = encodeURIComponent(JSON.stringify({ location: "restaurang_boras", note: "Lunch" }));
-    expect(parseKassaPlace(raw)).toEqual({ location: "restaurang_boras", note: "Lunch" });
-    expect(parseKassaPlace(encodeURIComponent(JSON.stringify({ location: "okänd" })))).toEqual({
-      location: "event",
+  it("läser sparat ställe och anteckning, och faller tillbaka vid skräp", () => {
+    const raw = encodeURIComponent(JSON.stringify({ locationId: "abc", note: "Lunch" }));
+    expect(parseKassaPlace(raw)).toEqual({ locationId: "abc", note: "Lunch" });
+    expect(parseKassaPlace(encodeURIComponent(JSON.stringify({ locationId: 5 })))).toEqual({
+      locationId: null,
       note: "",
     });
-    expect(parseKassaPlace("%%%")).toEqual({ location: "event", note: "" });
-    expect(parseKassaPlace(undefined)).toEqual({ location: "event", note: "" });
+    expect(parseKassaPlace("%%%")).toEqual({ locationId: null, note: "" });
+    expect(parseKassaPlace(undefined)).toEqual({ locationId: null, note: "" });
   });
-});
 
-describe("parseKassaPlace med redan avkodat värde", () => {
-  it("klarar ett procenttecken i anteckningen", () => {
-    expect(parseKassaPlace(JSON.stringify({ location: "event", note: "50% av allt" }))).toEqual({
-      location: "event",
+  it("klarar ett procenttecken i ett redan avkodat värde", () => {
+    expect(parseKassaPlace(JSON.stringify({ locationId: "abc", note: "50% av allt" }))).toEqual({
+      locationId: "abc",
       note: "50% av allt",
     });
   });

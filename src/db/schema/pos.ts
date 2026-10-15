@@ -14,13 +14,44 @@ import { products, productVariants } from "./catalog";
  * betalning - lagret är tillbakalagt, pengarna betalas tillbaka i Swish-
  * appen för hand). Fritext som orders.status, kontrolleras i koden.
  */
+/**
+ * Försäljningsställen - "Restaurang TRAN", "Event" och de event ni lägger
+ * till själva (2026-10-15), så varje kassaköp kategoriseras efter var det
+ * gjordes. Ett ställe arkiveras i stället för att tas bort, så gamla köp
+ * behåller sin koppling.
+ */
+export const posLocations = pgTable("pos_locations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  name: text("name").notNull().unique(),
+  archivedAt: timestamp("archived_at", { withTimezone: true }),
+  createdByEmail: text("created_by_email"),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+posLocations.enableRLS();
+
+/**
+ * Fast försäljningsställe per e-postadress (gemener) - den personen säljer
+ * alltid där och kan varken välja eller lägga till andra ställen. Nyckel på
+ * e-post, inte admin_users, så det kan ställas in innan personen loggat in.
+ */
+export const posLocationUsers = pgTable("pos_location_users", {
+  email: text("email").primaryKey(),
+  locationId: uuid("location_id")
+    .notNull()
+    .references(() => posLocations.id, { onDelete: "cascade" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+});
+posLocationUsers.enableRLS();
+
 export const posSales = pgTable(
   "pos_sales",
   {
     id: uuid("id").primaryKey().defaultRandom(),
     saleNumber: integer("sale_number").notNull().generatedAlwaysAsIdentity({ startWith: 1 }),
     status: text("status").notNull().default("pending"),
-    /** En av POS_LOCATIONS i lib/kassa/locations.ts. */
+    /** Försäljningsstället (pos_locations) - null bara om stället skulle tas bort helt. */
+    locationId: uuid("location_id").references(() => posLocations.id, { onDelete: "set null" }),
+    /** Ställets namn vid försäljningen (visas även om stället senare döps om). */
     location: text("location").notNull(),
     /** Valfri anteckning, t.ex. eventets namn. */
     note: text("note"),
@@ -33,6 +64,9 @@ export const posSales = pgTable(
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     paidAt: timestamp("paid_at", { withTimezone: true }),
     cancelledAt: timestamp("cancelled_at", { withTimezone: true }),
+    /** Dit kvittot skickades, om kunden ville ha ett (se lib/email/pos-receipt.ts). */
+    receiptEmail: text("receipt_email"),
+    receiptSentAt: timestamp("receipt_sent_at", { withTimezone: true }),
   },
   (table) => [index("pos_sales_created_at_idx").on(table.createdAt)],
 );

@@ -4,50 +4,69 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatOre } from "@/lib/format";
 import type { KassaItem } from "@/lib/kassa/sale-lines";
-import { KASSA_PLACE_COOKIE, POS_LOCATIONS } from "@/lib/kassa/options";
+import type { PosLocation } from "@/lib/kassa/locations";
+import { KASSA_PLACE_COOKIE } from "@/lib/kassa/options";
 import {
+  addLocationAction,
   cancelSaleAction,
   markSalePaidAction,
+  sendReceiptAction,
   startSaleAction,
   type StartSaleResult,
 } from "@/app/(kassa)/kassa/actions";
 
 type ActiveSale = Extract<StartSaleResult, { ok: true }>;
+type PaidSale = ActiveSale["sale"];
 
 function formatSwishNumber(digits: string): string {
   return digits.length === 10 ? `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8)}` : digits;
 }
 
+const optionClass = (selected: boolean) =>
+  `tran-label h-11 border px-4 text-xs ${
+    selected ? "border-tran-black bg-tran-black text-tran-white" : "border-tran-black hover:text-tran-red"
+  }`;
+
 /**
- * Kassan (bara Swish): tryck på varor, visa Swish-QR (belopp och
- * meddelande låsta) och markera som betald när kunden visat kvittot i
- * sin Swish-app. Swish Företag kan inte tala om för oss att en betalning
- * gått igenom - därför trycker kassabiträdet själv på "Betald".
+ * Kassan (bara Swish): välj försäljningsställe, tryck på varor, visa
+ * Swish-QR (belopp och meddelande låsta) och markera som betald när kunden
+ * visat betalningen i sin Swish-app - Swish Företag kan inte tala om för oss
+ * att den gått igenom. Därefter frågar kassan om kunden vill ha kvitto.
  */
 export function KassaRegister({
   catalog,
+  locations: initialLocations,
+  fixedLocation,
   initialPlace,
 }: {
   catalog: KassaItem[];
-  initialPlace: { location: string; note: string };
+  locations: PosLocation[];
+  /** Satt = personen säljer alltid här och kan inte välja eller lägga till ställen. */
+  fixedLocation: PosLocation | null;
+  initialPlace: { locationId: string | null; note: string };
 }) {
   const router = useRouter();
   const [cart, setCart] = useState<Record<string, number>>({});
-  const [location, setLocation] = useState(initialPlace.location);
+  const [locations, setLocations] = useState(initialLocations);
+  const [locationId, setLocationId] = useState<string | null>(
+    fixedLocation?.id ?? initialPlace.locationId,
+  );
   const [note, setNote] = useState(initialPlace.note);
+  const [newLocationName, setNewLocationName] = useState<string | null>(null);
   const [activeSale, setActiveSale] = useState<ActiveSale | null>(null);
+  const [paidSale, setPaidSale] = useState<PaidSale | null>(null);
+  const [receiptEmail, setReceiptEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
 
-  // Platsen och anteckningen (t.ex. eventets namn) kommer ihåg mellan
-  // försäljningar på samma enhet - i en cookie som kassasidan läser, så
-  // den syns direkt utan att sidan blinkar.
+  // Stället och anteckningen kommer ihåg mellan försäljningar på samma
+  // enhet - i en cookie som kassasidan läser, så de syns direkt.
   useEffect(() => {
     document.cookie = `${KASSA_PLACE_COOKIE}=${encodeURIComponent(
-      JSON.stringify({ location, note }),
+      JSON.stringify({ locationId, note }),
     )}; path=/kassa; max-age=31536000; samesite=lax`;
-  }, [location, note]);
+  }, [locationId, note]);
 
   const lines = catalog
     .filter((item) => (cart[item.sku] ?? 0) > 0)
@@ -64,13 +83,36 @@ export function KassaRegister({
     });
   };
 
+  const addLocation = () => {
+    if (newLocationName === null) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await addLocationAction(newLocationName);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      setLocations((current) =>
+        current.some((option) => option.id === result.location.id)
+          ? current
+          : [...current, result.location].sort((a, b) => a.name.localeCompare(b.name, "sv")),
+      );
+      setLocationId(result.location.id);
+      setNewLocationName(null);
+    });
+  };
+
   const startSale = () => {
     setError(null);
     setNotice(null);
+    if (!locationId) {
+      setError("Välj försäljningsställe först.");
+      return;
+    }
     startTransition(async () => {
       const result = await startSaleAction({
         lines: lines.map((line) => ({ sku: line.item.sku, quantity: line.quantity })),
-        location,
+        locationId,
         note,
       });
       if (!result.ok) {
@@ -90,7 +132,7 @@ export function KassaRegister({
         setError(result.error ?? "Kunde inte registrera betalningen.");
         return;
       }
-      setNotice(`Kassa #${activeSale.sale.saleNumber} registrerad - ${formatOre(activeSale.sale.totalOre)}.`);
+      setPaidSale(activeSale.sale);
       setActiveSale(null);
       setCart({});
       router.refresh();
@@ -106,6 +148,99 @@ export function KassaRegister({
       router.refresh();
     });
   };
+
+  const finishPaid = (message: string) => {
+    setNotice(message);
+    setPaidSale(null);
+    setReceiptEmail(null);
+    setError(null);
+  };
+
+  const sendReceipt = () => {
+    if (!paidSale || receiptEmail === null) return;
+    setError(null);
+    startTransition(async () => {
+      const result = await sendReceiptAction(paidSale.id, receiptEmail);
+      if (!result.ok) {
+        setError(result.error);
+        return;
+      }
+      finishPaid(`Kassa #${paidSale.saleNumber} klar - kvitto skickat till ${result.email}.`);
+      router.refresh();
+    });
+  };
+
+  if (paidSale) {
+    return (
+      <section className="mx-auto flex w-full max-w-md flex-col items-center gap-6 border border-tran-black p-6 text-center">
+        <p className="tran-label text-xs text-tran-green">Betald</p>
+        <p className="tran-tabular text-4xl font-bold">{formatOre(paidSale.totalOre)}</p>
+        <p className="text-sm">Kassa #{paidSale.saleNumber} är registrerad.</p>
+
+        {receiptEmail === null ? (
+          <>
+            <p className="text-lg font-bold">Vill kunden ha ett kvitto?</p>
+            <div className="flex w-full flex-col gap-3">
+              <button
+                type="button"
+                onClick={() => setReceiptEmail("")}
+                className="tran-label h-14 w-full bg-tran-black text-sm text-tran-white"
+              >
+                Ja, skicka kvitto
+              </button>
+              <button
+                type="button"
+                onClick={() => finishPaid(`Kassa #${paidSale.saleNumber} klar - ${formatOre(paidSale.totalOre)}.`)}
+                className="tran-label h-11 w-full border border-tran-black text-xs"
+              >
+                Nej tack
+              </button>
+            </div>
+          </>
+        ) : (
+          <form
+            className="flex w-full flex-col gap-3 text-left"
+            onSubmit={(event) => {
+              event.preventDefault();
+              sendReceipt();
+            }}
+          >
+            <label className="tran-label text-xs text-tran-muted" htmlFor="receipt-email">
+              Kundens e-post
+            </label>
+            <input
+              id="receipt-email"
+              type="email"
+              inputMode="email"
+              autoComplete="email"
+              autoFocus
+              required
+              value={receiptEmail}
+              onChange={(event) => setReceiptEmail(event.target.value)}
+              placeholder="namn@exempel.se"
+              className="h-12 border border-tran-black px-3 text-base"
+            />
+            {error ? <p className="text-sm text-tran-red">{error}</p> : null}
+            <button
+              type="submit"
+              disabled={pending}
+              className="tran-label h-14 w-full bg-tran-black text-sm text-tran-white disabled:opacity-50"
+            >
+              Skicka kvitto
+            </button>
+            <button
+              type="button"
+              onClick={() => setReceiptEmail(null)}
+              disabled={pending}
+              className="tran-label h-11 w-full border border-tran-black text-xs disabled:opacity-50"
+            >
+              Tillbaka
+            </button>
+          </form>
+        )}
+      </section>
+    );
+  }
 
   if (activeSale) {
     const { sale, swish } = activeSale;
@@ -162,28 +297,72 @@ export function KassaRegister({
     <section className="grid gap-8 lg:grid-cols-[1fr_22rem]">
       <div className="flex flex-col gap-6">
         <div className="flex flex-col gap-3">
-          <p className="tran-label text-xs text-tran-muted">Plats</p>
-          <div className="flex flex-wrap gap-2">
-            {POS_LOCATIONS.map((option) => (
-              <button
-                key={option.id}
-                type="button"
-                onClick={() => setLocation(option.id)}
-                aria-pressed={location === option.id}
-                className={`tran-label h-11 border px-4 text-xs ${
-                  location === option.id
-                    ? "border-tran-black bg-tran-black text-tran-white"
-                    : "border-tran-black hover:text-tran-red"
-                }`}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
+          <p className="tran-label text-xs text-tran-muted">Försäljningsställe</p>
+          {fixedLocation ? (
+            <p className="text-lg font-bold">{fixedLocation.name}</p>
+          ) : (
+            <>
+              <div className="flex flex-wrap gap-2">
+                {locations.map((option) => (
+                  <button
+                    key={option.id}
+                    type="button"
+                    onClick={() => setLocationId(option.id)}
+                    aria-pressed={locationId === option.id}
+                    className={optionClass(locationId === option.id)}
+                  >
+                    {option.name}
+                  </button>
+                ))}
+                {newLocationName === null ? (
+                  <button
+                    type="button"
+                    onClick={() => setNewLocationName("")}
+                    className="tran-label h-11 border border-dashed border-tran-black px-4 text-xs hover:text-tran-red"
+                  >
+                    + Nytt ställe
+                  </button>
+                ) : null}
+              </div>
+              {newLocationName !== null ? (
+                <form
+                  className="flex gap-2"
+                  onSubmit={(event) => {
+                    event.preventDefault();
+                    addLocation();
+                  }}
+                >
+                  <input
+                    value={newLocationName}
+                    onChange={(event) => setNewLocationName(event.target.value)}
+                    placeholder="T.ex. Kaffefestivalen 2026"
+                    maxLength={60}
+                    autoFocus
+                    required
+                    className="h-11 min-w-0 flex-1 border border-tran-black px-3 text-sm"
+                  />
+                  <button
+                    type="submit"
+                    disabled={pending}
+                    className="tran-label h-11 bg-tran-black px-4 text-xs text-tran-white disabled:opacity-50"
+                  >
+                    Lägg till
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setNewLocationName(null)}
+                    className="tran-label h-11 border border-tran-black px-3 text-xs"
+                  >
+                    Avbryt
+                  </button>
+                </form>
+              ) : null}
+            </>
+          )}
           <input
             value={note}
             onChange={(event) => setNote(event.target.value)}
-            placeholder="Anteckning, t.ex. eventets namn (valfritt)"
+            placeholder="Anteckning (valfritt)"
             maxLength={200}
             className="h-11 border border-tran-black px-3 text-sm"
           />

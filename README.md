@@ -336,25 +336,35 @@ synligt under Loggar.
 
 ## Kassan (försäljning på plats)
 
-`/kassa` är en enkel kassa för event och restaurangen i Borås, helt skild
+`/kassa` är en enkel kassa för Restaurang TRAN och event, helt skild
 från webbshopens ordrar (egna tabeller `pos_sales`/`pos_sale_lines`, egen
 nummerserie "Kassa #n"). Den delar bara lagret och Slack med resten:
 
-- Tryck in varorna, välj plats (Event / Restaurangen i Borås, valfri
-  anteckning som eventets namn). Kassan tar bara Swish.
+- **Försäljningsställe:** varje köp sparas med sitt ställe
+  (`pos_locations` - "Restaurang TRAN", "Event" och de event ni lägger
+  till, direkt i kassan med "+ Nytt ställe" eller under
+  `/kassa/installningar`). Startsidan och inställningssidan visar
+  försäljningen per ställe (idag, denna månad, totalt). Ett ställe
+  arkiveras i stället för att tas bort.
+- **Fast ställe per person** (`pos_location_users`, ställs in på
+  `/kassa/installningar`): den personen säljer alltid där, kan inte välja
+  eller lägga till ställen och ser bara det ställets försäljning
+  (kontrolleras även på servern). Övriga väljer själva.
 - **Swish:** kassan visar en QR-kod med ert nummer (123-694 96 06, kan
-  ändras med `SWISH_PAYEE_NUMBER`),
-  beloppet och meddelandet "TRAN kassa n" låsta - skapad med Swish egen
-  QR-tjänst, som fungerar med Swish Företag. Swish Företag kan inte tala om
-  för oss att kunden betalat, så kassabiträdet trycker **Betald** när kunden
-  visat betalningen i sin app. (Med Swish Handel kan det steget bli
-  automatiskt.)
+  ändras med `SWISH_PAYEE_NUMBER`), beloppet och meddelandet "TRAN kassa n"
+  låsta - skapad med Swish egen QR-tjänst, som fungerar med Swish Företag.
+  Swish Företag kan inte tala om för oss att kunden betalat, så
+  kassabiträdet trycker **Betald** när kunden visat betalningen i sin app.
 - **Betald** drar varorna från "I lager" (ett kit från sina komponenter,
   lagerorsak `pos_sale`) och skickar en Slack-notis. **Ångra** lägger
   tillbaka exakt det som drogs; pengarna betalas tillbaka för hand i
   Swish-appen.
-- Kassaförsäljningen ingår inte i startsidans webbshopsiffror - den har en
-  egen rad "Kassa på plats".
+- **Kvitto:** efter Betald frågar kassan om kunden vill ha kvitto. Ja =
+  kundens e-post, och ett kvitto i orderbekräftelsens stil skickas via
+  Resend (`lib/email/pos-receipt.ts`: nummer, datum, ställe, varor, moms
+  per sats, Systrarna TRAN AB:s org.nr/momsreg.nr/adress). Kan skickas
+  (om) från listan med "Kvitto". Adressen sparas bara på försäljningen -
+  kunden läggs inte i kundregistret.
 
 **Kassabiträden:** adresser i `ALLOWED_CASHIER_EMAILS` får logga in med
 Google men ser bara kassan - alla andra sidor skickas till `/kassa`
