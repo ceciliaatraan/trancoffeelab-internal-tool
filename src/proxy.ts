@@ -11,7 +11,19 @@ export default auth((req) => {
     PUBLIC_PREFIXES.some((prefix) => pathname.startsWith(prefix)) ||
     PUBLIC_PATHS.includes(pathname);
 
-  if (isPublic || req.auth) {
+  if (isPublic) {
+    return NextResponse.next();
+  }
+
+  if (req.auth) {
+    // Kassabiträden (rollen cashier) ser bara kassan - allt annat skickas
+    // dit. Server actions skyddas dessutom av requireCurrentAdmin.
+    if (req.auth.user?.role === "cashier" && !isKassaPath(pathname)) {
+      if (req.method !== "GET" && req.method !== "HEAD") {
+        return new NextResponse("Kassabiträden har bara tillgång till kassan.", { status: 403 });
+      }
+      return NextResponse.redirect(new URL("/kassa", req.nextUrl.origin));
+    }
     return NextResponse.next();
   }
 
@@ -19,6 +31,10 @@ export default auth((req) => {
   loginUrl.searchParams.set("callbackUrl", pathname);
   return NextResponse.redirect(loginUrl);
 });
+
+function isKassaPath(pathname: string): boolean {
+  return pathname === "/kassa" || pathname.startsWith("/kassa/");
+}
 
 export const config = {
   matcher: ["/((?!_next/static|_next/image|favicon.ico|fonts/|logo/).*)"],

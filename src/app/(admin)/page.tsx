@@ -17,6 +17,8 @@ import { TopProductsList } from "@/components/top-products-list";
 import { FraktStatusBadge } from "@/components/frakt-status-badge";
 import { customerDisplayName } from "@/lib/orders/customer-display-name";
 import { scheduleBackgroundSync } from "@/lib/orders/postnord-auto-sync";
+import { getPaidTotalsByLocation } from "@/lib/kassa/sales";
+import { POS_LOCATIONS } from "@/lib/kassa/options";
 
 // Ger bakgrundssynken mot Kustom/PostNord (scheduleBackgroundSync) tid att gå igenom
 // alla öppna ordrar vid dygnets fulla genomgång.
@@ -27,8 +29,17 @@ export default async function DashboardPage() {
   // sidvisningar, aldrig när sidan förrenderas under bygget.
   await connection();
   scheduleBackgroundSync();
-  const [daily, recentOrders, topProducts, unprocessedOrders, inventoryOverview, webhookErrors, allTimeSalesOre] =
-    await Promise.all([
+  const [
+    daily,
+    recentOrders,
+    topProducts,
+    unprocessedOrders,
+    inventoryOverview,
+    webhookErrors,
+    allTimeSalesOre,
+    kassaToday,
+    kassaMonth,
+  ] = await Promise.all([
       getDailySales(30),
       getRecentOrders(8),
       getTopProducts(30, 5),
@@ -49,6 +60,8 @@ export default async function DashboardPage() {
         .orderBy(desc(schema.webhookEvents.receivedAt))
         .limit(5),
       getAllTimeSalesOre(),
+      getPaidTotalsByLocation("day"),
+      getPaidTotalsByLocation("month"),
     ]);
 
   const summary = summarizeDailySales(daily);
@@ -88,6 +101,33 @@ export default async function DashboardPage() {
         <div className="min-w-0 border border-tran-hairline p-6">
           <p className="tran-label text-xs text-tran-muted">Genom tiderna</p>
           <p className="tran-tabular break-words text-xl">{formatOreWhole(allTimeSalesOre)}</p>
+        </div>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <div className="flex items-baseline justify-between">
+          <h2 className="tran-label text-xs text-tran-muted">Kassa på plats (ingår inte i siffrorna ovan)</h2>
+          <Link href="/kassa" className="text-sm text-tran-muted hover:text-tran-red">
+            Öppna kassan →
+          </Link>
+        </div>
+        <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+          {POS_LOCATIONS.map((location) => (
+            <div key={location.id} className="contents">
+              <div className="min-w-0 border border-tran-hairline p-6">
+                <p className="tran-label text-xs text-tran-muted">{location.label} idag</p>
+                <p className="tran-tabular break-words text-xl">
+                  {formatOreWhole(kassaToday.get(location.id) ?? 0)}
+                </p>
+              </div>
+              <div className="min-w-0 border border-tran-hairline p-6">
+                <p className="tran-label text-xs text-tran-muted">{location.label} denna månad</p>
+                <p className="tran-tabular break-words text-xl">
+                  {formatOreWhole(kassaMonth.get(location.id) ?? 0)}
+                </p>
+              </div>
+            </div>
+          ))}
         </div>
       </section>
 

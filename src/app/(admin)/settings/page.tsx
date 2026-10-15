@@ -20,6 +20,10 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
     .split(",")
     .map((email) => email.trim())
     .filter(Boolean);
+  const cashierEmails = (process.env.ALLOWED_CASHIER_EMAILS ?? "")
+    .split(",")
+    .map((email) => email.trim())
+    .filter(Boolean);
   const allowedHd = process.env.ALLOWED_GOOGLE_HD?.trim();
   const kustomEnv = process.env.KUSTOM_ENV ?? "okänd";
 
@@ -133,6 +137,21 @@ export default async function SettingsPage({ searchParams }: PageProps<"/setting
         ) : null}
         <p className="text-sm text-tran-muted">
           Ändras i Vercels miljövariabel ALLOWED_ADMIN_EMAILS, inte här.
+        </p>
+      </section>
+
+      <section className="flex flex-col gap-4">
+        <h2 className="tran-label text-xs text-tran-muted">Kassabiträden (skrivskyddat)</h2>
+        <ul className="text-sm">
+          {cashierEmails.length > 0 ? (
+            cashierEmails.map((email) => <li key={email}>{email}</li>)
+          ) : (
+            <li className="text-tran-muted">Ingen adress konfigurerad.</li>
+          )}
+        </ul>
+        <p className="text-sm text-tran-muted">
+          Ser och använder bara kassan - inte ordrar, lager, kunder eller inställningar. Ändras i
+          Vercels miljövariabel ALLOWED_CASHIER_EMAILS.
         </p>
       </section>
     </div>

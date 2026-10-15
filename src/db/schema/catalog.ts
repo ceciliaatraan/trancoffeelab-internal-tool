@@ -147,6 +147,8 @@ export const inventoryMovementReasonEnum = pgEnum(
     "return",
     /** Eget uttag (eget bruk, marknadsföring, event) - minskar "I lager", syftet står i note. */
     "internal_use",
+    /** Såld i kassan på plats (pos_sales) - minskar "I lager"; positivt antal = ångrad försäljning. */
+    "pos_sale",
   ],
 );
 
@@ -160,6 +162,8 @@ export const inventoryMovements = pgTable("inventory_movements", {
   reason: inventoryMovementReasonEnum("reason").notNull(),
   note: text("note"),
   orderId: uuid("order_id"),
+  /** Kassaförsäljningen raden hör till (reason pos_sale) - så en ångrad försäljning lägger tillbaka exakt det som drogs. */
+  posSaleId: uuid("pos_sale_id"),
   causedByAdminId: uuid("caused_by_admin_id").references(
     () => adminUsers.id,
     { onDelete: "set null" },

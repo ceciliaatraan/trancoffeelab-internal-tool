@@ -11,14 +11,33 @@ export class UnauthorizedError extends Error {
 }
 
 export class ForbiddenError extends Error {
-  constructor() {
-    super("Kräver ägarbehörighet.");
+  constructor(message = "Kräver ägarbehörighet.") {
+    super(message);
     this.name = "ForbiddenError";
   }
 }
 
-/** Kastar om ingen session finns - alla anrop hit sker bakom proxy.ts skydd ändå. */
+/**
+ * Inloggad användare med tillgång till ADMIN (ägare eller personal) -
+ * kassabiträden nekas. Varje server action utanför kassan anropar den här,
+ * så ett kassabiträde inte kan köra dem ens med ett handgjort anrop (proxy.ts
+ * stoppar bara sidvisningar).
+ */
 export async function requireCurrentAdmin() {
+  const adminUser = await requireSignedInUser();
+  if (adminUser.role === "cashier") {
+    throw new ForbiddenError("Kassabiträden har bara tillgång till kassan.");
+  }
+  return adminUser;
+}
+
+/** Inloggad användare med valfri roll - för kassan, som även kassabiträden får använda. */
+export async function requireKassaUser() {
+  return requireSignedInUser();
+}
+
+/** Kastar om ingen session finns - alla anrop hit sker bakom proxy.ts skydd ändå. */
+async function requireSignedInUser() {
   const session = await auth();
   if (!session?.user?.id) {
     throw new UnauthorizedError();

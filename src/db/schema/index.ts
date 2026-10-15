@@ -6,3 +6,4 @@ export * from "./discounts";
 export * from "./orders";
 export * from "./webhooks";
 export * from "./settings";
+export * from "./pos";

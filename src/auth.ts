@@ -3,7 +3,12 @@ import Google from "next-auth/providers/google";
 import { DrizzleAdapter } from "@auth/drizzle-adapter";
 import { eq } from "drizzle-orm";
 import { db, schema } from "@/db";
-import { getAllowedGoogleHd, isEmailAllowed } from "@/lib/allowlist";
+import {
+  getAllowedGoogleHd,
+  isCashierEmail,
+  isEmailAllowed,
+  resolveLoginRole,
+} from "@/lib/allowlist";
 
 /**
  * Google-profilen har fler fält än next-auth's inbyggda Profile-typ
@@ -36,7 +41,8 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
       const emailVerified = googleProfile?.email_verified === true;
       const allowedHd = getAllowedGoogleHd();
       const hdMatches = allowedHd === null || googleProfile?.hd === allowedHd;
-      const allowed = isEmailAllowed(email) && emailVerified && hdMatches;
+      const listed = isEmailAllowed(email) || isCashierEmail(email);
+      const allowed = listed && emailVerified && hdMatches;
 
       if (!allowed) {
         await db.insert(schema.auditLog).values({
@@ -44,7 +50,7 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           action: "signin_rejected",
           success: false,
           metadata: {
-            reason: !isEmailAllowed(email)
+            reason: !listed
               ? "email_not_allowlisted"
               : !emailVerified
                 ? "email_not_verified"
@@ -73,10 +79,18 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     /**
      * Körs bara för sign-ins som redan passerat signIn-callbacken ovan,
      * dvs. bara allowlistade konton. Skapar admin_users-raden första
-     * gången och rör aldrig en redan satt roll vid efterföljande inlogg.
+     * gången. Rollen styrs av listorna via resolveLoginRole: ett konto som
+     * bara står i ALLOWED_CASHIER_EMAILS är alltid kassabiträde, annars
+     * rörs en redan satt roll inte.
      */
     async signIn({ user }) {
       if (!user.id || !user.email) return;
+
+      const [existing] = await db
+        .select({ role: schema.adminUsers.role })
+        .from(schema.adminUsers)
+        .where(eq(schema.adminUsers.userId, user.id));
+      const role = resolveLoginRole(user.email, existing?.role ?? null);
 
       await db
         .insert(schema.adminUsers)
@@ -84,10 +98,11 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
           userId: user.id,
           email: user.email,
           lastLoginAt: new Date(),
+          ...(role ? { role } : {}),
         })
         .onConflictDoUpdate({
           target: schema.adminUsers.userId,
-          set: { lastLoginAt: new Date(), email: user.email },
+          set: { lastLoginAt: new Date(), email: user.email, ...(role ? { role } : {}) },
         });
     },
   },

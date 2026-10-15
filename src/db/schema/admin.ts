@@ -9,7 +9,8 @@ import {
 } from "drizzle-orm/pg-core";
 import { users } from "./auth";
 
-export const adminRoleEnum = pgEnum("admin_role", ["owner", "staff"]);
+/** cashier = kassabiträde: ser och använder bara kassan (/kassa), se proxy.ts. */
+export const adminRoleEnum = pgEnum("admin_role", ["owner", "staff", "cashier"]);
 
 /**
  * Roller för de inloggade admin-användarna. Separat från Auth.js `users`

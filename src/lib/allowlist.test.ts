@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getAllowedGoogleHd, isEmailAllowed } from "./allowlist";
+import { getAllowedGoogleHd, isCashierEmail, isEmailAllowed, resolveLoginRole } from "./allowlist";
 
 const ORIGINAL_ENV = { ...process.env };
 
@@ -52,5 +52,23 @@ describe("getAllowedGoogleHd", () => {
   it("returnerar den trimmade domänen när satt", () => {
     process.env.ALLOWED_GOOGLE_HD = " trancoffeelab.com ";
     expect(getAllowedGoogleHd()).toBe("trancoffeelab.com");
+  });
+});
+
+describe("resolveLoginRole", () => {
+  it("gör en adress som bara står i kassalistan till kassabiträde, oavsett tidigare roll", () => {
+    process.env.ALLOWED_ADMIN_EMAILS = "agare@example.com";
+    process.env.ALLOWED_CASHIER_EMAILS = " Mamma@Example.com ";
+    expect(isCashierEmail("mamma@example.com")).toBe(true);
+    expect(resolveLoginRole("mamma@example.com", null)).toBe("cashier");
+    expect(resolveLoginRole("mamma@example.com", "staff")).toBe("cashier");
+  });
+
+  it("låter ägare och personal behålla sin roll och lyfter ett kassabiträde som flyttats till admin-listan", () => {
+    process.env.ALLOWED_ADMIN_EMAILS = "agare@example.com,erik@example.com";
+    process.env.ALLOWED_CASHIER_EMAILS = "erik@example.com";
+    expect(resolveLoginRole("agare@example.com", "owner")).toBeNull();
+    expect(resolveLoginRole("agare@example.com", null)).toBeNull();
+    expect(resolveLoginRole("erik@example.com", "cashier")).toBe("staff");
   });
 });

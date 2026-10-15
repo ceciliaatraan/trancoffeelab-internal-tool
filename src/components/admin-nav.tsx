@@ -10,6 +10,7 @@ const NAV_ITEMS = [
   { href: "/inventory", label: "Lager" },
   { href: "/discounts", label: "Rabatter" },
   { href: "/customers", label: "Kunder" },
+  { href: "/kassa", label: "Kassa" },
   { href: "/settings", label: "Inställningar" },
   { href: "/logs", label: "Loggar" },
 ];

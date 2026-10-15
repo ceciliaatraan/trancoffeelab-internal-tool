@@ -1,5 +1,6 @@
 import "server-only";
 import { formatOre } from "@/lib/format";
+import { locationLabel, paymentMethodLabel } from "@/lib/kassa/options";
 import type { PersistedOrder } from "@/lib/orders/persist-order";
 
 /**
@@ -87,5 +88,52 @@ export async function notifyNewOrderInSlack(
     }
   } catch (err) {
     console.error("Slack-notis misslyckades", err);
+  }
+}
+
+export type PosSaleForSlack = {
+  saleNumber: number;
+  totalOre: number;
+  location: string;
+  note: string | null;
+  paymentMethod: string;
+  soldByEmail: string | null;
+  lines: { name: string; quantity: number }[];
+};
+
+/** Notistexten för en betald kassaförsäljning - ren funktion, testas för sig. */
+export function formatPosSaleSlackText(sale: PosSaleForSlack): string {
+  const place = sale.note ? `${locationLabel(sale.location)} - ${sale.note}` : locationLabel(sale.location);
+  const items = sale.lines.map((line) => `${line.quantity} × ${line.name}`).join("\n");
+  const seller = sale.soldByEmail ? `\n🧑‍🍳 ${sale.soldByEmail}` : "";
+  return `🧾 *Kassa #${sale.saleNumber}* - ${formatOre(sale.totalOre)} (${paymentMethodLabel(
+    sale.paymentMethod,
+  )})\n📍 ${place}${seller}\n${items}`;
+}
+
+/**
+ * Slack-notis när en kassaförsäljning markerats som betald. Samma regler
+ * som notifyNewOrderInSlack: bara i live-miljön, och ett fel kastas aldrig
+ * vidare - försäljningen är redan sparad.
+ */
+export async function notifyPosSaleInSlack(sale: PosSaleForSlack): Promise<void> {
+  const webhookUrl = process.env.SLACK_WEBHOOK_URL;
+  if (!webhookUrl || process.env.KUSTOM_ENV !== "live") return;
+
+  const text = formatPosSaleSlackText(sale);
+  try {
+    const response = await fetch(webhookUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        text: `🧾 Kassa #${sale.saleNumber} - ${formatOre(sale.totalOre)}`,
+        blocks: [{ type: "section", text: { type: "mrkdwn", text } }],
+      }),
+    });
+    if (!response.ok) {
+      console.error("Slack-notis (kassa) misslyckades", response.status, await response.text());
+    }
+  } catch (err) {
+    console.error("Slack-notis (kassa) misslyckades", err);
   }
 }

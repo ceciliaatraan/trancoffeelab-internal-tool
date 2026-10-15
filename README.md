@@ -334,6 +334,32 @@ PostNord (rätta den i PostNords portal). Gammal och ny adress loggas i
 audit_log (`order.shipping_address_updated`/`order.billing_address_updated`),
 synligt under Loggar.
 
+## Kassan (försäljning på plats)
+
+`/kassa` är en enkel kassa för event och restaurangen i Borås, helt skild
+från webbshopens ordrar (egna tabeller `pos_sales`/`pos_sale_lines`, egen
+nummerserie "Kassa #n"). Den delar bara lagret och Slack med resten:
+
+- Tryck in varorna, välj plats (Event / Restaurangen i Borås, valfri
+  anteckning som eventets namn) och betalsätt (Swish, kort, kontant).
+- **Swish:** kassan visar en QR-kod med ert nummer (`SWISH_PAYEE_NUMBER`),
+  beloppet och meddelandet "TRAN kassa n" låsta - skapad med Swish egen
+  QR-tjänst, som fungerar med Swish Företag. Swish Företag kan inte tala om
+  för oss att kunden betalat, så kassabiträdet trycker **Betald** när kunden
+  visat betalningen i sin app. (Med Swish Handel kan det steget bli
+  automatiskt.)
+- **Betald** drar varorna från "I lager" (ett kit från sina komponenter,
+  lagerorsak `pos_sale`) och skickar en Slack-notis. **Ångra** lägger
+  tillbaka exakt det som drogs; pengarna betalas tillbaka för hand i
+  Swish-appen.
+- Kassaförsäljningen ingår inte i startsidans webbshopsiffror - den har en
+  egen rad "Kassa på plats".
+
+**Kassabiträden:** adresser i `ALLOWED_CASHIER_EMAILS` får logga in med
+Google men ser bara kassan - alla andra sidor skickas till `/kassa`
+(`proxy.ts`), och alla adminens server actions nekar dem
+(`requireCurrentAdmin`). Står en adress i båda listorna gäller admin.
+
 ## Byggordning
 
 Projektet byggs i faser, med avstämning efter varje fas:

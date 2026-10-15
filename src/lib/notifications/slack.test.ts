@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { formatCustomerLabel, notifyNewOrderInSlack } from "./slack";
+import { formatCustomerLabel, formatPosSaleSlackText, notifyNewOrderInSlack } from "./slack";
 import type { PersistedOrder } from "@/lib/orders/persist-order";
 
 const ORIGINAL_ENV = { ...process.env };
@@ -157,5 +157,42 @@ describe("notifyNewOrderInSlack", () => {
 
     const body = JSON.parse(fetchMock.mock.calls[0][1].body as string);
     expect(JSON.stringify(body)).not.toContain("🏷️");
+  });
+});
+
+describe("formatPosSaleSlackText", () => {
+  it("visar nummer, belopp, betalsätt, plats, säljare och varor", () => {
+    const text = formatPosSaleSlackText({
+      saleNumber: 12,
+      totalOre: 39800,
+      location: "event",
+      note: "Kaffefestivalen",
+      paymentMethod: "swish",
+      soldByEmail: "mamma@example.com",
+      lines: [
+        { name: "Komplett kit", quantity: 1 },
+        { name: "Kondenserad mjölk", quantity: 1 },
+      ],
+    });
+    expect(text).toContain("Kassa #12");
+    expect(text).toContain("398,00");
+    expect(text).toContain("(Swish)");
+    expect(text).toContain("Event - Kaffefestivalen");
+    expect(text).toContain("mamma@example.com");
+    expect(text).toContain("1 × Komplett kit\n1 × Kondenserad mjölk");
+  });
+
+  it("visar platsens namn utan anteckning", () => {
+    const text = formatPosSaleSlackText({
+      saleNumber: 1,
+      totalOre: 4900,
+      location: "restaurang_boras",
+      note: null,
+      paymentMethod: "card",
+      soldByEmail: null,
+      lines: [{ name: "Kondenserad mjölk", quantity: 1 }],
+    });
+    expect(text).toContain("📍 Restaurangen i Borås\n");
+    expect(text).toContain("(Kort)");
   });
 });
