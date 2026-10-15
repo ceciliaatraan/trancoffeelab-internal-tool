@@ -341,8 +341,9 @@ från webbshopens ordrar (egna tabeller `pos_sales`/`pos_sale_lines`, egen
 nummerserie "Kassa #n"). Den delar bara lagret och Slack med resten:
 
 - Tryck in varorna, välj plats (Event / Restaurangen i Borås, valfri
-  anteckning som eventets namn) och betalsätt (Swish, kort, kontant).
-- **Swish:** kassan visar en QR-kod med ert nummer (`SWISH_PAYEE_NUMBER`),
+  anteckning som eventets namn). Kassan tar bara Swish.
+- **Swish:** kassan visar en QR-kod med ert nummer (123-694 96 06, kan
+  ändras med `SWISH_PAYEE_NUMBER`),
   beloppet och meddelandet "TRAN kassa n" låsta - skapad med Swish egen
   QR-tjänst, som fungerar med Swish Företag. Swish Företag kan inte tala om
   för oss att kunden betalat, så kassabiträdet trycker **Betald** när kunden

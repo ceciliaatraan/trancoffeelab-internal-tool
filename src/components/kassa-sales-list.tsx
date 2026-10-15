@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatDateTime, formatOre } from "@/lib/format";
-import { POS_STATUS_LABELS, locationLabel, paymentMethodLabel } from "@/lib/kassa/options";
+import { POS_STATUS_LABELS, locationLabel } from "@/lib/kassa/options";
 import type { RecentPosSale } from "@/lib/kassa/sales";
 import { cancelSaleAction, refundSaleAction } from "@/app/(kassa)/kassa/actions";
 
@@ -49,7 +49,6 @@ export function KassaSalesList({ sales }: { sales: RecentPosSale[] }) {
                 <th className="py-2 pr-4 font-medium">Tid</th>
                 <th className="py-2 pr-4 font-medium">Varor</th>
                 <th className="py-2 pr-4 font-medium">Plats</th>
-                <th className="py-2 pr-4 font-medium">Betalsätt</th>
                 <th className="py-2 pr-4 text-right font-medium">Belopp</th>
                 <th className="py-2 pr-4 font-medium">Status</th>
                 <th className="py-2 font-medium" />
@@ -69,7 +68,6 @@ export function KassaSalesList({ sales }: { sales: RecentPosSale[] }) {
                     {locationLabel(sale.location)}
                     {sale.note ? <span className="text-tran-muted"> - {sale.note}</span> : null}
                   </td>
-                  <td className="py-2 pr-4">{paymentMethodLabel(sale.paymentMethod)}</td>
                   <td className={`tran-tabular py-2 pr-4 text-right ${sale.status === "refunded" ? "line-through text-tran-muted" : ""}`}>
                     {formatOre(sale.totalOre)}
                   </td>

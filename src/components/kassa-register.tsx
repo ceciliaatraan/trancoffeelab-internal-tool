@@ -4,12 +4,7 @@ import { useEffect, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { formatOre } from "@/lib/format";
 import type { KassaItem } from "@/lib/kassa/sale-lines";
-import {
-  KASSA_PLACE_COOKIE,
-  PAYMENT_METHODS,
-  POS_LOCATIONS,
-  paymentMethodLabel,
-} from "@/lib/kassa/options";
+import { KASSA_PLACE_COOKIE, POS_LOCATIONS } from "@/lib/kassa/options";
 import {
   cancelSaleAction,
   markSalePaidAction,
@@ -17,33 +12,29 @@ import {
   type StartSaleResult,
 } from "@/app/(kassa)/kassa/actions";
 
-
-type ActiveSale = Extract<StartSaleResult, { ok: true }> & { paymentMethod: string };
+type ActiveSale = Extract<StartSaleResult, { ok: true }>;
 
 function formatSwishNumber(digits: string): string {
   return digits.length === 10 ? `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8)}` : digits;
 }
 
 /**
- * Kassan: tryck på varor, välj betalsätt, visa Swish-QR (belopp och
+ * Kassan (bara Swish): tryck på varor, visa Swish-QR (belopp och
  * meddelande låsta) och markera som betald när kunden visat kvittot i
  * sin Swish-app. Swish Företag kan inte tala om för oss att en betalning
  * gått igenom - därför trycker kassabiträdet själv på "Betald".
  */
 export function KassaRegister({
   catalog,
-  swishConfigured,
   initialPlace,
 }: {
   catalog: KassaItem[];
-  swishConfigured: boolean;
   initialPlace: { location: string; note: string };
 }) {
   const router = useRouter();
   const [cart, setCart] = useState<Record<string, number>>({});
   const [location, setLocation] = useState(initialPlace.location);
   const [note, setNote] = useState(initialPlace.note);
-  const [paymentMethod, setPaymentMethod] = useState<string>(swishConfigured ? "swish" : "card");
   const [activeSale, setActiveSale] = useState<ActiveSale | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -81,13 +72,12 @@ export function KassaRegister({
         lines: lines.map((line) => ({ sku: line.item.sku, quantity: line.quantity })),
         location,
         note,
-        paymentMethod,
       });
       if (!result.ok) {
         setError(result.error);
         return;
       }
-      setActiveSale({ ...result, paymentMethod });
+      setActiveSale(result);
     });
   };
 
@@ -124,31 +114,25 @@ export function KassaRegister({
         <p className="tran-label text-xs text-tran-muted">Kassa #{sale.saleNumber}</p>
         <p className="tran-tabular text-4xl font-bold">{formatOre(sale.totalOre)}</p>
 
-        {swish ? (
-          <>
-            {swish.qrDataUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element -- data-URL från Swish QR-tjänst, inget att optimera
-              <img src={swish.qrDataUrl} alt="Swish-QR-kod" className="h-64 w-64" />
-            ) : (
-              <p className="text-sm text-tran-muted">
-                QR-koden kunde inte hämtas från Swish just nu - be kunden swisha för hand.
-              </p>
-            )}
-            <div className="text-sm">
-              <p>
-                Swish till <span className="tran-tabular font-bold">{formatSwishNumber(swish.payee)}</span>
-              </p>
-              <p>
-                Meddelande: <span className="font-bold">{swish.message}</span>
-              </p>
-            </div>
-            <p className="text-xs text-tran-muted">
-              Tryck på Betald när kunden visat att betalningen gått igenom i sin Swish-app.
-            </p>
-          </>
+        {swish.qrDataUrl ? (
+          // eslint-disable-next-line @next/next/no-img-element -- data-URL från Swish QR-tjänst, inget att optimera
+          <img src={swish.qrDataUrl} alt="Swish-QR-kod" className="h-64 w-64" />
         ) : (
-          <p className="text-sm">Ta betalt med {paymentMethodLabel(activeSale.paymentMethod).toLowerCase()}.</p>
+          <p className="text-sm text-tran-muted">
+            QR-koden kunde inte hämtas från Swish just nu - be kunden swisha för hand.
+          </p>
         )}
+        <div className="text-sm">
+          <p>
+            Swish till <span className="tran-tabular font-bold">{formatSwishNumber(swish.payee)}</span>
+          </p>
+          <p>
+            Meddelande: <span className="font-bold">{swish.message}</span>
+          </p>
+        </div>
+        <p className="text-xs text-tran-muted">
+          Tryck på Betald när kunden visat att betalningen gått igenom i sin Swish-app.
+        </p>
 
         {error ? <p className="text-sm text-tran-red">{error}</p> : null}
 
@@ -264,29 +248,6 @@ export function KassaRegister({
           <span className="tran-tabular text-2xl font-bold">{formatOre(totalOre)}</span>
         </div>
 
-        <div className="flex gap-2">
-          {PAYMENT_METHODS.map((method) => (
-            <button
-              key={method.id}
-              type="button"
-              onClick={() => setPaymentMethod(method.id)}
-              aria-pressed={paymentMethod === method.id}
-              className={`tran-label h-10 flex-1 border text-xs ${
-                paymentMethod === method.id
-                  ? "border-tran-black bg-tran-black text-tran-white"
-                  : "border-tran-black hover:text-tran-red"
-              }`}
-            >
-              {method.label}
-            </button>
-          ))}
-        </div>
-        {paymentMethod === "swish" && !swishConfigured ? (
-          <p className="text-xs text-tran-red">
-            Swish-numret är inte inlagt än (SWISH_PAYEE_NUMBER i Vercel).
-          </p>
-        ) : null}
-
         {error ? <p className="text-sm text-tran-red">{error}</p> : null}
         {notice ? <p className="text-sm text-tran-green">{notice}</p> : null}
 
@@ -296,7 +257,7 @@ export function KassaRegister({
           disabled={pending || lines.length === 0}
           className="tran-label h-14 w-full bg-tran-black text-sm text-tran-white disabled:opacity-40"
         >
-          {paymentMethod === "swish" ? "Visa Swish-QR" : "Ta betalt"} {lines.length > 0 ? formatOre(totalOre) : ""}
+          Visa Swish-QR {lines.length > 0 ? formatOre(totalOre) : ""}
         </button>
       </aside>
     </section>

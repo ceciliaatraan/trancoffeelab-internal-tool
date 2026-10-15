@@ -1,7 +1,6 @@
 import { cookies } from "next/headers";
 import { requireKassaUser } from "@/lib/current-admin";
 import { getKassaCatalog, getPaidTotalsByLocation, getRecentSales } from "@/lib/kassa/sales";
-import { normalizeSwishNumber } from "@/lib/kassa/swish-qr";
 import { KASSA_PLACE_COOKIE, POS_LOCATIONS, parseKassaPlace } from "@/lib/kassa/options";
 import { KassaRegister } from "@/components/kassa-register";
 import { KassaSalesList } from "@/components/kassa-sales-list";
@@ -16,11 +15,10 @@ export default async function KassaPage() {
     getRecentSales(30),
     getPaidTotalsByLocation("day"),
   ]);
-  const swishConfigured = normalizeSwishNumber(process.env.SWISH_PAYEE_NUMBER) !== null;
 
   return (
     <div className="mx-auto flex max-w-6xl flex-col gap-10">
-      <KassaRegister catalog={catalog} swishConfigured={swishConfigured} initialPlace={initialPlace} />
+      <KassaRegister catalog={catalog} initialPlace={initialPlace} />
 
       <section className="flex flex-col gap-4">
         <h2 className="tran-label text-xs text-tran-muted">Idag</h2>

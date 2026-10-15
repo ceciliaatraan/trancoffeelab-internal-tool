@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import { buildSaleLines, type KassaItem } from "./sale-lines";
-import { buildSwishQrRequest, normalizeSwishNumber, swishMessageForSale } from "./swish-qr";
+import {
+  buildSwishQrRequest,
+  normalizeSwishNumber,
+  swishMessageForSale,
+  swishPayeeNumber,
+} from "./swish-qr";
 import { parseKassaPlace } from "./options";
 
 const catalog: KassaItem[] = [
@@ -36,6 +41,16 @@ describe("Swish-QR", () => {
     expect(normalizeSwishNumber("123 456 78 90")).toBe("1234567890");
     expect(normalizeSwishNumber("")).toBeNull();
     expect(normalizeSwishNumber(undefined)).toBeNull();
+  });
+
+  it("använder TRAN:s nummer 123-694 96 06 om inget annat är inställt", () => {
+    const original = process.env.SWISH_PAYEE_NUMBER;
+    delete process.env.SWISH_PAYEE_NUMBER;
+    expect(swishPayeeNumber()).toBe("1236949606");
+    process.env.SWISH_PAYEE_NUMBER = "123-111 22 33";
+    expect(swishPayeeNumber()).toBe("1231112233");
+    if (original === undefined) delete process.env.SWISH_PAYEE_NUMBER;
+    else process.env.SWISH_PAYEE_NUMBER = original;
   });
 
   it("låser mottagare, belopp i kronor och meddelande", () => {

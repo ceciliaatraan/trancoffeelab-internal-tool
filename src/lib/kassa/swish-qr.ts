@@ -9,6 +9,13 @@ export const SWISH_QR_URL = "https://mpc.getswish.net/qrg-swish/api/v1/prefilled
 /** Swish-meddelanden får vara högst 50 tecken. */
 export const SWISH_MESSAGE_MAX = 50;
 
+/** TRAN Coffee Labs Swish-nummer (123-694 96 06) - SWISH_PAYEE_NUMBER i Vercel går före. */
+export const DEFAULT_SWISH_NUMBER = "1236949606";
+
+export function swishPayeeNumber(): string | null {
+  return normalizeSwishNumber(process.env.SWISH_PAYEE_NUMBER) ?? DEFAULT_SWISH_NUMBER;
+}
+
 export function normalizeSwishNumber(value: string | null | undefined): string | null {
   const digits = (value ?? "").replace(/\D/g, "");
   return digits.length >= 8 ? digits : null;

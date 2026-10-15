@@ -188,11 +188,10 @@ describe("formatPosSaleSlackText", () => {
       totalOre: 4900,
       location: "restaurang_boras",
       note: null,
-      paymentMethod: "card",
+      paymentMethod: "swish",
       soldByEmail: null,
       lines: [{ name: "Kondenserad mjölk", quantity: 1 }],
     });
     expect(text).toContain("📍 Restaurangen i Borås\n");
-    expect(text).toContain("(Kort)");
   });
 });

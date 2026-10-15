@@ -3,48 +3,39 @@
 import { revalidatePath } from "next/cache";
 import { requireKassaUser } from "@/lib/current-admin";
 import { describeError } from "@/lib/describe-error";
-import { isPosLocation, isPosPaymentMethod } from "@/lib/kassa/options";
+import { isPosLocation } from "@/lib/kassa/options";
 import { cancelPendingSale, createPendingSale, markSalePaid, refundSale } from "@/lib/kassa/sales";
-import { normalizeSwishNumber, swishMessageForSale } from "@/lib/kassa/swish-qr";
+import { swishMessageForSale, swishPayeeNumber } from "@/lib/kassa/swish-qr";
 import { fetchSwishQrDataUrl } from "@/lib/kassa/swish-qr-server";
 
 export type StartSaleResult =
   | {
       ok: true;
       sale: { id: string; saleNumber: number; totalOre: number };
-      swish: { payee: string; message: string; qrDataUrl: string | null } | null;
+      swish: { payee: string; message: string; qrDataUrl: string | null };
     }
   | { ok: false; error: string };
 
-/** Skapar försäljningen (väntar på betalning) och, för Swish, QR-koden. */
+/** Skapar försäljningen (väntar på betalning) och Swish-QR-koden. */
 export async function startSaleAction(input: {
   lines: { sku: string; quantity: number }[];
   location: string;
   note: string;
-  paymentMethod: string;
 }): Promise<StartSaleResult> {
   try {
     const seller = await requireKassaUser();
     if (!isPosLocation(input.location)) return { ok: false, error: "Välj var försäljningen sker." };
-    if (!isPosPaymentMethod(input.paymentMethod)) return { ok: false, error: "Välj betalsätt." };
-
-    const payee = normalizeSwishNumber(process.env.SWISH_PAYEE_NUMBER);
-    if (input.paymentMethod === "swish" && !payee) {
-      return {
-        ok: false,
-        error: "Swish-numret saknas (miljövariabeln SWISH_PAYEE_NUMBER i Vercel). Välj kort/kontant så länge.",
-      };
-    }
+    const payee = swishPayeeNumber();
+    if (!payee) return { ok: false, error: "Swish-numret saknas." };
 
     const sale = await createPendingSale({
       requested: input.lines,
       location: input.location,
       note: input.note.trim().slice(0, 200) || null,
-      paymentMethod: input.paymentMethod,
+      paymentMethod: "swish",
       seller: { id: seller.id, email: seller.email },
     });
 
-    if (input.paymentMethod !== "swish" || !payee) return { ok: true, sale, swish: null };
     const message = swishMessageForSale(sale.saleNumber);
     return {
       ok: true,

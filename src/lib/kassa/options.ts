@@ -6,11 +6,8 @@ export const POS_LOCATIONS = [
 
 export type PosLocation = (typeof POS_LOCATIONS)[number]["id"];
 
-export const PAYMENT_METHODS = [
-  { id: "swish", label: "Swish" },
-  { id: "card", label: "Kort" },
-  { id: "cash", label: "Kontant" },
-] as const;
+/** Kassan tar bara Swish (ägarens beslut 2026-10-15). */
+export const PAYMENT_METHODS = [{ id: "swish", label: "Swish" }] as const;
 
 export type PosPaymentMethod = (typeof PAYMENT_METHODS)[number]["id"];
 
@@ -24,10 +21,6 @@ export function paymentMethodLabel(id: string): string {
 
 export function isPosLocation(value: unknown): value is PosLocation {
   return POS_LOCATIONS.some((location) => location.id === value);
-}
-
-export function isPosPaymentMethod(value: unknown): value is PosPaymentMethod {
-  return PAYMENT_METHODS.some((method) => method.id === value);
 }
 
 export const POS_STATUS_LABELS: Record<string, string> = {
