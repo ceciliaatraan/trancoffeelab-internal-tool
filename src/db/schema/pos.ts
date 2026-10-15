@@ -70,6 +70,8 @@ export const posSales = pgTable(
      * automatiskt.
      */
     customerName: text("customer_name"),
+    /** Kundens e-post - krävs innan Swish-koden visas (ägarens beslut 2026-10-15). Kvittot skickas hit om kunden vill. */
+    customerEmail: text("customer_email"),
     /** Om kunden ville ha kvitto: true = ja (skickat), false = nej tack, null = inte frågat. */
     receiptRequested: boolean("receipt_requested"),
     /** Dit kvittot skickades, om kunden ville ha ett (se lib/email/pos-receipt.ts). */

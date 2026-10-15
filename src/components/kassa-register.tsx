@@ -23,6 +23,8 @@ function formatSwishNumber(digits: string): string {
   return digits.length === 10 ? `${digits.slice(0, 3)} ${digits.slice(3, 6)} ${digits.slice(6, 8)} ${digits.slice(8)}` : digits;
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const optionClass = (selected: boolean) =>
   `tran-label h-11 border px-4 text-xs ${
     selected ? "border-tran-black bg-tran-black text-tran-white" : "border-tran-black hover:text-tran-red"
@@ -32,7 +34,8 @@ const optionClass = (selected: boolean) =>
  * Kassan (bara Swish): välj försäljningsställe, tryck på varor, visa
  * Swish-QR (belopp och meddelande låsta) och markera som betald när kunden
  * visat betalningen i sin Swish-app - Swish Företag kan inte tala om för oss
- * att den gått igenom. Därefter frågar kassan om kunden vill ha kvitto.
+ * att den gått igenom. Kundens e-post krävs innan Swish-koden visas;
+ * efter betalningen väljer kunden om ett kvitto ska skickas dit.
  */
 export function KassaRegister({
   catalog,
@@ -56,8 +59,8 @@ export function KassaRegister({
   const [newLocationName, setNewLocationName] = useState<string | null>(null);
   const [activeSale, setActiveSale] = useState<ActiveSale | null>(null);
   const [customerName, setCustomerName] = useState("");
+  const [customerEmail, setCustomerEmail] = useState("");
   const [paidSale, setPaidSale] = useState<PaidSale | null>(null);
-  const [receiptEmail, setReceiptEmail] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [pending, startTransition] = useTransition();
@@ -111,11 +114,16 @@ export function KassaRegister({
       setError("Välj försäljningsställe först.");
       return;
     }
+    if (!EMAIL_RE.test(customerEmail.trim())) {
+      setError("Skriv kundens e-postadress innan Swish-koden visas.");
+      return;
+    }
     startTransition(async () => {
       const result = await startSaleAction({
         lines: lines.map((line) => ({ sku: line.item.sku, quantity: line.quantity })),
         locationId,
         note,
+        customerEmail,
       });
       if (!result.ok) {
         setError(result.error);
@@ -138,6 +146,7 @@ export function KassaRegister({
       setPaidSale(activeSale.sale);
       setActiveSale(null);
       setCart({});
+      setCustomerEmail("");
       router.refresh();
     });
   };
@@ -155,15 +164,14 @@ export function KassaRegister({
   const finishPaid = (message: string) => {
     setNotice(message);
     setPaidSale(null);
-    setReceiptEmail(null);
     setError(null);
   };
 
   const sendReceipt = () => {
-    if (!paidSale || receiptEmail === null) return;
+    if (!paidSale) return;
     setError(null);
     startTransition(async () => {
-      const result = await sendReceiptAction(paidSale.id, receiptEmail);
+      const result = await sendReceiptAction(paidSale.id, paidSale.customerEmail);
       if (!result.ok) {
         setError(result.error);
         return;
@@ -180,74 +188,33 @@ export function KassaRegister({
         <p className="tran-tabular text-4xl font-bold">{formatOre(paidSale.totalOre)}</p>
         <p className="text-sm">Kassa #{paidSale.saleNumber} är registrerad.</p>
 
-        {receiptEmail === null ? (
-          <>
-            <p className="text-lg font-bold">Vill kunden ha ett kvitto?</p>
-            <div className="flex w-full flex-col gap-3">
-              <button
-                type="button"
-                onClick={() => setReceiptEmail("")}
-                className="tran-label h-14 w-full bg-tran-black text-sm text-tran-white"
-              >
-                Ja, skicka kvitto
-              </button>
-              <button
-                type="button"
-                disabled={pending}
-                onClick={() =>
-                  startTransition(async () => {
-                    await declineReceiptAction(paidSale.id);
-                    finishPaid(`Kassa #${paidSale.saleNumber} klar - ${formatOre(paidSale.totalOre)}.`);
-                    router.refresh();
-                  })
-                }
-                className="tran-label h-11 w-full border border-tran-black text-xs disabled:opacity-50"
-              >
-                Nej tack
-              </button>
-            </div>
-          </>
-        ) : (
-          <form
-            className="flex w-full flex-col gap-3 text-left"
-            onSubmit={(event) => {
-              event.preventDefault();
-              sendReceipt();
-            }}
+        <p className="text-lg font-bold">Vill kunden ha ett kvitto?</p>
+        <p className="-mt-4 break-all text-sm text-tran-muted">Skickas till {paidSale.customerEmail}</p>
+        {error ? <p className="text-sm text-tran-red">{error}</p> : null}
+        <div className="flex w-full flex-col gap-3">
+          <button
+            type="button"
+            onClick={sendReceipt}
+            disabled={pending}
+            className="tran-label h-14 w-full bg-tran-black text-sm text-tran-white disabled:opacity-50"
           >
-            <label className="tran-label text-xs text-tran-muted" htmlFor="receipt-email">
-              Kundens e-post
-            </label>
-            <input
-              id="receipt-email"
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              autoFocus
-              required
-              value={receiptEmail}
-              onChange={(event) => setReceiptEmail(event.target.value)}
-              placeholder="namn@exempel.se"
-              className="h-12 border border-tran-black px-3 text-base"
-            />
-            {error ? <p className="text-sm text-tran-red">{error}</p> : null}
-            <button
-              type="submit"
-              disabled={pending}
-              className="tran-label h-14 w-full bg-tran-black text-sm text-tran-white disabled:opacity-50"
-            >
-              Skicka kvitto
-            </button>
-            <button
-              type="button"
-              onClick={() => setReceiptEmail(null)}
-              disabled={pending}
-              className="tran-label h-11 w-full border border-tran-black text-xs disabled:opacity-50"
-            >
-              Tillbaka
-            </button>
-          </form>
-        )}
+            Ja, skicka kvitto
+          </button>
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() =>
+              startTransition(async () => {
+                await declineReceiptAction(paidSale.id);
+                finishPaid(`Kassa #${paidSale.saleNumber} klar - ${formatOre(paidSale.totalOre)}.`);
+                router.refresh();
+              })
+            }
+            className="tran-label h-11 w-full border border-tran-black text-xs disabled:opacity-50"
+          >
+            Nej tack
+          </button>
+        </div>
       </section>
     );
   }
@@ -450,6 +417,25 @@ export function KassaRegister({
         <div className="flex items-baseline justify-between border-t border-tran-black pt-3">
           <span className="tran-label text-xs">Totalt</span>
           <span className="tran-tabular text-2xl font-bold">{formatOre(totalOre)}</span>
+        </div>
+
+        <div className="flex flex-col gap-1">
+          <label className="tran-label text-xs text-tran-muted" htmlFor="customer-email">
+            Kundens e-post
+          </label>
+          <input
+            id="customer-email"
+            type="email"
+            inputMode="email"
+            autoComplete="off"
+            value={customerEmail}
+            onChange={(event) => {
+              setCustomerEmail(event.target.value);
+              setError(null);
+            }}
+            placeholder="namn@exempel.se"
+            className="h-12 border border-tran-black px-3 text-base"
+          />
         </div>
 
         {error ? <p className="text-sm text-tran-red">{error}</p> : null}

@@ -31,7 +31,7 @@ export function KassaSalesList({ sales }: { sales: RecentPosSale[] }) {
   const sendReceipt = (sale: RecentPosSale) => {
     const email = window.prompt(
       `Kvitto för kassa #${sale.saleNumber} - kundens e-post:`,
-      sale.receiptEmail ?? "",
+      sale.receiptEmail ?? sale.customerEmail ?? "",
     );
     if (!email) return;
     setError(null);
@@ -89,7 +89,12 @@ export function KassaSalesList({ sales }: { sales: RecentPosSale[] }) {
                     {sale.location}
                     {sale.note ? <span className="text-tran-muted"> - {sale.note}</span> : null}
                   </td>
-                  <td className="py-2 pr-4">{sale.customerName ?? <span className="text-tran-muted">-</span>}</td>
+                  <td className="py-2 pr-4">
+                    {sale.customerName ?? (sale.customerEmail ? null : <span className="text-tran-muted">-</span>)}
+                    {sale.customerEmail ? (
+                      <span className="block break-all text-xs text-tran-muted">{sale.customerEmail}</span>
+                    ) : null}
+                  </td>
                   <td className={`tran-tabular py-2 pr-4 text-right ${sale.status === "refunded" ? "line-through text-tran-muted" : ""}`}>
                     {formatOre(sale.totalOre)}
                   </td>

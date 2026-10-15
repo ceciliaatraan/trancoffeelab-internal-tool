@@ -41,7 +41,7 @@ async function assertSaleAccessible(sellerEmail: string, saleId: string): Promis
 export type StartSaleResult =
   | {
       ok: true;
-      sale: { id: string; saleNumber: number; totalOre: number };
+      sale: { id: string; saleNumber: number; totalOre: number; customerEmail: string };
       swish: { payee: string; message: string; qrDataUrl: string | null };
     }
   | { ok: false; error: string };
@@ -51,6 +51,7 @@ export async function startSaleAction(input: {
   lines: { sku: string; quantity: number }[];
   locationId: string;
   note: string;
+  customerEmail: string;
 }): Promise<StartSaleResult> {
   try {
     const seller = await requireKassaUser();
@@ -67,6 +68,7 @@ export async function startSaleAction(input: {
       requested: input.lines,
       location,
       note: input.note.trim().slice(0, 200) || null,
+      customerEmail: input.customerEmail,
       paymentMethod: "swish",
       seller: { id: seller.id, email: seller.email },
     });

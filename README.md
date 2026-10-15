@@ -359,8 +359,10 @@ nummerserie "Kassa #n"). Den delar bara lagret och Slack med resten:
   lagerorsak `pos_sale`) och skickar en Slack-notis. **Ångra** lägger
   tillbaka exakt det som drogs; pengarna betalas tillbaka för hand i
   Swish-appen.
+- **Kundens e-post krävs** innan Swish-koden visas (sparas på köpet,
+  syns i listan och i Slack-notisen).
 - **Kvitto:** efter Betald frågar kassan om kunden vill ha kvitto. Ja =
-  kundens e-post, och ett kvitto i orderbekräftelsens stil skickas via
+  ett kvitto i orderbekräftelsens stil skickas till den e-posten via
   Resend (`lib/email/pos-receipt.ts`: nummer, datum, ställe, varor, moms
   per sats, Systrarna TRAN AB:s org.nr/momsreg.nr/adress). Kan skickas
   (om) från listan med "Kvitto". Adressen sparas bara på försäljningen -

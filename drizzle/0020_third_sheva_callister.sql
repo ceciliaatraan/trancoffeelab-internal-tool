@@ -1,0 +1,1 @@
+ALTER TABLE "pos_sales" ADD COLUMN "customer_email" text;

@@ -66,6 +66,15 @@ export async function getKassaCatalog(): Promise<KassaItem[]> {
   });
 }
 
+/** Trimmar och kontrollerar kundens e-post - kastar med ett begripligt fel om den inte ser giltig ut. */
+export function normalizeCustomerEmail(raw: string): string {
+  const email = raw.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) || email.length > 254) {
+    throw new Error("Skriv kundens e-postadress.");
+  }
+  return email;
+}
+
 /**
  * Skapar en försäljning som väntar på betalning ("pending") - när QR-koden
  * visas, så Swish-meddelandet kan bära försäljningens nummer. Lagret rörs
@@ -76,8 +85,11 @@ export async function createPendingSale(input: {
   location: PosLocation;
   note: string | null;
   paymentMethod: PosPaymentMethod;
+  /** Krävs - frågas efter innan Swish-koden visas. */
+  customerEmail: string;
   seller: Seller;
-}): Promise<{ id: string; saleNumber: number; totalOre: number }> {
+}): Promise<{ id: string; saleNumber: number; totalOre: number; customerEmail: string }> {
+  const customerEmail = normalizeCustomerEmail(input.customerEmail);
   const sale = buildSaleLines(await getKassaCatalog(), input.requested);
 
   return db.transaction(async (tx) => {
@@ -93,6 +105,7 @@ export async function createPendingSale(input: {
         taxOre: sale.taxOre,
         soldByAdminId: input.seller.id,
         soldByEmail: input.seller.email,
+        customerEmail,
       })
       .returning({ id: schema.posSales.id, saleNumber: schema.posSales.saleNumber });
 
@@ -110,7 +123,7 @@ export async function createPendingSale(input: {
       })),
     );
 
-    return { id: created.id, saleNumber: created.saleNumber, totalOre: sale.totalOre };
+    return { id: created.id, saleNumber: created.saleNumber, totalOre: sale.totalOre, customerEmail };
   });
 }
 
@@ -194,6 +207,7 @@ export async function markSalePaid(
     paymentMethod: result.sale.paymentMethod,
     soldByEmail: result.sale.soldByEmail,
     customerName: result.sale.customerName,
+    customerEmail: result.sale.customerEmail,
     lines: result.lines.map((line) => ({ name: line.name, quantity: line.quantity })),
   });
   return true;
@@ -266,6 +280,7 @@ export type RecentPosSale = {
   totalOre: number;
   soldByEmail: string | null;
   customerName: string | null;
+  customerEmail: string | null;
   /** true = kvitto skickat, false = kunden ville inte ha kvitto, null = inte frågat. */
   receiptRequested: boolean | null;
   receiptEmail: string | null;
@@ -310,6 +325,7 @@ export async function getRecentSales(limit: number, locationId?: string): Promis
     totalOre: sale.totalOre,
     soldByEmail: sale.soldByEmail,
     customerName: sale.customerName,
+    customerEmail: sale.customerEmail,
     receiptRequested: sale.receiptRequested,
     receiptEmail: sale.receiptSentAt ? sale.receiptEmail : null,
     createdAt: sale.createdAt,
@@ -317,7 +333,6 @@ export async function getRecentSales(limit: number, locationId?: string): Promis
   }));
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 /**
  * Skickar kvittot för en betald försäljning till kundens e-post och sparar
@@ -326,8 +341,7 @@ const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * eller på någon utskickslista.
  */
 export async function sendSaleReceipt(saleId: string, rawEmail: string): Promise<{ email: string }> {
-  const email = rawEmail.trim();
-  if (!EMAIL_RE.test(email)) throw new Error("Skriv en giltig e-postadress.");
+  const email = normalizeCustomerEmail(rawEmail);
 
   const [sale] = await db.select().from(schema.posSales).where(eq(schema.posSales.id, saleId));
   if (!sale || sale.status !== "paid" || !sale.paidAt) {
